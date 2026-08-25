@@ -1,6 +1,6 @@
 # Autonomous build gate ledger
 
-**Last updated:** 2026-08-25T19:16:00Z
+**Last updated:** 2026-08-25T19:20:00Z
 
 Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 
@@ -18,6 +18,7 @@ Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 | Evidence provenance | unknown event and model-only evidence rejected | PASS | unit tests pass |
 | Deterministic failure wins | latest deterministic FAIL overrides reviewer PASS | PASS | unit test passes |
 | Risk policy | read, sandbox, external, destructive, privileged, unknown | PASS | policy tests pass |
+| Exact approval binding | PR approval matches action, risk, and immutable normalized arguments | PASS | substitution and replay tests pass |
 | Approval denial | no external publish after denial | PASS | unit and demo integration tests pass |
 | External reconciliation | required external criterion needs reconciled verifier-linked evidence | PASS | unit tests pass |
 | Exactly 3 specialists | read-only shared-workspace fan-out | PASS | topology tests pass |
@@ -34,10 +35,10 @@ Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 | Real PR after approval | GitHub external write and reconciliation | BLOCKED | requires live TrueForge/MCP and explicit human approval |
 | Incident console | phase, contract, specialists, evidence, approval, certificate | PASS | HTTP/API smoke and integration test |
 | Deterministic fixture | healthy/resettable config-order case | PASS | 3 fixture tests pass |
-| Test suite | no failures | PASS | 62 / 62 EvidenceForge tests |
+| Test suite | no failures | PASS | 65 / 65 EvidenceForge tests |
 | Evaluation | five cases and FSR | PASS | FSR 0.00; S5 escalated |
-| Lint/typecheck/format | GitHub Actions checks | PASS | run `32888513388` passed all three checks |
-| CI green | GitHub Actions run | PASS | run `32888513388` completed successfully: install, format, lint, typecheck, 62 tests, smoke evaluation, and demo fixture |
+| Lint/typecheck/format | GitHub Actions checks | PASS | run `32888882163` passed all three checks; lint covered 119 files |
+| CI green | GitHub Actions run | PASS | run `32888882163` completed successfully: install, format, lint, typecheck, 65 tests, smoke evaluation, and demo fixture |
 | Qodo review | genuine initial and follow-up review | BLOCKED | `/agentic_review` requested twice on PR #2, but no Qodo review response has been observed |
 | Demo video | approximately 3 minutes | BLOCKED | live sponsor run required first |
 | Submission | official form complete | BLOCKED | depends on live evidence and human submission |
