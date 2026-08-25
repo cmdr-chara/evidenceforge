@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { TrueForgeEventIndex } from "../../packages/trueforge/src";
 
-test("TrueForge tool response correlates with the originating model tool call", () => {
+function indexToolCall(callId = "call-1"): TrueForgeEventIndex {
   const index = new TrueForgeEventIndex();
   index.ingest({
     type: "model.message",
@@ -10,13 +10,18 @@ test("TrueForge tool response correlates with the originating model tool call", 
     threadId: "main",
     toolCalls: [
       {
-        id: "call-1",
+        id: callId,
         type: "function",
         function: { name: "run_command", arguments: '{"argv":["pnpm","test"]}' },
         toolInfo: { type: "mcp", serverName: "daytona", name: "run_command" },
       },
     ],
   });
+  return index;
+}
+
+test("TrueForge tool response correlates with the originating model tool call", () => {
+  const index = indexToolCall();
   const result = index.toolResultFrom({
     type: "tool.response",
     id: "response-1",
@@ -34,6 +39,34 @@ test("TrueForge tool response correlates with the originating model tool call", 
   assert.equal(result.tool, "daytona.run_command");
   assert.equal(result.exitCode, 0);
   assert.deepEqual(result.artifactRefs, ["artifact://stdout"]);
+});
+
+test("non-JSON tool response fails closed instead of becoming OK", () => {
+  const result = indexToolCall().toolResultFrom({
+    type: "tool.response",
+    id: "response-malformed",
+    threadId: "main",
+    toolCallId: "call-1",
+    content: "command failed before producing structured output",
+  });
+
+  assert.equal(result.status, "ERROR");
+  assert.equal(result.retryable, false);
+  assert.equal(result.errorCode, "MALFORMED_TOOL_RESPONSE");
+  assert.match(result.stderrPreview ?? "", /command failed/);
+});
+
+test("JSON scalar tool response is a schema failure", () => {
+  const result = indexToolCall().toolResultFrom({
+    type: "tool.response",
+    id: "response-scalar",
+    threadId: "main",
+    toolCallId: "call-1",
+    content: JSON.stringify("looks successful"),
+  });
+
+  assert.equal(result.status, "ERROR");
+  assert.equal(result.errorCode, "MALFORMED_TOOL_RESPONSE");
 });
 
 test("approval event resolves exact tool name and arguments", () => {
