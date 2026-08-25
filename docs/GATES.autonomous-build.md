@@ -1,6 +1,6 @@
 # Autonomous build gate ledger
 
-**Last updated:** 2026-08-25T22:04:00+02:00
+**Last updated:** 2026-08-25T23:03:42+02:00
 
 Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 
@@ -38,7 +38,7 @@ Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 | Test suite | no failures on current branch | PASS | current-head GitHub Actions CI completed successfully and executes `pnpm test` |
 | Evaluation | false-success and escalation cases execute in CI | PASS | current-head CI executes `pnpm eval:smoke` successfully; detailed measured results remain in `docs/EVALUATION.md` |
 | Lint/typecheck/format | repository checks | PASS | current-head CI executes format, lint, and typecheck successfully |
-| CI green | GitHub Actions run on current head | PASS | CI runs `32893009254` (push) and `32893010879` (PR) completed successfully on `ed536868a1631f785f056cd8e22dda79485ee73a` before this documentation synchronization commit |
+| CI green | GitHub Actions run on current head | PASS | CI runs `32898802584` (push) and `32898808554` (PR) completed successfully on hardening candidate `5b0e2e4d41f26975ca9b190fe873935ea42ba88d`; this ledger-only follow-up must also pass exact-head CI |
 | Qodo review | genuine initial and follow-up review | BLOCKED | `/agentic_review` was requested three times on PR #2; GitHub still exposes no Qodo review submission or review comment |
 | Demo video | approximately 3–5 minutes with real sponsor path | BLOCKED | truthful live sponsor run is required before recording the requested end-to-end demo |
 | Human merge | reviewed PR merged by human authority | BLOCKED | PR #2 is open and mergeable; Qodo/live acceptance gates remain open |
@@ -59,7 +59,7 @@ Status values: `OPEN`, `PASS`, `BLOCKED`, `WAIVED`.
 | H7 Recovery correctness | restart tests around intent/effect/settlement boundaries | recovery has an explicit durable program counter and legal next action | PASS |
 | H8 Comparative evaluation | `pnpm eval:smoke` and report inspection | same deterministic corpus reports baseline and gated metrics without fabricated live measurements | PASS |
 | H9 Documentation synchronization | architecture/security/evaluation/ADR/journal/gate review | adopted/rejected reference ideas, TrueForge boundary, methodology, results, and blockers are truthful | PASS |
-| H10 Integrated verification | full local check ladder, dependency audit, exact-head GitHub CI | all applicable checks pass on the pushed candidate SHA | OPEN |
+| H10 Integrated verification | full local check ladder, dependency audit, exact-head GitHub CI | all applicable checks pass on the pushed candidate SHA | PASS |
 | H11 Qodo and human/external gates | GitHub PR reviews/checks and live runtime artifacts | remains `BLOCKED` unless public/runtime evidence appears; no merge without human authorization | BLOCKED |
 
 ## Minimum human/external actions for blocked P0 gates
