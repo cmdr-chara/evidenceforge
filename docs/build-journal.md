@@ -162,4 +162,41 @@ GitHub Actions run `32887937986` completed successfully. Every verification step
 - five-case smoke evaluation;
 - healthy demo fixture.
 
-CI is now green. Qodo still has no observed review response, so the pull request remains unmergeable under the required hackathon process.
+CI became green. Qodo still had no observed review response, so the pull request remained unmergeable under the required hackathon process.
+
+## 2026-08-25 — CompletionGate correlation hardening
+
+### Finding
+
+An independent control-plane review found two linked defects:
+
+1. a criterion could be manually marked `PASS` with admissible-looking evidence even when no matching `VerificationResult` existed;
+2. the gate searched all historical verifier results for any deterministic failure, so one failed patch attempt could permanently block completion even after a later verified PASS.
+
+The first weakened the “verifier never runs means completion is impossible” invariant. The second conflicted with bounded retry and replan semantics.
+
+### Correction
+
+- Completion now requires the latest result for every required criterion.
+- The result must match the criterion verifier kind.
+- Non-review criteria require a deterministic result.
+- The latest PASS must reference evidence that is both attached to the criterion and admissible for its verifier type.
+- Historical failures remain auditable but a later verified PASS can supersede an earlier failed attempt.
+- A required external-state criterion now also requires a `RECONCILED` external action whose evidence ID is linked to the passing external verifier result.
+- Completion certificates include only verifier-linked admissible evidence IDs.
+
+### Verified remotely
+
+GitHub Actions run `32888513388` passed:
+
+- dependency installation;
+- format check;
+- lint across 118 files;
+- TypeScript typecheck;
+- 62 / 62 EvidenceForge tests;
+- five-case smoke evaluation with false-success rate `0.00`;
+- 3 / 3 healthy demo-fixture tests.
+
+Four new tests cover missing verifier results, retry recovery after an earlier deterministic failure, verifier/evidence mismatch, and mandatory external reconciliation.
+
+Qodo was triggered twice on PR #2 but still produced no observable review or finding. That blocker remains documented rather than fabricated.
