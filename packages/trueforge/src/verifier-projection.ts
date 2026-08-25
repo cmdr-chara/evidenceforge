@@ -83,25 +83,31 @@ export class TrueForgeVerifierProjector {
       return reject(`criterion ${criterionId} cannot override verifier environment variables`);
     }
 
-    const evidenceId = `evidence-${toolResult.callId}`;
-    const existing = state.verifierResults.find(
-      (result) =>
-        result.criterionId === criterionId && result.evidenceIds.includes(evidenceId),
+    const existing = findExistingResult(
+      state,
+      criterionId,
+      toolResult.callId,
+      this.evidenceStore,
     );
     if (existing !== undefined) {
-      if (!this.evidenceStore.hasEvidence(evidenceId)) {
-        return reject(
-          `criterion ${criterionId} has a persisted verifier result but its evidence is unavailable`,
-        );
-      }
       toolResult.evidenceIds = unique([...toolResult.evidenceIds, ...existing.evidenceIds]);
       return { recognized: true, result: structuredClone(existing) };
     }
 
-    const result = this.engine.verify(criterion, toolResult);
-    this.engine.applyResult(state, result);
-    toolResult.evidenceIds = unique([...toolResult.evidenceIds, ...result.evidenceIds]);
-    return { recognized: true, result };
+    const event = this.evidenceStore.getEvent(toolResult.eventId);
+    if (event === undefined) {
+      return reject(
+        `criterion ${criterionId} cannot use unregistered runtime event ${toolResult.eventId}`,
+      );
+    }
+
+    const evaluation = this.engine.evaluateToolResult(criterion, event, toolResult);
+    applyVerificationResult(state, criterion, evaluation.result);
+    toolResult.evidenceIds = unique([
+      ...toolResult.evidenceIds,
+      ...evaluation.result.evidenceIds,
+    ]);
+    return { recognized: true, result: structuredClone(evaluation.result) };
   }
 }
 
@@ -125,6 +131,34 @@ export function buildVerifierManifest(criteria: SuccessCriterion[]): VerifierMan
 export function renderArgv(argv: string[]): string {
   if (argv.length === 0) throw new Error("verifier argv cannot be empty");
   return argv.map(shellQuote).join(" ");
+}
+
+function applyVerificationResult(
+  state: SessionState,
+  criterion: SuccessCriterion,
+  result: VerificationResult,
+): void {
+  criterion.status = result.status;
+  criterion.evidenceIds = unique([...criterion.evidenceIds, ...result.evidenceIds]);
+  state.verifierResults.push(structuredClone(result));
+  state.evidenceIds = unique([...state.evidenceIds, ...result.evidenceIds]);
+  state.version += 1;
+}
+
+function findExistingResult(
+  state: SessionState,
+  criterionId: string,
+  callId: string,
+  evidenceStore: EvidenceStore,
+): VerificationResult | undefined {
+  return state.verifierResults.find(
+    (result) =>
+      result.criterionId === criterionId &&
+      result.evidenceIds.some((evidenceId) => {
+        const evidence = evidenceStore.getEvidence(evidenceId);
+        return evidence?.metadata?.callId === callId;
+      }),
+  );
 }
 
 function verifierExecution(
