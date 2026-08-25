@@ -13,6 +13,7 @@ import { ApprovalPolicy } from "../../../packages/policies/src";
 import { DIAGNOSTIC_SPECIALISTS } from "../../../packages/specialists/src";
 import { EventJournal } from "../../../packages/telemetry/src";
 import {
+  buildVerifierManifest,
   DurableTrueForgeRuntime,
   loadTrueForgeConfig,
   TrueForgeSdkAdapter,
@@ -94,12 +95,16 @@ export class LiveIncidentService {
       constraints: input.constraints,
     });
     const state = createSessionState(task, buildCiSuccessContract(task));
+    const verifierManifest = buildVerifierManifest(state.successCriteria);
     await this.sessions.save(state);
     const runtime = this.createRuntime();
     const message = [
       `Investigate GitHub Actions run ${task.source.runId} for ${task.repository} at ${task.revision}.`,
       "Define the success contract before patching.",
       "Run exactly three read-only diagnostic specialists, reproduce in Daytona, patch serially, verify deterministically, review independently, and pause before creating a pull request.",
+      "The following verifier manifest is application-owned and immutable. To run a deterministic verifier, call sandbox.exec using the exact intent, command, and cwd shown, with no environment overrides:",
+      JSON.stringify(verifierManifest, null, 2),
+      "A command with different arguments is diagnostic only and cannot update the success contract.",
       "Do not claim completion; the application CompletionGate owns that decision.",
     ].join("\n");
     const updated = await runtime.start(state, message);
