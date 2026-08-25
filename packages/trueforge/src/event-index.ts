@@ -27,8 +27,8 @@ export class TrueForgeEventIndex {
     const type = readString(event, "type");
     if (type !== "model.message") return;
     const sourceEventId = requireString(event, "id");
-    const threadId = readString(event, "threadId") ?? "main";
-    const calls = event.toolCalls;
+    const threadId = readString(event, "threadId") ?? readString(event, "thread_id") ?? "main";
+    const calls = event.toolCalls ?? event.tool_calls;
     if (!Array.isArray(calls)) return;
     for (const value of calls) {
       const call = asRecord(value);
@@ -36,7 +36,7 @@ export class TrueForgeEventIndex {
       const fn = asRecord(call.function);
       const name = readString(fn, "name");
       if (id === undefined || name === undefined) continue;
-      const info = asRecord(call.toolInfo);
+      const info = asRecord(call.toolInfo ?? call.tool_info);
       this.registerToolCall({
         id,
         sourceEventId,
@@ -44,7 +44,7 @@ export class TrueForgeEventIndex {
         name,
         arguments: readString(fn, "arguments") ?? "{}",
         toolType: readString(info, "type"),
-        serverName: readString(info, "serverName"),
+        serverName: readString(info, "serverName") ?? readString(info, "server_name"),
       });
     }
   }
@@ -67,13 +67,13 @@ export class TrueForgeEventIndex {
       throw new Error("expected a TrueForge tool.response event");
     }
     const eventId = requireString(event, "id");
-    const callId = requireString(event, "toolCallId");
+    const callId = requireStringFrom(event, ["toolCallId", "tool_call_id"]);
     const content = requireString(event, "content");
     const indexed = this.toolCalls.get(callId);
     if (indexed === undefined) {
       throw new Error(`tool response ${eventId} references unknown call ${callId}`);
     }
-    const structured = parseContent(content);
+    const structured = authoritativePayload(parseContent(content));
     return {
       callId,
       eventId,
@@ -103,8 +103,8 @@ export class TrueForgeEventIndex {
       throw new Error("expected a TrueForge tool.approval_required event");
     }
     const eventId = requireString(event, "id");
-    const threadId = readString(event, "threadId") ?? "main";
-    const refs = event.toolCalls;
+    const threadId = readString(event, "threadId") ?? readString(event, "thread_id") ?? "main";
+    const refs = event.toolCalls ?? event.tool_calls;
     if (!Array.isArray(refs)) throw new Error("approval event has no toolCalls");
     const calls = refs.map((value) => {
       const ref = asRecord(value);
@@ -158,6 +158,49 @@ function parseContent(content: string): UnknownRecord {
   };
 }
 
+function authoritativePayload(record: UnknownRecord): UnknownRecord {
+  const output = asRecord(record.output);
+  const nestedResult = asRecord(output.result);
+  if (Object.keys(nestedResult).length > 0) return nestedResult;
+
+  const directResult = asRecord(record.result);
+  if (Object.keys(directResult).length > 0) return directResult;
+
+  if (Object.keys(output).length > 0 && hasResultFields(output)) return output;
+
+  if (readBoolean(record, "success") === false) {
+    return {
+      status: "ERROR",
+      retryable: false,
+      errorCode:
+        readString(record, "errorCode") ??
+        readString(record, "error_code") ??
+        "TOOL_RESPONSE_UNSUCCESSFUL",
+      stderrPreview: readErrorMessage(record.error) ?? JSON.stringify(record),
+    };
+  }
+
+  return record;
+}
+
+function hasResultFields(record: UnknownRecord): boolean {
+  return [
+    "status",
+    "exitCode",
+    "exit_code",
+    "stdout",
+    "stderr",
+    "artifactRefs",
+    "artifact_refs",
+  ].some((key) => record[key] !== undefined);
+}
+
+function readErrorMessage(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  const record = asRecord(value);
+  return readString(record, "message") ?? readString(record, "detail");
+}
+
 function readStatus(record: UnknownRecord): ToolResult["status"] {
   const status = readString(record, "status")?.toUpperCase();
   if (status === "OK" || status === "ERROR" || status === "DENIED" || status === "TIMEOUT") {
@@ -179,6 +222,14 @@ function requireString(record: UnknownRecord, key: string): string {
   const value = readString(record, key);
   if (value === undefined) throw new Error(`missing string field ${key}`);
   return value;
+}
+
+function requireStringFrom(record: UnknownRecord, keys: string[]): string {
+  for (const key of keys) {
+    const value = readString(record, key);
+    if (value !== undefined) return value;
+  }
+  throw new Error(`missing string field ${keys.join(" or ")}`);
 }
 
 function readString(record: UnknownRecord, key: string): string | undefined {
