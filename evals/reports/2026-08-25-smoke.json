@@ -1,0 +1,68 @@
+{
+  "generatedAt": "2026-08-25T18:35:01.228Z",
+  "cases": [
+    {
+      "id": "S1",
+      "name": "configuration-order regression",
+      "terminal": "COMPLETED",
+      "oracleComplete": true,
+      "falseSuccess": false,
+      "requiredCriteriaPassed": 3,
+      "requiredCriteriaTotal": 3,
+      "completionCertificateIssued": true,
+      "failureReproduced": true
+    },
+    {
+      "id": "S2",
+      "name": "dependency/config mismatch",
+      "terminal": "COMPLETED",
+      "oracleComplete": true,
+      "falseSuccess": false,
+      "requiredCriteriaPassed": 3,
+      "requiredCriteriaTotal": 3,
+      "completionCertificateIssued": true,
+      "failureReproduced": true
+    },
+    {
+      "id": "S3",
+      "name": "source regression",
+      "terminal": "COMPLETED",
+      "oracleComplete": true,
+      "falseSuccess": false,
+      "requiredCriteriaPassed": 3,
+      "requiredCriteriaTotal": 3,
+      "completionCertificateIssued": true,
+      "failureReproduced": true
+    },
+    {
+      "id": "S4",
+      "name": "misleading evidence",
+      "terminal": "COMPLETED",
+      "oracleComplete": true,
+      "falseSuccess": false,
+      "requiredCriteriaPassed": 3,
+      "requiredCriteriaTotal": 3,
+      "completionCertificateIssued": true,
+      "failureReproduced": true
+    },
+    {
+      "id": "S5",
+      "name": "ambiguous/unresolvable",
+      "terminal": "ESCALATED",
+      "oracleComplete": false,
+      "falseSuccess": false,
+      "requiredCriteriaPassed": 0,
+      "requiredCriteriaTotal": 3,
+      "completionCertificateIssued": false,
+      "failureReproduced": false
+    }
+  ],
+  "metrics": {
+    "falseSuccessRate": 0,
+    "trueCompletionPrecision": 1,
+    "taskSuccessRate": 1,
+    "reproductionRate": 0.8,
+    "verificationCoverage": 0.8,
+    "escalationRate": 0.2
+  }
+}
