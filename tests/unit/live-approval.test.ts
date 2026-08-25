@@ -27,48 +27,76 @@ function approval(overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
 
 function readyState() {
   const state = buildState();
-  passAll(state, new EvidenceStore());
+  const evidence = new EvidenceStore();
+  passAll(state, evidence);
   state.phase = "AWAITING_APPROVAL";
-  return state;
+  return { state, evidence };
 }
 
 test("live PR approval requires verified pre-publish state", () => {
-  assert.doesNotThrow(() => assertLiveApprovalReady(readyState(), approval()));
+  const { state, evidence } = readyState();
+  assert.doesNotThrow(() => assertLiveApprovalReady(state, approval(), evidence));
 });
 
 test("live PR approval is blocked while any required criterion is not PASS", () => {
-  const state = readyState();
+  const { state, evidence } = readyState();
   const criterion = state.successCriteria.find((item) => item.id === "tests");
   assert.ok(criterion);
   criterion.status = "FAIL";
 
   assert.throws(
-    () => assertLiveApprovalReady(state, approval()),
-    /blocked by criteria: tests/,
+    () => assertLiveApprovalReady(state, approval(), evidence),
+    /tests: status FAIL/,
+  );
+});
+
+test("live PR approval is blocked when a verifier never ran", () => {
+  const { state, evidence } = readyState();
+  state.verifierResults = state.verifierResults.filter((result) => result.criterionId !== "tests");
+
+  assert.throws(
+    () => assertLiveApprovalReady(state, approval(), evidence),
+    /tests: verifier never ran/,
+  );
+});
+
+test("live PR approval requires verifier-linked admissible evidence", () => {
+  const { state, evidence } = readyState();
+  const result = state.verifierResults.find((item) => item.criterionId === "tests");
+  assert.ok(result);
+  result.evidenceIds = ["evidence-review"];
+
+  assert.throws(
+    () => assertLiveApprovalReady(state, approval(), evidence),
+    /tests: latest PASS has no criterion-linked evidence/,
   );
 });
 
 test("live publishing rejects non-PR external writes in P0", () => {
+  const { state, evidence } = readyState();
   assert.throws(
     () =>
       assertLiveApprovalReady(
-        readyState(),
+        state,
         approval({ action: "github.create_comment" }),
+        evidence,
       ),
     /supports only pull-request creation/,
   );
 });
 
 test("privileged live approvals remain denied by the P0 policy", () => {
+  const { state, evidence } = readyState();
   assert.throws(
     () =>
       assertLiveApprovalReady(
-        readyState(),
+        state,
         approval({
           action: "github.read_secret",
           risk: "PRIVILEGED",
           reversible: false,
         }),
+        evidence,
       ),
     /denied by the P0 policy/,
   );
@@ -84,6 +112,7 @@ test("read-only TrueForge approvals do not require patch completion", () => {
         risk: "READ_ONLY",
         reversible: false,
       }),
+      new EvidenceStore(),
     ),
   );
 });
