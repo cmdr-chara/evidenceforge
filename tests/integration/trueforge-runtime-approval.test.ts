@@ -38,7 +38,25 @@ class FakeAdapter implements TrueForgeRuntimeAdapter {
   ): Promise<StreamResult> {
     assert.equal(sessionId, "tf-session");
     this.submitted = structuredClone(approvals);
-    const event: RuntimeEvent = {
+    const responseEvent: RuntimeEvent = {
+      id: "tool-response-after-approval",
+      type: "TOOL_RESULT",
+      source: "trueforge:tool.response",
+      threadId: "main",
+      timestamp: "2026-08-25T19:39:59.000Z",
+      payload: {
+        type: "tool.response",
+        id: "tool-response-after-approval",
+        threadId: "main",
+        toolCallId: "call-pr",
+        content: JSON.stringify({
+          status: approvals[0]?.decision === "allow" ? "OK" : "DENIED",
+          retryable: false,
+        }),
+      },
+      sequenceNumber: 11,
+    };
+    const turnEvent: RuntimeEvent = {
       id: "turn-created-after-approval",
       type: "TURN_CREATED",
       source: "trueforge:turn.created",
@@ -50,12 +68,13 @@ class FakeAdapter implements TrueForgeRuntimeAdapter {
       },
       sequenceNumber: 12,
     };
-    await onEvent?.(event);
+    await onEvent?.(responseEvent);
+    await onEvent?.(turnEvent);
     return {
       sessionId,
       turnId: "turn-after-approval",
       lastSequenceNumber: 12,
-      events: [event],
+      events: [responseEvent, turnEvent],
       paused: false,
       requiredActions: [],
     };
@@ -108,6 +127,7 @@ test("durable runtime submits the exact approved TrueForge tool call and persist
     assert.equal(updated.activeTurnId, "turn-after-approval");
     assert.equal(updated.lastSequenceNumber, 12);
     assert.equal(updated.phase, "DEFINE_SUCCESS");
+    assert.equal(updated.status, "ACTIVE");
     const persisted = await sessions.load(updated.task.id);
     assert.equal(persisted?.activeTurnId, "turn-after-approval");
   } finally {
