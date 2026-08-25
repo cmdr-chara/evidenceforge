@@ -105,10 +105,16 @@ export class TrueForgeEventIndex {
 function parseContent(content: string): UnknownRecord {
   try {
     const parsed: unknown = JSON.parse(content);
-    return asRecord(parsed);
+    if (isRecord(parsed)) return parsed;
   } catch {
-    return { stdoutPreview: content, status: "OK" };
+    // Fall through to a deterministic schema failure below.
   }
+  return {
+    status: "ERROR",
+    retryable: false,
+    errorCode: "MALFORMED_TOOL_RESPONSE",
+    stderrPreview: content,
+  };
 }
 
 function readStatus(record: UnknownRecord): ToolResult["status"] {
@@ -120,10 +126,12 @@ function readStatus(record: UnknownRecord): ToolResult["status"] {
   return exit === undefined || exit === 0 ? "OK" : "ERROR";
 }
 
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function asRecord(value: unknown): UnknownRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as UnknownRecord)
-    : {};
+  return isRecord(value) ? value : {};
 }
 
 function requireString(record: UnknownRecord, key: string): string {
