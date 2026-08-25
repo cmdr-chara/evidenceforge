@@ -85,7 +85,7 @@ test("authoritative TrueForge sandbox success decodes the nested command result"
   assert.equal(result.errorCode, undefined);
 });
 
-test("authoritative TrueForge sandbox non-zero exit is never reported as OK", () => {
+test("sandbox command exit is preserved separately from tool execution status", () => {
   const result = indexSandboxExec().toolResultFrom({
     type: "tool.response",
     id: "response-exec-fail",
@@ -97,10 +97,10 @@ test("authoritative TrueForge sandbox non-zero exit is never reported as OK", ()
     }),
   });
 
-  assert.equal(result.status, "ERROR");
+  assert.equal(result.status, "OK");
   assert.equal(result.retryable, false);
   assert.equal(result.exitCode, 1);
-  assert.equal(result.errorCode, "COMMAND_EXIT_NON_ZERO");
+  assert.equal(result.errorCode, undefined);
   assert.match(result.stdoutPreview ?? "", /CONFIG_VALIDATION_ORDER/);
 });
 
