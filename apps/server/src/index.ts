@@ -85,6 +85,17 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     sendJson(response, 200, await live.resume(taskId));
     return;
   }
+  const liveApprovalMatch = /^\/api\/live\/session\/([^/]+)\/approvals\/([^/]+)$/.exec(
+    url.pathname,
+  );
+  if (request.method === "POST" && liveApprovalMatch !== null) {
+    const body = await readJson(request);
+    const decision = readDecision(body);
+    const taskId = decodeURIComponent(liveApprovalMatch[1] ?? "");
+    const approvalId = decodeURIComponent(liveApprovalMatch[2] ?? "");
+    sendJson(response, 200, await live.decideApproval(taskId, approvalId, decision));
+    return;
+  }
   if (request.method === "GET" && url.pathname.startsWith("/api/live/session/")) {
     const taskId = decodeURIComponent(url.pathname.slice("/api/live/session/".length));
     const state = await live.load(taskId);
