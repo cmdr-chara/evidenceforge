@@ -32,7 +32,10 @@ export class DurableTrueForgeRuntime {
     private readonly sessionStore: SessionStore,
     private readonly evidenceStore: EvidenceStore,
     private readonly journal: EventJournal,
-    private readonly onEvent?: (event: RuntimeEvent) => void | Promise<void>,
+    private readonly onEvent?: (
+      event: RuntimeEvent,
+      state: SessionState,
+    ) => void | Promise<void>,
     private readonly projector = new TrueForgeEventProjector(),
   ) {}
 
@@ -122,7 +125,7 @@ export class DurableTrueForgeRuntime {
     if (event.sequenceNumber !== undefined) state.lastSequenceNumber = event.sequenceNumber;
     if (isNewEvent) await this.journal.append(event);
     await this.sessionStore.save(state);
-    if (isNewEvent) await this.onEvent?.(event);
+    if (isNewEvent) await this.onEvent?.(event, structuredClone(state));
   }
 }
 
