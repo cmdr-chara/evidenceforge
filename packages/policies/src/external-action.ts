@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import {
   ApprovalRequest,
   ExternalActionState,
@@ -48,7 +49,7 @@ export class ExternalActionCoordinator {
     const approval: ApprovalRequest = {
       id: `approval-${randomUUID()}`,
       action: "github.create_pull_request",
-      normalizedArguments: action.preparedArguments,
+      normalizedArguments: structuredClone(action.preparedArguments),
       risk: "EXTERNAL_REVERSIBLE",
       reason: "Creating a pull request is an externally visible GitHub write",
       reversible: true,
@@ -58,6 +59,7 @@ export class ExternalActionCoordinator {
   }
 
   public applyApproval(action: ExternalActionState, approval: ApprovalRequest): ExternalActionState {
+    assertApprovalMatches(action, approval);
     const outcome = this.approvalPolicy.authorize(approval);
     if (!outcome.allowed) {
       return { ...action, status: approval.status === "DENIED" ? "DENIED" : action.status };
@@ -109,5 +111,20 @@ export class ExternalActionCoordinator {
 
   public mustReconcileBeforeRetry(action: ExternalActionState): boolean {
     return action.status === "COMMITTED" || action.status === "APPROVED";
+  }
+}
+
+function assertApprovalMatches(action: ExternalActionState, approval: ApprovalRequest): void {
+  if (action.status !== "PREPARED") {
+    throw new Error(`approval can only be applied to a PREPARED action, received ${action.status}`);
+  }
+  if (approval.action !== "github.create_pull_request") {
+    throw new Error(`approval action ${approval.action} does not authorize pull-request creation`);
+  }
+  if (approval.risk !== "EXTERNAL_REVERSIBLE" || !approval.reversible) {
+    throw new Error("approval risk metadata does not match pull-request creation policy");
+  }
+  if (!isDeepStrictEqual(approval.normalizedArguments, action.preparedArguments)) {
+    throw new Error("approval arguments do not match the prepared pull-request action");
   }
 }
