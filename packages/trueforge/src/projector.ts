@@ -18,6 +18,22 @@ export class TrueForgeEventProjector {
 
   public constructor(private readonly riskPolicy = new RiskPolicy()) {}
 
+  public registerApprovalToolCall(approval: ApprovalRequest): void {
+    if (approval.toolCallId === undefined || approval.threadId === undefined) {
+      throw new Error("approval is missing its TrueForge tool-call correlation");
+    }
+    const { serverName, name } = splitToolName(approval.action);
+    this.eventIndex.registerToolCall({
+      id: approval.toolCallId,
+      sourceEventId: approval.id,
+      threadId: approval.threadId,
+      name,
+      arguments: JSON.stringify(approval.normalizedArguments),
+      toolType: serverName === undefined ? undefined : "mcp",
+      serverName,
+    });
+  }
+
   public project(state: SessionState, event: RuntimeEvent): RuntimeProjection {
     this.eventIndex.ingest(event.payload);
 
@@ -97,6 +113,15 @@ export class TrueForgeEventProjector {
 
     return { approvalIds: [] };
   }
+}
+
+function splitToolName(action: string): { serverName?: string; name: string } {
+  const separator = action.indexOf(".");
+  if (separator <= 0 || separator === action.length - 1) return { name: action };
+  return {
+    serverName: action.slice(0, separator),
+    name: action.slice(separator + 1),
+  };
 }
 
 function parseArguments(value: string): unknown {
