@@ -27,6 +27,8 @@ export interface TrueForgeRuntimeAdapter {
 }
 
 export class DurableTrueForgeRuntime {
+  private readonly projector: TrueForgeEventProjector;
+
   public constructor(
     private readonly adapter: TrueForgeRuntimeAdapter | TrueForgeSdkAdapter,
     private readonly sessionStore: SessionStore,
@@ -36,8 +38,10 @@ export class DurableTrueForgeRuntime {
       event: RuntimeEvent,
       state: SessionState,
     ) => void | Promise<void>,
-    private readonly projector = new TrueForgeEventProjector(),
-  ) {}
+    projector?: TrueForgeEventProjector,
+  ) {
+    this.projector = projector ?? new TrueForgeEventProjector(undefined, evidenceStore);
+  }
 
   public async start(state: SessionState, message: string): Promise<SessionState> {
     const sessionId = state.trueForgeSessionId ?? (await this.adapter.createSession());
