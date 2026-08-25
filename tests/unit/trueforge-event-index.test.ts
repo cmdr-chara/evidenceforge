@@ -20,6 +20,31 @@ function indexToolCall(callId = "call-1"): TrueForgeEventIndex {
   return index;
 }
 
+function indexSandboxExec(callId = "call-exec"): TrueForgeEventIndex {
+  const index = new TrueForgeEventIndex();
+  index.ingest({
+    type: "model.message",
+    id: "message-exec",
+    thread_id: "main",
+    tool_calls: [
+      {
+        id: callId,
+        type: "function",
+        function: {
+          name: "exec",
+          arguments: JSON.stringify({
+            intent: "Run the deterministic test verifier",
+            command: "pnpm test",
+            cwd: "/workspace/repository",
+          }),
+        },
+        tool_info: { type: "truefoundry-system", name: "sandbox" },
+      },
+    ],
+  });
+  return index;
+}
+
 test("TrueForge tool response correlates with the originating model tool call", () => {
   const index = indexToolCall();
   const result = index.toolResultFrom({
@@ -39,6 +64,76 @@ test("TrueForge tool response correlates with the originating model tool call", 
   assert.equal(result.tool, "daytona.run_command");
   assert.equal(result.exitCode, 0);
   assert.deepEqual(result.artifactRefs, ["artifact://stdout"]);
+});
+
+test("authoritative TrueForge sandbox success decodes the nested command result", () => {
+  const result = indexSandboxExec().toolResultFrom({
+    type: "tool.response",
+    id: "response-exec-pass",
+    threadId: "main",
+    toolCallId: "call-exec",
+    content: JSON.stringify({
+      success: true,
+      response: { exitCode: 0, result: "83 tests passed" },
+    }),
+  });
+
+  assert.equal(result.tool, "sandbox.exec");
+  assert.equal(result.status, "OK");
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stdoutPreview, "83 tests passed");
+  assert.equal(result.errorCode, undefined);
+});
+
+test("authoritative TrueForge sandbox non-zero exit is never reported as OK", () => {
+  const result = indexSandboxExec().toolResultFrom({
+    type: "tool.response",
+    id: "response-exec-fail",
+    threadId: "main",
+    toolCallId: "call-exec",
+    content: JSON.stringify({
+      success: true,
+      response: { exitCode: 1, result: "CONFIG_VALIDATION_ORDER" },
+    }),
+  });
+
+  assert.equal(result.status, "ERROR");
+  assert.equal(result.retryable, false);
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.errorCode, "COMMAND_EXIT_NON_ZERO");
+  assert.match(result.stdoutPreview ?? "", /CONFIG_VALIDATION_ORDER/);
+});
+
+test("authoritative TrueForge sandbox infrastructure failure is explicit", () => {
+  const result = indexSandboxExec().toolResultFrom({
+    type: "tool.response",
+    id: "response-exec-infra",
+    threadId: "main",
+    toolCallId: "call-exec",
+    content: JSON.stringify({
+      success: false,
+      error: "temporary network timeout while contacting Daytona",
+    }),
+  });
+
+  assert.equal(result.status, "ERROR");
+  assert.equal(result.retryable, true);
+  assert.equal(result.errorCode, "SANDBOX_INFRASTRUCTURE_ERROR");
+  assert.match(result.stderrPreview ?? "", /Daytona/);
+});
+
+test("incomplete TrueForge sandbox envelope fails closed", () => {
+  const result = indexSandboxExec().toolResultFrom({
+    type: "tool.response",
+    id: "response-exec-malformed",
+    threadId: "main",
+    toolCallId: "call-exec",
+    content: JSON.stringify({ success: true, response: { result: "looks good" } }),
+  });
+
+  assert.equal(result.status, "ERROR");
+  assert.equal(result.retryable, false);
+  assert.equal(result.errorCode, "MALFORMED_TOOL_RESPONSE");
 });
 
 test("non-JSON tool response fails closed instead of becoming OK", () => {
