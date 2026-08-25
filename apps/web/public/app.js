@@ -1,4 +1,4 @@
-const state = { snapshot: null };
+const state = { snapshot: null, busy: false };
 
 const elements = {
   connection: byId('connection-status'),
@@ -52,23 +52,27 @@ async function load() {
 }
 
 async function mutate(path) {
-  setControlsDisabled(true);
+  setBusy(true);
   try {
     render(await request(path, { method: 'POST' }));
   } catch (error) {
     elements.notice.textContent = error.message;
   } finally {
-    setControlsDisabled(false);
+    setBusy(false);
   }
 }
 
 async function decideApproval(decision) {
-  const approval = state.snapshot?.approvals.find((item) => item.status === 'PENDING');
-  if (!approval) return;
-  setControlsDisabled(true);
+  const snapshot = state.snapshot;
+  const approval = snapshot?.approvals.find((item) => item.status === 'PENDING');
+  if (!approval || !snapshot) return;
+  const path = snapshot.mode === 'LIVE_TRUEFORGE'
+    ? `/api/live/session/${encodeURIComponent(snapshot.task.id)}/approvals/${encodeURIComponent(approval.id)}`
+    : `/api/demo/approvals/${encodeURIComponent(approval.id)}`;
+  setBusy(true);
   try {
     render(
-      await request(`/api/demo/approvals/${encodeURIComponent(approval.id)}`, {
+      await request(path, {
         method: 'POST',
         body: JSON.stringify({ decision }),
       }),
@@ -76,7 +80,7 @@ async function decideApproval(decision) {
   } catch (error) {
     elements.notice.textContent = error.message;
   } finally {
-    setControlsDisabled(false);
+    setBusy(false);
   }
 }
 
@@ -86,11 +90,12 @@ async function startLive(event) {
   elements.liveStatus.textContent = 'Starting durable TrueForge session…';
   elements.liveForm.querySelector('button').disabled = true;
   try {
-    const session = await request('/api/live/start', {
+    const snapshot = await request('/api/live/start', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    elements.liveStatus.textContent = `TrueForge session ${session.trueForgeSessionId ?? 'created'} persisted for task ${session.task.id}.`;
+    render(snapshot);
+    elements.liveStatus.textContent = `TrueForge session ${snapshot.trueForgeSessionId ?? 'created'} persisted for task ${snapshot.task.id}.`;
   } catch (error) {
     elements.liveStatus.textContent = `Live mode BLOCKED: ${error.message}`;
   } finally {
@@ -102,6 +107,7 @@ function connectEvents() {
   const source = new EventSource('/api/events');
   source.addEventListener('connected', () => showConnection('Event stream live', 'complete'));
   source.addEventListener('demo-state', (event) => render(JSON.parse(event.data)));
+  source.addEventListener('live-state', (event) => render(JSON.parse(event.data)));
   source.addEventListener('runtime-event', (event) => {
     const runtimeEvent = JSON.parse(event.data);
     elements.liveStatus.textContent = `TrueForge: ${runtimeEvent.source} · event ${runtimeEvent.id}`;
@@ -109,11 +115,13 @@ function connectEvents() {
   source.onerror = () => showConnection('Reconnecting', 'warning');
 }
 
-function render(snapshot) {
+function render(input) {
+  const snapshot = normalizeSnapshot(input);
   state.snapshot = snapshot;
   elements.mode.textContent = snapshot.mode.replaceAll('_', ' ');
+  elements.mode.className = `status-pill ${snapshot.mode === 'LIVE_TRUEFORGE' ? 'active' : 'warning'}`;
   elements.phase.textContent = snapshot.phase;
-  elements.phase.className = `status-pill ${snapshot.status === 'COMPLETED' ? 'complete' : snapshot.status === 'BLOCKED' ? 'danger' : 'active'}`;
+  elements.phase.className = `status-pill ${snapshot.status === 'COMPLETED' ? 'complete' : snapshot.status === 'BLOCKED' || snapshot.status === 'ESCALATED' ? 'danger' : 'active'}`;
   elements.title.textContent = snapshot.task.objective;
   elements.repository.textContent = snapshot.task.repository;
   elements.run.textContent = snapshot.task.source.runId;
@@ -128,8 +136,53 @@ function render(snapshot) {
   renderPatch(snapshot.patch);
   renderApproval(snapshot.approvals, snapshot.phase);
   renderCertificate(snapshot.completionCertificate);
-  elements.advance.disabled = snapshot.status !== 'ACTIVE' || snapshot.phase === 'AWAITING_APPROVAL';
   elements.advance.textContent = snapshot.phase === 'PUBLISHING' ? 'Reconcile & complete' : 'Advance evidence';
+  elements.reset.textContent = snapshot.mode === 'LIVE_TRUEFORGE' ? 'Return to fixture' : 'Reset fixture';
+  if (snapshot.mode === 'LIVE_TRUEFORGE') {
+    elements.liveStatus.textContent = `Live task ${snapshot.task.id} · ${snapshot.phase} · cursor ${snapshot.lastSequenceNumber ?? '—'}`;
+  }
+  syncControls();
+}
+
+function normalizeSnapshot(snapshot) {
+  if (snapshot?.mode) return snapshot;
+  return {
+    ...snapshot,
+    mode: 'LIVE_TRUEFORGE',
+    notice: 'Live TrueForge state. Only application-correlated evidence is displayed.',
+    timeline: buildTimeline(snapshot.phase, snapshot.status),
+    specialists: [],
+    evidence: [],
+    approvals: snapshot.approvals ?? [],
+    hypotheses: snapshot.hypotheses ?? [],
+    successCriteria: snapshot.successCriteria ?? [],
+  };
+}
+
+function buildTimeline(current, statusValue) {
+  const order = [
+    'INTAKE',
+    'DEFINE_SUCCESS',
+    'INVESTIGATING',
+    'REPRODUCING',
+    'PATCHING',
+    'VERIFYING',
+    'REVIEWING',
+    'AWAITING_APPROVAL',
+    'PUBLISHING',
+    'COMPLETED',
+  ];
+  const currentIndex = order.indexOf(current === 'PLANNING' ? 'DEFINE_SUCCESS' : current);
+  return order.map((phase, index) => ({
+    phase,
+    status: phase === current
+      ? statusValue === 'BLOCKED' ? 'BLOCKED' : 'ACTIVE'
+      : index < currentIndex || current === 'COMPLETED'
+        ? 'COMPLETE'
+        : currentIndex === -1 && statusValue !== 'ACTIVE'
+          ? 'BLOCKED'
+          : 'PENDING',
+  }));
 }
 
 function renderTimeline(items) {
@@ -158,6 +211,10 @@ function renderContract(criteria) {
 }
 
 function renderSpecialists(specialists) {
+  if (specialists.length === 0) {
+    replace(elements.specialists, [el('p', 'No specialist state has been projected yet.')]);
+    return;
+  }
   replace(elements.specialists, specialists.map((specialist) => {
     const row = el('div');
     row.className = 'specialist-item';
@@ -192,7 +249,10 @@ function renderEvidence(evidence) {
   replace(elements.evidence, evidence.map((item) => {
     const row = el('article');
     row.className = 'evidence-item';
-    const time = el('time', new Date(item.timestamp).toLocaleTimeString([], { hour12: false }));
+    const parsedTime = Date.parse(item.timestamp);
+    const time = el('time', Number.isNaN(parsedTime)
+      ? '—'
+      : new Date(parsedTime).toLocaleTimeString([], { hour12: false }));
     time.className = 'evidence-time';
     const content = el('div');
     const kind = el('span', item.kind);
@@ -217,10 +277,12 @@ function renderApproval(approvals, phase) {
   elements.approvalPanel.classList.toggle('hidden', !approval || phase !== 'AWAITING_APPROVAL');
   if (!approval) return;
   elements.approvalReason.textContent = approval.reason;
-  const args = approval.normalizedArguments ?? {};
+  const args = isPlainObject(approval.normalizedArguments) ? approval.normalizedArguments : {
+    value: approval.normalizedArguments,
+  };
   replace(elements.approvalArguments, Object.entries(args).slice(0, 6).map(([key, value]) => {
     const group = el('div');
-    group.append(el('dt', key), el('dd', String(value)));
+    group.append(el('dt', key), el('dd', formatValue(value)));
     return group;
   }));
 }
@@ -256,11 +318,19 @@ function showConnection(text, variant) {
   elements.connection.className = `status-pill ${variant}`;
 }
 
-function setControlsDisabled(disabled) {
-  elements.advance.disabled = disabled;
-  elements.reset.disabled = disabled;
-  elements.approve.disabled = disabled;
-  elements.reject.disabled = disabled;
+function setBusy(busy) {
+  state.busy = busy;
+  syncControls();
+}
+
+function syncControls() {
+  const snapshot = state.snapshot;
+  const isFixture = snapshot?.mode === 'DETERMINISTIC_FIXTURE';
+  const pendingApproval = snapshot?.approvals.some((item) => item.status === 'PENDING') ?? false;
+  elements.advance.disabled = state.busy || !isFixture || snapshot?.status !== 'ACTIVE' || snapshot?.phase === 'AWAITING_APPROVAL';
+  elements.reset.disabled = state.busy;
+  elements.approve.disabled = state.busy || !pendingApproval || snapshot?.phase !== 'AWAITING_APPROVAL';
+  elements.reject.disabled = state.busy || !pendingApproval || snapshot?.phase !== 'AWAITING_APPROVAL';
 }
 
 async function request(path, options = {}) {
@@ -281,6 +351,19 @@ function el(tag, text) {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+function isPlainObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function formatValue(value) {
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function byId(id) {
