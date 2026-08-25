@@ -72,7 +72,9 @@ export class LiveIncidentService {
     const existing = state.approvals.find((approval) => approval.id === approvalId);
     if (existing === undefined) throw new Error(`unknown approval request: ${approvalId}`);
     if (existing.status !== "PENDING") throw new Error(`approval ${approvalId} is already decided`);
-    if (decision === "APPROVED") assertLiveApprovalReady(state, existing, this.approvalPolicy);
+    if (decision === "APPROVED") {
+      assertLiveApprovalReady(state, existing, this.evidence, this.approvalPolicy);
+    }
 
     const controller = new SessionController(state);
     let updated = controller.decideApproval(approvalId, decision);
@@ -133,6 +135,7 @@ export class LiveIncidentService {
 export function assertLiveApprovalReady(
   state: SessionState,
   approval: ApprovalRequest,
+  evidenceStore: EvidenceStore,
   policy = new ApprovalPolicy(),
 ): void {
   const authorization = policy.authorize({ ...approval, status: "APPROVED" });
@@ -145,14 +148,48 @@ export function assertLiveApprovalReady(
   if (state.phase !== "AWAITING_APPROVAL") {
     throw new Error(`external approval requires AWAITING_APPROVAL, received ${state.phase}`);
   }
-  const missing = state.successCriteria.filter(
-    (criterion) =>
-      criterion.required &&
-      criterion.verifier.kind !== "EXTERNAL_STATE" &&
-      criterion.status !== "PASS",
+
+  const failures: string[] = [];
+  const criteria = state.successCriteria.filter(
+    (criterion) => criterion.required && criterion.verifier.kind !== "EXTERNAL_STATE",
   );
-  if (missing.length > 0) {
-    throw new Error(`external approval blocked by criteria: ${missing.map((item) => item.id).join(", ")}`);
+  for (const criterion of criteria) {
+    if (criterion.status !== "PASS") {
+      failures.push(`${criterion.id}: status ${criterion.status}`);
+      continue;
+    }
+    const result = [...state.verifierResults]
+      .reverse()
+      .find((candidate) => candidate.criterionId === criterion.id);
+    if (result === undefined) {
+      failures.push(`${criterion.id}: verifier never ran`);
+      continue;
+    }
+    if (result.status !== "PASS") {
+      failures.push(`${criterion.id}: latest verifier result is ${result.status}`);
+      continue;
+    }
+    if (result.verifier !== criterion.verifier.kind) {
+      failures.push(
+        `${criterion.id}: verifier ${result.verifier} does not match ${criterion.verifier.kind}`,
+      );
+      continue;
+    }
+    if (criterion.verifier.kind !== "REVIEWER" && !result.deterministic) {
+      failures.push(`${criterion.id}: verifier result is not deterministic`);
+      continue;
+    }
+    const linkedEvidenceIds = result.evidenceIds.filter((id) => criterion.evidenceIds.includes(id));
+    if (linkedEvidenceIds.length === 0) {
+      failures.push(`${criterion.id}: latest PASS has no criterion-linked evidence`);
+      continue;
+    }
+    if (!linkedEvidenceIds.some((id) => evidenceStore.isAdmissibleForCriterion(id, criterion))) {
+      failures.push(`${criterion.id}: latest PASS has no admissible evidence`);
+    }
+  }
+  if (failures.length > 0) {
+    throw new Error(`external approval blocked by verification: ${failures.join("; ")}`);
   }
   if (state.reviewerVerdict !== "PASS" && state.reviewerVerdict !== "PASS_WITH_WARNINGS") {
     throw new Error("external approval requires an independent reviewer PASS");
