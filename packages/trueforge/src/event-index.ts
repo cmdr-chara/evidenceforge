@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import { ToolResult } from "../../domain/src/types";
 
 type UnknownRecord = Record<string, unknown>;
@@ -36,7 +37,7 @@ export class TrueForgeEventIndex {
       const name = readString(fn, "name");
       if (id === undefined || name === undefined) continue;
       const info = asRecord(call.toolInfo);
-      this.toolCalls.set(id, {
+      this.registerToolCall({
         id,
         sourceEventId,
         threadId,
@@ -46,6 +47,18 @@ export class TrueForgeEventIndex {
         serverName: readString(info, "serverName"),
       });
     }
+  }
+
+  public registerToolCall(call: IndexedToolCall): void {
+    const snapshot = structuredClone(call);
+    const existing = this.toolCalls.get(call.id);
+    if (existing !== undefined) {
+      if (!sameToolCall(existing, snapshot)) {
+        throw new Error(`tool call ${call.id} was redefined with different arguments or identity`);
+      }
+      return;
+    }
+    this.toolCalls.set(call.id, snapshot);
   }
 
   public toolResultFrom(raw: unknown, durationMs = 0): ToolResult {
@@ -68,11 +81,18 @@ export class TrueForgeEventIndex {
       status: readStatus(structured),
       retryable: readBoolean(structured, "retryable") ?? false,
       errorCode: readString(structured, "errorCode") ?? readString(structured, "error_code"),
-      artifactRefs: readStringArray(structured, "artifactRefs") ?? readStringArray(structured, "artifact_refs") ?? [],
+      artifactRefs:
+        readStringArray(structured, "artifactRefs") ??
+        readStringArray(structured, "artifact_refs") ??
+        [],
       evidenceIds: [],
-      durationMs: readNumber(structured, "durationMs") ?? readNumber(structured, "duration_ms") ?? durationMs,
+      durationMs:
+        readNumber(structured, "durationMs") ??
+        readNumber(structured, "duration_ms") ??
+        durationMs,
       exitCode: readNumber(structured, "exitCode") ?? readNumber(structured, "exit_code"),
-      stdoutPreview: readString(structured, "stdoutPreview") ?? readString(structured, "stdout") ?? content,
+      stdoutPreview:
+        readString(structured, "stdoutPreview") ?? readString(structured, "stdout") ?? content,
       stderrPreview: readString(structured, "stderrPreview") ?? readString(structured, "stderr"),
     };
   }
@@ -91,7 +111,7 @@ export class TrueForgeEventIndex {
       const id = requireString(ref, "id");
       const call = this.toolCalls.get(id);
       if (call === undefined) throw new Error(`approval ${eventId} references unknown call ${id}`);
-      return call;
+      return structuredClone(call);
     });
     return { eventId, threadId, toolCalls: calls };
   }
@@ -100,6 +120,27 @@ export class TrueForgeEventIndex {
     const call = this.toolCalls.get(id);
     return call === undefined ? undefined : structuredClone(call);
   }
+}
+
+function sameToolCall(left: IndexedToolCall, right: IndexedToolCall): boolean {
+  return isDeepStrictEqual(
+    {
+      id: left.id,
+      threadId: left.threadId,
+      name: left.name,
+      arguments: left.arguments,
+      toolType: left.toolType,
+      serverName: left.serverName,
+    },
+    {
+      id: right.id,
+      threadId: right.threadId,
+      name: right.name,
+      arguments: right.arguments,
+      toolType: right.toolType,
+      serverName: right.serverName,
+    },
+  );
 }
 
 function parseContent(content: string): UnknownRecord {
