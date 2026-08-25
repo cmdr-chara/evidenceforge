@@ -5,3 +5,4 @@ export * from "./event-index";
 export * from "./event-normalizer";
 export * from "./projector";
 export * from "./runtime";
+export * from "./verifier-projection";
