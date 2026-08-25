@@ -3,4 +3,5 @@ export * from "./client";
 export * from "./config";
 export * from "./event-index";
 export * from "./event-normalizer";
+export * from "./projector";
 export * from "./runtime";
