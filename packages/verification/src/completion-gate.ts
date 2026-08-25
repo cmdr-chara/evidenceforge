@@ -3,6 +3,8 @@ import {
   GateDecision,
   GateFailure,
   SessionState,
+  SuccessCriterion,
+  VerificationResult,
 } from "../../domain/src/types";
 import { EvidenceStore } from "../../evidence/src";
 
@@ -18,6 +20,7 @@ export class CompletionGate {
   public evaluate(state: SessionState, generatedAt = new Date().toISOString()): GateDecision {
     const failures: GateFailure[] = [];
     const required = state.successCriteria.filter((criterion) => criterion.required);
+    const acceptedEvidenceIds = new Map<string, string[]>();
 
     for (const criterion of required) {
       if (criterion.status !== "PASS") {
@@ -28,23 +31,70 @@ export class CompletionGate {
         });
         continue;
       }
-      if (!this.evidenceStore.criterionHasAdmissibleEvidence(criterion)) {
+
+      const admissibleEvidenceIds = criterion.evidenceIds.filter((evidenceId) =>
+        this.evidenceStore.isAdmissibleForCriterion(evidenceId, criterion),
+      );
+      if (admissibleEvidenceIds.length === 0) {
         failures.push({
           code: "MISSING_ADMISSIBLE_EVIDENCE",
           criterionId: criterion.id,
           message: `${criterion.id} has no admissible PASS evidence`,
         });
       }
-      const deterministicFailure = state.verifierResults.find(
-        (result) => result.criterionId === criterion.id && result.deterministic && result.status === "FAIL",
-      );
-      if (deterministicFailure !== undefined) {
+
+      const latestResult = latestVerificationResult(state, criterion.id);
+      if (latestResult === undefined) {
         failures.push({
-          code: "DETERMINISTIC_FAILURE",
+          code: "MISSING_ADMISSIBLE_EVIDENCE",
           criterionId: criterion.id,
-          message: deterministicFailure.details,
+          message: `${criterion.id} has no verifier result correlated to its PASS evidence`,
         });
+        continue;
       }
+
+      if (latestResult.verifier !== criterion.verifier.kind) {
+        failures.push({
+          code: "MISSING_ADMISSIBLE_EVIDENCE",
+          criterionId: criterion.id,
+          message: `${criterion.id} latest verifier ${latestResult.verifier} does not match ${criterion.verifier.kind}`,
+        });
+        continue;
+      }
+
+      if (latestResult.status !== "PASS") {
+        failures.push({
+          code:
+            latestResult.deterministic && latestResult.status === "FAIL"
+              ? "DETERMINISTIC_FAILURE"
+              : "REQUIRED_CRITERION_NOT_PASSING",
+          criterionId: criterion.id,
+          message: latestResult.details,
+        });
+        continue;
+      }
+
+      if (criterion.verifier.kind !== "REVIEWER" && !latestResult.deterministic) {
+        failures.push({
+          code: "MISSING_ADMISSIBLE_EVIDENCE",
+          criterionId: criterion.id,
+          message: `${criterion.id} requires a deterministic verifier result`,
+        });
+        continue;
+      }
+
+      const linkedEvidenceIds = latestResult.evidenceIds.filter((evidenceId) =>
+        admissibleEvidenceIds.includes(evidenceId),
+      );
+      if (linkedEvidenceIds.length === 0) {
+        failures.push({
+          code: "MISSING_ADMISSIBLE_EVIDENCE",
+          criterionId: criterion.id,
+          message: `${criterion.id} latest PASS result does not reference admissible criterion evidence`,
+        });
+        continue;
+      }
+      acceptedEvidenceIds.set(criterion.id, linkedEvidenceIds);
     }
 
     if (state.patchDigest === undefined || state.patchDigest.trim().length === 0) {
@@ -65,7 +115,28 @@ export class CompletionGate {
       failures.push({ code: "REVIEW_BLOCKED", message: "independent reviewer did not pass the patch" });
     }
 
-    if (state.externalAction !== undefined && state.externalAction.status !== "RECONCILED") {
+    const externalCriteria = required.filter(
+      (criterion) => criterion.verifier.kind === "EXTERNAL_STATE",
+    );
+    if (externalCriteria.length > 0) {
+      const externalAction = state.externalAction;
+      const evidenceIsLinked =
+        externalAction?.evidenceId !== undefined &&
+        externalCriteria.some((criterion) =>
+          acceptedEvidenceIds.get(criterion.id)?.includes(externalAction.evidenceId as string),
+        );
+      if (
+        externalAction?.status !== "RECONCILED" ||
+        externalAction.identifier === undefined ||
+        externalAction.evidenceId === undefined ||
+        !evidenceIsLinked
+      ) {
+        failures.push({
+          code: "EXTERNAL_ACTION_NOT_RECONCILED",
+          message: "required external action is missing reconciled, verifier-linked evidence",
+        });
+      }
+    } else if (state.externalAction !== undefined && state.externalAction.status !== "RECONCILED") {
       failures.push({
         code: "EXTERNAL_ACTION_NOT_RECONCILED",
         message: "prepared external action has not been reconciled",
@@ -80,7 +151,7 @@ export class CompletionGate {
       requiredCriteria: required.map((criterion) => ({
         criterionId: criterion.id,
         result: "PASS" as const,
-        evidenceIds: [...criterion.evidenceIds],
+        evidenceIds: [...(acceptedEvidenceIds.get(criterion.id) ?? [])],
       })),
       originalFailureReproduced: true,
       patchDigest: state.patchDigest as string,
@@ -101,4 +172,15 @@ export class CompletionGate {
     issuedCertificates.add(certificate);
     return { allowed: true, certificate };
   }
+}
+
+function latestVerificationResult(
+  state: SessionState,
+  criterionId: SuccessCriterion["id"],
+): VerificationResult | undefined {
+  for (let index = state.verifierResults.length - 1; index >= 0; index -= 1) {
+    const result = state.verifierResults[index];
+    if (result?.criterionId === criterionId) return result;
+  }
+  return undefined;
 }
