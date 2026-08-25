@@ -1,0 +1,15 @@
+[config]
+response_language = "en-US"
+
+[pr_reviewer]
+require_score_review = true
+require_tests_review = true
+require_security_review = true
+persistent_comment = true
+
+[pr_description]
+publish_labels = true
+add_original_user_description = true
+
+[pr_code_suggestions]
+commitable_code_suggestions = true
