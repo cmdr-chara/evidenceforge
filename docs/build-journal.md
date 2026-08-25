@@ -129,9 +129,37 @@ No TrueForge server, model credential, GitHub MCP credential, Daytona credential
 
 - Added `pnpm/action-setup@v4` before `actions/setup-node@v4`.
 - Pinned the action to the repository's declared pnpm version `11.16.0`.
-- Retained pnpm dependency caching and removed the now-redundant `corepack enable` CI step.
+- Removed the now-redundant `corepack enable` CI step.
 
 ### Verification
 
 - Local typecheck, lint, format checks, 58 tests, 3 fixture tests, and the five-case smoke evaluation still pass.
-- Remote CI status is pending the corrective commit; no green result is claimed until observed.
+- The next remote run reached pnpm installation successfully, exposing a second independent setup issue.
+
+## 2026-08-25 — second pull request CI diagnosis
+
+### Observed
+
+- Corrective run `32887843828` successfully installed pnpm with `pnpm/action-setup@v4`.
+- `actions/setup-node@v4` still failed before dependency installation.
+- The workflow enabled pnpm caching before the repository had a committed `pnpm-lock.yaml`; setup-node could not derive its cache key.
+
+### Correction
+
+- Removed `cache: pnpm` from `actions/setup-node@v4` for the bootstrap PR.
+- Retained explicit pnpm setup, Node 22.14, and real dependency installation.
+- Caching can be restored after a reviewed lockfile is committed.
+
+### Verified remotely
+
+GitHub Actions run `32887937986` completed successfully. Every verification step passed:
+
+- dependency installation;
+- format check;
+- lint;
+- TypeScript typecheck;
+- 58-test EvidenceForge suite;
+- five-case smoke evaluation;
+- healthy demo fixture.
+
+CI is now green. Qodo still has no observed review response, so the pull request remains unmergeable under the required hackathon process.
