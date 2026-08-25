@@ -1,6 +1,6 @@
 # Autonomous build gate ledger
 
-**Last updated:** 2026-08-25T23:03:42+02:00
+**Last updated:** 2026-08-25T23:06:00+02:00
 
 Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 
@@ -38,8 +38,8 @@ Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 | Test suite | no failures on current branch | PASS | current-head GitHub Actions CI completed successfully and executes `pnpm test` |
 | Evaluation | false-success and escalation cases execute in CI | PASS | current-head CI executes `pnpm eval:smoke` successfully; detailed measured results remain in `docs/EVALUATION.md` |
 | Lint/typecheck/format | repository checks | PASS | current-head CI executes format, lint, and typecheck successfully |
-| CI green | GitHub Actions run on current head | PASS | CI runs `32898802584` (push) and `32898808554` (PR) completed successfully on hardening candidate `5b0e2e4d41f26975ca9b190fe873935ea42ba88d`; this ledger-only follow-up must also pass exact-head CI |
-| Qodo review | genuine initial and follow-up review | BLOCKED | `/agentic_review` was requested three times on PR #2; GitHub still exposes no Qodo review submission or review comment |
+| CI green | GitHub Actions run on current head | PASS | hardening candidate `5b0e2e4d41f26975ca9b190fe873935ea42ba88d` passed push/PR runs `32898802584` and `32898808554`; ledger head `9093e9ee90d4f405ff81d31e95e4380827f2c6ae` passed push/PR runs `32898949166` and `32898953732`; final exact-head status is also checked in GitHub before handoff |
+| Qodo review | genuine initial and follow-up review | BLOCKED | `/agentic_review` was requested repeatedly on PR #2; GitHub still exposes no Qodo review submission or review comment |
 | Demo video | approximately 3–5 minutes with real sponsor path | BLOCKED | truthful live sponsor run is required before recording the requested end-to-end demo |
 | Human merge | reviewed PR merged by human authority | BLOCKED | PR #2 is open and mergeable; Qodo/live acceptance gates remain open |
 | Submission | official form complete | BLOCKED | requires live evidence, demo/publication assets, and human account action |
