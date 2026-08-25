@@ -1,6 +1,6 @@
 import { ApprovalRequest, RuntimeEvent, SessionState } from "../../domain/src/types";
 import { EvidenceStore } from "../../evidence/src";
-import { SessionStore } from "../../persistence/src";
+import { isRuntimeCheckpointStore, SessionStore } from "../../persistence/src";
 import { EventJournal } from "../../telemetry/src";
 import {
   ApprovalResponse,
@@ -46,7 +46,7 @@ export class DurableTrueForgeRuntime {
   public async start(state: SessionState, message: string): Promise<SessionState> {
     const sessionId = state.trueForgeSessionId ?? (await this.adapter.createSession());
     state.trueForgeSessionId = sessionId;
-    await this.sessionStore.save(state);
+    await this.persist(state);
 
     const result = await this.adapter.runTurn({
       sessionId,
@@ -54,7 +54,7 @@ export class DurableTrueForgeRuntime {
       onEvent: async (event) => this.handleEvent(state, event),
     });
     applyStreamCursor(state, result);
-    await this.sessionStore.save(state);
+    await this.persist(state);
     return state;
   }
 
@@ -87,7 +87,7 @@ export class DurableTrueForgeRuntime {
       async (event) => this.handleEvent(state, event),
     );
     applyStreamCursor(state, result);
-    await this.sessionStore.save(state);
+    await this.persist(state);
     return state;
   }
 
@@ -107,7 +107,7 @@ export class DurableTrueForgeRuntime {
       async (event) => this.handleEvent(state, event),
     );
     applyStreamCursor(state, result);
-    await this.sessionStore.save(state);
+    await this.persist(state);
     return state;
   }
 
@@ -128,8 +128,16 @@ export class DurableTrueForgeRuntime {
     }
     if (event.sequenceNumber !== undefined) state.lastSequenceNumber = event.sequenceNumber;
     if (isNewEvent) await this.journal.append(event);
-    await this.sessionStore.save(state);
+    await this.persist(state);
     if (isNewEvent) await this.onEvent?.(event, structuredClone(state));
+  }
+
+  private async persist(state: SessionState): Promise<void> {
+    if (isRuntimeCheckpointStore(this.sessionStore)) {
+      await this.sessionStore.saveCheckpoint(state, this.evidenceStore);
+      return;
+    }
+    await this.sessionStore.save(state);
   }
 }
 
