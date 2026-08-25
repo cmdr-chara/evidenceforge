@@ -13,6 +13,7 @@ const elements = {
   timeline: byId('phase-timeline'),
   contract: byId('success-contract'),
   contractCount: byId('contract-count'),
+  contractProgress: byId('contract-progress-bar'),
   specialists: byId('specialists'),
   hypotheses: byId('hypotheses'),
   evidence: byId('evidence-timeline'),
@@ -196,6 +197,7 @@ function renderTimeline(items) {
 function renderContract(criteria) {
   const passed = criteria.filter((item) => item.status === 'PASS').length;
   elements.contractCount.textContent = `${passed} / ${criteria.length}`;
+  elements.contractProgress.style.width = `${criteria.length === 0 ? 0 : (passed / criteria.length) * 100}%`;
   replace(elements.contract, criteria.map((criterion) => {
     const row = el('div');
     row.className = `contract-item ${criterion.status.toLowerCase()}`;
@@ -254,6 +256,7 @@ function renderEvidence(evidence) {
       ? '—'
       : new Date(parsedTime).toLocaleTimeString([], { hour12: false }));
     time.className = 'evidence-time';
+    if (!Number.isNaN(parsedTime)) time.dateTime = new Date(parsedTime).toISOString();
     const content = el('div');
     const kind = el('span', item.kind);
     kind.className = 'evidence-kind';

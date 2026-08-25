@@ -4,184 +4,157 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>EvidenceForge Incident Console</title>
-    <meta
-      name="description"
-      content="Evidence-gated CI incident resolution console built on TrueForge"
-    />
+    <meta name="theme-color" content="#090a08" />
+    <title>EvidenceForge — Incident Dossier</title>
+    <meta name="description" content="Evidence-gated CI incident resolution console built on TrueForge" />
+    <link rel="preload" href="/assets/evidence-strata.webp" as="image" type="image/webp" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Skip to incident dossier</a>
+
     <header class="topbar">
-      <div class="brand-block">
-        <div class="brand-mark" aria-hidden="true">EF</div>
-        <div>
-          <p class="eyebrow">TRUEFORGE INCIDENT HARNESS</p>
-          <h1>EvidenceForge</h1>
-        </div>
-      </div>
+      <a class="wordmark" href="#main-content" aria-label="EvidenceForge home">
+        <span class="wordmark-glyph" aria-hidden="true"><i></i><i></i></span>
+        <span>Evidence<span>Forge</span></span>
+      </a>
+      <p class="masthead-label">Evidence-gated incident control</p>
       <div class="topbar-actions">
-        <span id="connection-status" class="status-pill neutral">Connecting</span>
-        <button id="reset-button" class="button secondary" type="button">Reset fixture</button>
-        <button id="advance-button" class="button primary" type="button">Advance evidence</button>
+        <span id="connection-status" class="status-pill neutral" aria-live="polite">Connecting</span>
+        <button id="reset-button" class="button ghost" type="button">Reset fixture</button>
+        <button id="advance-button" class="button signal" type="button">Advance evidence <span aria-hidden="true">→</span></button>
       </div>
     </header>
 
-    <main>
-      <section class="hero panel" aria-labelledby="incident-title">
-        <div>
-          <div class="hero-meta">
-            <span id="mode-badge" class="status-pill warning">DETERMINISTIC FIXTURE</span>
-            <span id="phase-badge" class="status-pill active">INTAKE</span>
+    <main id="main-content">
+      <section class="dossier-hero" aria-labelledby="incident-title">
+        <div class="hero-copy">
+          <div class="hero-kicker">
+            <span>Incident dossier</span>
+            <span class="rule"></span>
+            <span id="mode-badge" class="status-pill warning">Deterministic fixture</span>
           </div>
-          <p class="eyebrow">INCIDENT</p>
-          <h2 id="incident-title">Loading incident…</h2>
-          <p id="incident-repository" class="mono muted"></p>
+          <h1 id="incident-title">Loading incident…</h1>
+          <p id="incident-repository" class="repository mono"></p>
           <p id="mode-notice" class="notice"></p>
         </div>
-        <dl class="hero-facts">
+        <div class="hero-visual" aria-hidden="true">
+          <img src="/assets/evidence-strata.webp" alt="" />
+          <div class="visual-readout"><span>Chain integrity</span><strong>Observed</strong></div>
+        </div>
+        <dl class="case-strip">
           <div>
-            <dt>Run</dt>
-            <dd id="incident-run" class="mono">—</dd>
+            <dt>Current gate</dt>
+            <dd><span id="phase-badge" class="status-pill active">Intake</span></dd>
           </div>
-          <div>
-            <dt>Revision</dt>
-            <dd id="incident-revision" class="mono">—</dd>
-          </div>
-          <div>
-            <dt>Trace</dt>
-            <dd id="trace-id" class="mono">—</dd>
-          </div>
+          <div><dt>Workflow run</dt><dd id="incident-run" class="mono">—</dd></div>
+          <div><dt>Revision</dt><dd id="incident-revision" class="mono">—</dd></div>
+          <div class="trace-fact"><dt>Trace</dt><dd id="trace-id" class="mono">—</dd></div>
         </dl>
       </section>
 
-      <section class="panel timeline-panel" aria-labelledby="timeline-heading">
+      <section class="phase-rail" aria-labelledby="timeline-heading">
+        <div class="section-index" aria-hidden="true">01</div>
         <div class="section-heading">
-          <div>
-            <p class="eyebrow">CONTROL PLANE</p>
-            <h2 id="timeline-heading">Phase timeline</h2>
-          </div>
-          <p class="muted">The model may propose progress. Application state controls transitions.</p>
+          <div><p class="eyebrow">Control plane</p><h2 id="timeline-heading">State, not sentiment</h2></div>
+          <p>The model proposes progress. The application authorizes each transition.</p>
         </div>
         <ol id="phase-timeline" class="timeline"></ol>
       </section>
 
-      <div class="dashboard-grid">
-        <section class="panel span-7" aria-labelledby="contract-heading">
+      <div class="workbench">
+        <section class="ledger contract-section" aria-labelledby="contract-heading">
+          <div class="section-index" aria-hidden="true">02</div>
           <div class="section-heading">
-            <div>
-              <p class="eyebrow">DEFINITION OF DONE</p>
-              <h2 id="contract-heading">Success contract</h2>
-            </div>
+            <div><p class="eyebrow">Definition of done</p><h2 id="contract-heading">Success contract</h2></div>
             <span id="contract-count" class="metric">0 / 0</span>
           </div>
+          <div class="contract-progress" aria-hidden="true"><i id="contract-progress-bar"></i></div>
           <div id="success-contract" class="contract-list"></div>
         </section>
 
-        <section class="panel span-5" aria-labelledby="specialists-heading">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">READ-ONLY FAN-OUT</p>
-              <h2 id="specialists-heading">Specialists</h2>
+        <div class="analysis-column">
+          <section class="ledger compact-section" aria-labelledby="specialists-heading">
+            <div class="section-heading">
+              <div><p class="eyebrow">Read-only fan-out</p><h2 id="specialists-heading">Specialist bench</h2></div>
+              <span class="permission-label">Write: disabled</span>
             </div>
-          </div>
-          <div id="specialists" class="specialist-list"></div>
-          <p class="footnote">All three share the sandbox. Write capabilities stay disabled until serialized patching.</p>
-        </section>
+            <div id="specialists" class="specialist-list"></div>
+            <p class="footnote">One sandbox, three independent readings. Mutation remains serialized.</p>
+          </section>
+          <section class="ledger compact-section" aria-labelledby="hypotheses-heading">
+            <div class="section-heading">
+              <div><p class="eyebrow">Causal model</p><h2 id="hypotheses-heading">Hypothesis ledger</h2></div>
+            </div>
+            <div id="hypotheses" class="hypothesis-list empty-state">No hypotheses recorded yet.</div>
+          </section>
+        </div>
 
-        <section class="panel span-5" aria-labelledby="hypotheses-heading">
+        <section class="ledger evidence-section" aria-labelledby="evidence-heading">
+          <div class="section-index" aria-hidden="true">03</div>
           <div class="section-heading">
-            <div>
-              <p class="eyebrow">CAUSAL MODEL</p>
-              <h2 id="hypotheses-heading">Hypothesis ledger</h2>
-            </div>
-          </div>
-          <div id="hypotheses" class="hypothesis-list empty-state">No hypotheses recorded yet.</div>
-        </section>
-
-        <section class="panel span-7" aria-labelledby="evidence-heading">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">PROVENANCE</p>
-              <h2 id="evidence-heading">Evidence timeline</h2>
-            </div>
+            <div><p class="eyebrow">Provenance</p><h2 id="evidence-heading">Admissible evidence</h2></div>
             <span id="evidence-count" class="metric">0 events</span>
           </div>
           <div id="evidence-timeline" class="evidence-list empty-state">No admissible evidence yet.</div>
         </section>
-
-        <section id="patch-panel" class="panel span-12 hidden" aria-labelledby="patch-heading">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">SERIALIZED MUTATION</p>
-              <h2 id="patch-heading">Candidate patch</h2>
-            </div>
-            <span id="patch-digest" class="mono digest"></span>
-          </div>
-          <pre id="patch-diff" class="diff" tabindex="0"></pre>
-        </section>
-
-        <section id="approval-panel" class="panel span-12 approval-panel hidden" aria-labelledby="approval-heading">
-          <div class="approval-icon" aria-hidden="true">!</div>
-          <div class="approval-content">
-            <p class="eyebrow">HUMAN CHECKPOINT</p>
-            <h2 id="approval-heading">External write requires approval</h2>
-            <p id="approval-reason" class="muted"></p>
-            <dl id="approval-arguments" class="approval-arguments"></dl>
-          </div>
-          <div class="approval-actions">
-            <button id="reject-button" class="button danger" type="button">Reject</button>
-            <button id="approve-button" class="button primary" type="button">Approve PR</button>
-          </div>
-        </section>
-
-        <section id="certificate-panel" class="panel span-12 certificate-panel hidden" aria-labelledby="certificate-heading">
-          <div class="certificate-header">
-            <div class="certificate-seal" aria-hidden="true">✓</div>
-            <div>
-              <p class="eyebrow">APPLICATION-ISSUED PROOF</p>
-              <h2 id="certificate-heading">Completion certificate</h2>
-              <p class="muted">Issued only after every required criterion has admissible PASS evidence.</p>
-            </div>
-          </div>
-          <div id="certificate-content" class="certificate-grid"></div>
-        </section>
       </div>
 
-      <section class="panel live-panel" aria-labelledby="live-heading">
+      <section id="patch-panel" class="ledger decision-panel hidden" aria-labelledby="patch-heading">
+        <div class="section-index" aria-hidden="true">04</div>
         <div class="section-heading">
-          <div>
-            <p class="eyebrow">LIVE TRUEFORGE MODE</p>
-            <h2 id="live-heading">Start from a real GitHub Actions run</h2>
-          </div>
-          <span class="status-pill neutral">Credentials required</span>
+          <div><p class="eyebrow">Serialized mutation</p><h2 id="patch-heading">Candidate patch</h2></div>
+          <span id="patch-digest" class="mono digest"></span>
+        </div>
+        <pre id="patch-diff" class="diff" tabindex="0"></pre>
+      </section>
+
+      <section id="approval-panel" class="approval-panel hidden" aria-labelledby="approval-heading">
+        <div class="approval-marker" aria-hidden="true">04 / HUMAN</div>
+        <div class="approval-content">
+          <p class="eyebrow">External boundary</p>
+          <h2 id="approval-heading">A human must authorize this write.</h2>
+          <p id="approval-reason"></p>
+          <dl id="approval-arguments" class="approval-arguments"></dl>
+        </div>
+        <div class="approval-actions">
+          <button id="reject-button" class="button danger" type="button">Reject</button>
+          <button id="approve-button" class="button signal" type="button">Approve PR <span aria-hidden="true">→</span></button>
+        </div>
+      </section>
+
+      <section id="certificate-panel" class="certificate-panel hidden" aria-labelledby="certificate-heading">
+        <div class="certificate-seal" aria-hidden="true">EF<span>✓</span></div>
+        <div class="certificate-body">
+          <p class="eyebrow">Application-issued proof</p>
+          <h2 id="certificate-heading">Completion certificate</h2>
+          <p>Every required criterion has admissible PASS evidence.</p>
+          <div id="certificate-content" class="certificate-grid"></div>
+        </div>
+      </section>
+
+      <section class="live-panel" aria-labelledby="live-heading">
+        <div class="live-intro">
+          <p class="eyebrow">Live TrueForge mode</p>
+          <h2 id="live-heading">Open a real incident.</h2>
+          <p>Bind a GitHub Actions failure to a durable, fail-closed investigation.</p>
         </div>
         <form id="live-form" class="live-form">
-          <label>
-            Repository
-            <input name="repository" autocomplete="off" placeholder="owner/repository" required />
-          </label>
-          <label>
-            Run ID
-            <input name="runId" autocomplete="off" placeholder="842" required />
-          </label>
-          <label>
-            Failing revision
-            <input name="revision" autocomplete="off" placeholder="commit SHA" required />
-          </label>
-          <button class="button primary" type="submit">Start live session</button>
+          <label><span>Repository</span><input name="repository" autocomplete="off" placeholder="owner/repository" required /></label>
+          <label><span>Run ID</span><input name="runId" inputmode="numeric" autocomplete="off" placeholder="842" required /></label>
+          <label><span>Failing revision</span><input name="revision" autocomplete="off" placeholder="commit SHA" required /></label>
+          <button class="button signal" type="submit">Start live session <span aria-hidden="true">→</span></button>
         </form>
-        <p id="live-status" class="notice">
-          Live mode creates a durable TrueForge session, streams runtime events, and uses the configured GitHub MCP and Daytona sandbox. It fails closed when infrastructure is absent.
+        <p id="live-status" class="live-status" aria-live="polite">
+          Credentials required · GitHub MCP + Daytona sandbox · fails closed if infrastructure is absent.
         </p>
       </section>
     </main>
 
     <footer>
       <p>Agents shouldn’t grade their own homework.</p>
-      <p class="mono">EvidenceForge · evidence-gated completion</p>
+      <p class="mono">EvidenceForge / evidence-gated completion</p>
     </footer>
-
     <script src="/app.js" defer></script>
   </body>
 </html>
