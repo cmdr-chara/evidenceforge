@@ -14,7 +14,7 @@ import {
   loadTrueForgeConfig,
   TrueForgeSdkAdapter,
 } from "../../../packages/trueforge/src";
-import { buildDefaultSuccessContract, SessionController } from "../../../packages/workflow/src";
+import { buildCiSuccessContract, SessionController } from "../../../packages/workflow/src";
 import { SseBroker } from "./sse-broker";
 
 export interface StartLiveIncidentInput {
@@ -42,7 +42,7 @@ export class LiveIncidentService {
       runId: input.runId,
       constraints: input.constraints,
     });
-    const state = createSessionState(task, buildDefaultSuccessContract(task));
+    const state = createSessionState(task, buildCiSuccessContract(task));
     await this.sessions.save(state);
     const runtime = this.createRuntime();
     const message = [
