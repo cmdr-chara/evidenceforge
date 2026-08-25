@@ -35,7 +35,7 @@ Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 | Test suite | no failures | PASS | 58 / 58 EvidenceForge tests |
 | Evaluation | five cases and FSR | PASS | FSR 0.00; S5 escalated |
 | Lint/typecheck/format | local checks | PASS | all passed |
-| CI green | GitHub Actions run | UNKNOWN | workflow added; no run observed yet |
+| CI green | GitHub Actions run | FAIL | run `32887542016` failed during setup because pnpm was unavailable before cache initialization; corrective commit pending |
 | Qodo review | genuine initial and follow-up review | BLOCKED | GitHub app installation/review required |
 | Demo video | approximately 3 minutes | BLOCKED | live sponsor run required first |
 | Submission | official form complete | BLOCKED | depends on live evidence and human submission |

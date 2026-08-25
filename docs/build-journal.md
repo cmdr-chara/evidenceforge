@@ -115,3 +115,23 @@ No TrueForge server, model credential, GitHub MCP credential, Daytona credential
 ### Honest blocked checks
 
 `node scripts/doctor.mjs` passed the Node, package-manager, and SDK-version checks, then reported missing TrueForge URL, model configuration, and installed dependencies. `node scripts/trueforge-smoke.mjs` failed closed because no TrueForge server was reachable. No live sponsor result was inferred from the adapter tests.
+
+## 2026-08-25 — first pull request CI diagnosis
+
+### Observed
+
+- PR #2 was open at commit `3aaed3c09d5d7571a5aedf235a0520f1d302dcc8`.
+- GitHub Actions run `32887542016` failed before installation or tests.
+- The failure occurred in `actions/setup-node@v4` because `cache: pnpm` was evaluated before a `pnpm` executable existed on `PATH`.
+- Qodo had been invoked with `/agentic_review`, but no Qodo review or finding was present yet.
+
+### Correction
+
+- Added `pnpm/action-setup@v4` before `actions/setup-node@v4`.
+- Pinned the action to the repository's declared pnpm version `11.16.0`.
+- Retained pnpm dependency caching and removed the now-redundant `corepack enable` CI step.
+
+### Verification
+
+- Local typecheck, lint, format checks, 58 tests, 3 fixture tests, and the five-case smoke evaluation still pass.
+- Remote CI status is pending the corrective commit; no green result is claimed until observed.
