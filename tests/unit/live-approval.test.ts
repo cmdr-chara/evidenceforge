@@ -59,7 +59,7 @@ test("live publishing rejects non-PR external writes in P0", () => {
   );
 });
 
-test("privileged live approvals remain denied by default", () => {
+test("privileged live approvals remain denied by the P0 policy", () => {
   assert.throws(
     () =>
       assertLiveApprovalReady(
@@ -70,7 +70,7 @@ test("privileged live approvals remain denied by default", () => {
           reversible: false,
         }),
       ),
-    /denied by default/,
+    /denied by the P0 policy/,
   );
 });
 
