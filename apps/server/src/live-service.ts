@@ -8,7 +8,10 @@ import {
   WorkflowPhase,
 } from "../../../packages/domain/src";
 import { EvidenceStore } from "../../../packages/evidence/src";
-import { JsonSessionStore } from "../../../packages/persistence/src";
+import {
+  JsonRuntimeCheckpointStore,
+  RuntimeCheckpoint,
+} from "../../../packages/persistence/src";
 import { ApprovalPolicy } from "../../../packages/policies/src";
 import { DIAGNOSTIC_SPECIALISTS } from "../../../packages/specialists/src";
 import { EventJournal } from "../../../packages/telemetry/src";
@@ -77,8 +80,9 @@ const TIMELINE_ORDER: WorkflowPhase[] = [
 
 export class LiveIncidentService {
   private readonly root = resolve(process.cwd(), ".evidenceforge");
-  private readonly sessions = new JsonSessionStore(join(this.root, "sessions"));
-  private readonly evidence = new EvidenceStore();
+  private readonly checkpoints = new JsonRuntimeCheckpointStore(
+    join(this.root, "checkpoints"),
+  );
   private readonly journal = new EventJournal(join(this.root, "events.jsonl"));
   private readonly approvalPolicy = new ApprovalPolicy();
 
@@ -95,9 +99,10 @@ export class LiveIncidentService {
       constraints: input.constraints,
     });
     const state = createSessionState(task, buildCiSuccessContract(task));
+    const evidenceStore = new EvidenceStore();
     const verifierManifest = buildVerifierManifest(state.successCriteria);
-    await this.sessions.save(state);
-    const runtime = this.createRuntime();
+    await this.checkpoints.saveCheckpoint(state, evidenceStore);
+    const runtime = this.createRuntime(evidenceStore);
     const message = [
       `Investigate GitHub Actions run ${task.source.runId} for ${task.repository} at ${task.revision}.`,
       "Define the success contract before patching.",
@@ -108,15 +113,17 @@ export class LiveIncidentService {
       "Do not claim completion; the application CompletionGate owns that decision.",
     ].join("\n");
     const updated = await runtime.start(state, message);
-    const snapshot = buildLiveConsoleSnapshot(updated, this.evidence);
+    const snapshot = buildLiveConsoleSnapshot(updated, evidenceStore);
     this.broker.publish("live-state", snapshot);
     return snapshot;
   }
 
   public async resume(taskId: string): Promise<LiveConsoleSnapshot> {
-    const state = await this.requireState(taskId);
-    const updated = await this.createRuntime().resume(state);
-    const snapshot = buildLiveConsoleSnapshot(updated, this.evidence);
+    const checkpoint = await this.requireCheckpoint(taskId);
+    const updated = await this.createRuntime(checkpoint.evidenceStore).resume(
+      checkpoint.state,
+    );
+    const snapshot = buildLiveConsoleSnapshot(updated, checkpoint.evidenceStore);
     this.broker.publish("live-state", snapshot);
     return snapshot;
   }
@@ -126,12 +133,14 @@ export class LiveIncidentService {
     approvalId: string,
     decision: "APPROVED" | "DENIED",
   ): Promise<LiveConsoleSnapshot> {
-    const state = await this.requireState(taskId);
+    const checkpoint = await this.requireCheckpoint(taskId);
+    const evidenceStore = checkpoint.evidenceStore;
+    const state = checkpoint.state;
     const existing = state.approvals.find((approval) => approval.id === approvalId);
     if (existing === undefined) throw new Error(`unknown approval request: ${approvalId}`);
     if (existing.status !== "PENDING") throw new Error(`approval ${approvalId} is already decided`);
     if (decision === "APPROVED") {
-      assertLiveApprovalReady(state, existing, this.evidence, this.approvalPolicy);
+      assertLiveApprovalReady(state, existing, evidenceStore, this.approvalPolicy);
     }
 
     const controller = new SessionController(state);
@@ -140,11 +149,11 @@ export class LiveIncidentService {
       controller.replaceState(updated);
       updated = controller.transition("BLOCKED", "APPLICATION", `approval ${approvalId} was denied`);
     }
-    await this.sessions.save(updated);
+    await this.checkpoints.saveCheckpoint(updated, evidenceStore);
 
     const decided = updated.approvals.find((approval) => approval.id === approvalId);
     if (decided === undefined) throw new Error(`approval ${approvalId} disappeared after persistence`);
-    updated = await this.createRuntime().submitApproval(
+    updated = await this.createRuntime(evidenceStore).submitApproval(
       updated,
       decided,
       decision,
@@ -162,34 +171,39 @@ export class LiveIncidentService {
         "APPLICATION",
         `TrueForge accepted approval ${approvalId}`,
       );
-      await this.sessions.save(updated);
+      await this.checkpoints.saveCheckpoint(updated, evidenceStore);
     }
-    const snapshot = buildLiveConsoleSnapshot(updated, this.evidence);
+    const snapshot = buildLiveConsoleSnapshot(updated, evidenceStore);
     this.broker.publish("live-state", snapshot);
     return snapshot;
   }
 
   public async load(taskId: string): Promise<LiveConsoleSnapshot | undefined> {
-    const state = await this.sessions.load(taskId);
-    return state === undefined ? undefined : buildLiveConsoleSnapshot(state, this.evidence);
+    const checkpoint = await this.checkpoints.loadCheckpoint(taskId);
+    return checkpoint === undefined
+      ? undefined
+      : buildLiveConsoleSnapshot(checkpoint.state, checkpoint.evidenceStore);
   }
 
-  private async requireState(taskId: string): Promise<SessionState> {
-    const state = await this.sessions.load(taskId);
-    if (state === undefined) throw new Error(`unknown live task ${taskId}`);
-    return state;
+  private async requireCheckpoint(taskId: string): Promise<RuntimeCheckpoint> {
+    const checkpoint = await this.checkpoints.loadCheckpoint(taskId);
+    if (checkpoint === undefined) throw new Error(`unknown live task ${taskId}`);
+    return checkpoint;
   }
 
-  private createRuntime(): DurableTrueForgeRuntime {
+  private createRuntime(evidenceStore: EvidenceStore): DurableTrueForgeRuntime {
     const config = loadTrueForgeConfig();
     return new DurableTrueForgeRuntime(
       new TrueForgeSdkAdapter(config),
-      this.sessions,
-      this.evidence,
+      this.checkpoints,
+      evidenceStore,
       this.journal,
       (event, state) => {
         this.broker.publish("runtime-event", event);
-        this.broker.publish("live-state", buildLiveConsoleSnapshot(state, this.evidence));
+        this.broker.publish(
+          "live-state",
+          buildLiveConsoleSnapshot(state, evidenceStore),
+        );
       },
     );
   }
