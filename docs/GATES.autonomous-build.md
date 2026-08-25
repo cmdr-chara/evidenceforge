@@ -1,6 +1,6 @@
 # Autonomous build gate ledger
 
-**Last updated:** 2026-08-25T18:29:10Z
+**Last updated:** 2026-08-25T19:11:00Z
 
 Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 
@@ -35,8 +35,8 @@ Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 | Test suite | no failures | PASS | 58 / 58 EvidenceForge tests |
 | Evaluation | five cases and FSR | PASS | FSR 0.00; S5 escalated |
 | Lint/typecheck/format | local checks | PASS | all passed |
-| CI green | GitHub Actions run | FAIL | run `32887542016` failed during setup because pnpm was unavailable before cache initialization; corrective commit pending |
-| Qodo review | genuine initial and follow-up review | BLOCKED | GitHub app installation/review required |
+| CI green | GitHub Actions run | PASS | run `32887937986` completed successfully: install, format, lint, typecheck, 58 tests, smoke evaluation, and demo fixture |
+| Qodo review | genuine initial and follow-up review | BLOCKED | `/agentic_review` requested on PR #2, but no Qodo review response has been observed |
 | Demo video | approximately 3 minutes | BLOCKED | live sponsor run required first |
 | Submission | official form complete | BLOCKED | depends on live evidence and human submission |
 
@@ -45,5 +45,5 @@ Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 1. Install or authorize Qodo for `cmdr-chara/evidenceforge`.
 2. Configure a TrueForge server with a model, GitHub MCP, Daytona, and the four skills.
 3. Approve the prepared demo-branch push and later the exact PR creation action.
-4. Run and preserve the live smoke, CI, Qodo, PR, and reconciliation evidence.
+4. Run and preserve the live smoke, Qodo, PR, and reconciliation evidence.
 5. Record/upload the demo and complete the submission form.
