@@ -3,20 +3,32 @@ import {
   RuntimeEvent,
   SessionState,
   ToolResult,
+  VerificationResult,
 } from "../../domain/src/types";
+import { EvidenceStore } from "../../evidence/src";
 import { RiskPolicy } from "../../policies/src";
 import { TrueForgeEventIndex } from "./event-index";
+import { TrueForgeVerifierProjector } from "./verifier-projection";
 
 export interface RuntimeProjection {
   toolResult?: ToolResult;
+  verificationResult?: VerificationResult;
+  verifierRejection?: string;
   approvalIds: string[];
   error?: string;
 }
 
 export class TrueForgeEventProjector {
   private readonly eventIndex = new TrueForgeEventIndex();
+  private readonly verifierProjector?: TrueForgeVerifierProjector;
 
-  public constructor(private readonly riskPolicy = new RiskPolicy()) {}
+  public constructor(
+    private readonly riskPolicy = new RiskPolicy(),
+    evidenceStore?: EvidenceStore,
+  ) {
+    this.verifierProjector =
+      evidenceStore === undefined ? undefined : new TrueForgeVerifierProjector(evidenceStore);
+  }
 
   public registerApprovalToolCall(approval: ApprovalRequest): void {
     if (approval.toolCallId === undefined || approval.threadId === undefined) {
@@ -44,8 +56,16 @@ export class TrueForgeEventProjector {
 
     if (event.type === "TOOL_RESULT") {
       try {
+        const toolResult = this.eventIndex.toolResultFrom(event.payload);
+        const toolCall = this.eventIndex.getToolCall(toolResult.callId);
+        if (toolCall === undefined) {
+          throw new Error(`correlated tool call ${toolResult.callId} disappeared from the index`);
+        }
+        const verification = this.verifierProjector?.project(state, toolCall, toolResult);
         return {
-          toolResult: this.eventIndex.toolResultFrom(event.payload),
+          toolResult,
+          verificationResult: verification?.result,
+          verifierRejection: verification?.rejection,
           approvalIds: [],
         };
       } catch (error) {
