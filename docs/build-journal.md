@@ -200,3 +200,31 @@ GitHub Actions run `32888513388` passed:
 Four new tests cover missing verifier results, retry recovery after an earlier deterministic failure, verifier/evidence mismatch, and mandatory external reconciliation.
 
 Qodo was triggered twice on PR #2 but still produced no observable review or finding. That blocker remains documented rather than fabricated.
+
+## 2026-08-25 — exact approval binding
+
+### Finding
+
+The pull-request approval object and the prepared external action shared the same mutable argument object. `applyApproval` also accepted an approval based only on its status and risk policy. That meant a mutated approval snapshot, an unrelated approval, or a replayed approval was not structurally rejected by the external-action coordinator.
+
+### Correction
+
+- Approval arguments are now a deep-cloned snapshot of the prepared PR arguments.
+- The coordinator verifies the exact action name, `EXTERNAL_REVERSIBLE` risk, reversibility, and deep equality of normalized arguments.
+- Approval can be applied only while the external action is `PREPARED`.
+- Reusing the approval after the action becomes `APPROVED` is rejected.
+- Mutation of the approval display payload cannot mutate the prepared action.
+
+### Verified remotely
+
+GitHub Actions run `32888882163` passed:
+
+- dependency installation;
+- format check;
+- lint across 119 files;
+- TypeScript typecheck;
+- 65 / 65 EvidenceForge tests;
+- five-case smoke evaluation with false-success rate `0.00`;
+- 3 / 3 healthy demo-fixture tests.
+
+Three new tests cover argument substitution, unrelated approval reuse, and approval replay. No Qodo response was observed after two `/agentic_review` requests; Qodo remains an external blocker.
