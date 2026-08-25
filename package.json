@@ -21,6 +21,7 @@
     "test:failure-injection": "node scripts/run-tests.mjs failure-injection",
     "eval:smoke": "node scripts/run-eval.mjs --smoke",
     "eval": "node scripts/run-eval.mjs",
+    "eval:report": "node scripts/run-eval.mjs --write-report",
     "dev": "node scripts/dev.mjs",
     "start": "node dist/apps/server/src/index.js",
     "doctor": "node scripts/doctor.mjs",

@@ -1,107 +1,96 @@
 # Evaluation
 
-## Objective
+## Question and baseline
 
-EvidenceForge is optimized against **false success**, not confident prose.
+EvidenceForge is optimized against false success. The comparison applies the same deterministic scenario inputs to:
+
+1. an unenforced baseline approximating a TrueForge agent flow where model/reviewer success may terminate without `CompletionGate`;
+2. the same inputs plus EvidenceForge deterministic verification, replay, approval, loop, and completion policy.
+
+This isolates control-policy behavior. It does **not** compare model quality or claim live TrueForge, GitHub MCP, Daytona, network, token, or end-to-end latency performance.
 
 ```text
-False Success Rate =
-completed tasks whose independent oracle says incomplete
---------------------------------------------------------
-all tasks marked completed
+False Success Rate = incomplete tasks marked COMPLETED / all tasks marked COMPLETED
 ```
 
-A correct escalation is preferable to an unsupported completion.
+A correct `BLOCKED` or `ESCALATED` result is preferable to unsupported completion, but is not counted as task completion.
 
-## Evaluation corpus
+## Corpus
 
-| Case | Purpose | Expected |
-|---|---|---|
-| S1 | configuration-order regression | `COMPLETED` with certificate |
-| S2 | dependency/config mismatch | identify non-source cause and complete |
-| S3 | source regression | code fix plus regression verification |
-| S4 | misleading evidence | reject plausible model-only claim, then complete on real evidence |
-| S5 | intentionally ambiguous/unresolvable | `ESCALATED`, never false success |
+The 15 cases include five incident fixtures and ten adversarial controls:
 
-## Latest observed local run
-
-**Run timestamp:** 2026-08-25T18:29:10Z
-
-Commands actually executed:
-
-```bash
-node scripts/run-tests.mjs
-node scripts/run-eval.mjs
-node --test demo/incident-fixture/test/*.test.mjs
-```
-
-Observed results:
-
-- EvidenceForge tests: **58 passed, 0 failed**.
-- Healthy demo fixture tests: **3 passed, 0 failed**.
-- Evaluation cases: **5 executed**.
-- Completed resolvable cases: **4 / 4**.
-- Safe escalations: **1 / 1**.
-- False-success completions: **0**.
-
-| Metric | Observed |
-|---|---:|
-| False Success Rate | 0.00 |
-| True completion precision | 1.00 |
-| Task success rate on resolvable fixture cases | 1.00 |
-| Failure reproduction rate | 0.80 |
-| Required-criterion verification coverage | 0.80 |
-| Escalation rate | 0.20 |
-
-The 0.80 reproduction and verification rates are intentional: S5 has insufficient evidence and escalates without claiming reproduction or passing criteria.
-
-## What these numbers do not mean
-
-These are deterministic fixture results. They do **not** establish:
-
-- live TrueForge reliability;
-- live GitHub MCP correctness;
-- Daytona provisioning success;
-- Qodo review quality;
-- performance across arbitrary repositories;
-- general model accuracy.
-
-Those claims remain blocked until real sponsor-infrastructure runs are captured.
-
-## Failure-injection coverage
-
-The suite covers:
-
-| Failure | Expected behavior |
+| ID | Scenario |
 |---|---|
-| GitHub 429 | bounded backoff, then escalation |
-| GitHub 500 | bounded transient policy |
-| malformed event | normalized without granting evidence |
-| sandbox crash | recreate exact revision and restore known patch |
-| specialist timeout | preserve partial results and identify missing specialist |
-| incorrect hypothesis | refute only with evidence |
-| patch still fails | semantic replan |
-| approval denied | no publish; `BLOCKED` |
-| oversized log | reject unbounded request |
-| verifier never runs | completion impossible |
-| reviewer PASS + test FAIL | deterministic failure wins |
-| possible PR timeout after write | reconcile before retry |
+| S1–S4 | resolvable configuration, dependency, source, and misleading-evidence cases |
+| S5 | intentionally ambiguous/unresolvable evidence |
+| A1 | model claims success while a test fails |
+| A2 | reviewer PASS while deterministic verification fails |
+| A3 | verifier never runs |
+| A4 | repeated identical failed command |
+| A5 | repeated semantically equivalent failed patch |
+| A6 | crash after an unsafe effect begins |
+| A7 | crash after a replay-safe read begins |
+| A8 | external timeout after possible success |
+| A9 | stale/substituted approval |
+| A10 | evidence missing after model-context compaction |
 
-## Reproduction
+## Latest observed deterministic run
+
+**Report:** `evals/reports/2026-08-25-comparison.json`
+
+**Command:**
 
 ```bash
-corepack enable
-pnpm install --no-frozen-lockfile
+pnpm eval:report
+```
+
+| Metric | Unenforced baseline | EvidenceForge |
+|---|---:|---:|
+| False-success rate | 0.5714 | 0.0000 |
+| True completion precision | 0.4286 | 1.0000 |
+| Overall task completion rate | 0.9333 | 0.4000 |
+| Resolvable-task completion rate | 1.0000 | 1.0000 |
+| Verification coverage | 0.8667 | 0.8667 |
+| Recovery success | 0.3333 | 0.6667 |
+| Repeated no-progress attempts | 6 | 6 |
+| Retries | 11 | 2 |
+| Replans | 0 | 11 |
+| Unnecessary actions | 8 | 0 |
+| Human interventions | 0 | 9 |
+| Tool calls | 64 | 56 |
+
+The high baseline completion rate is not a quality win: eight of its fourteen completions are false success. EvidenceForge completed all six oracle-resolvable cases, blocked or escalated all nine incomplete/unsafe cases, and issued certificates only for its six valid completions. Human intervention rises because honest blocking/escalation is recorded instead of silently converted to success.
+
+`controlEvaluationLatencyMs` in the JSON report is measured local JavaScript decision time only. It is intentionally not summarized as an operational latency claim because this small fixture run excludes the model, tools, sandbox, and network and is sensitive to local scheduling.
+
+## Instrumentation definitions
+
+- **Verification coverage:** fraction of cases whose required deterministic verifier executed; deliberately below 1 because S5 and A3 model a missing verifier.
+- **Recovery success:** successful policy-correct recovery among cases with interrupted effects. Blocking a `NEVER` operation is safe behavior but is not counted as recovered completion.
+- **No-progress attempts:** repeated equivalent attempts after the first fingerprint occurrence. EvidenceForge still observes the pattern before escalation; retry/replan counts show how it responds.
+- **Unnecessary actions:** duplicate or otherwise avoidable effects encoded by the fixture oracle.
+- **Human interventions:** fixture outcomes that explicitly require a human because the workflow blocks or escalates.
+- **Tool calls:** scenario-instrumented calls under the shared fixture definition, not live TrueForge telemetry.
+
+## Reproduction and regression coverage
+
+```bash
 pnpm test
 pnpm eval:smoke
+pnpm eval:report
 ```
 
-The evaluator emits JSON so future live case runs can be stored without manually editing results.
+The test suite separately exercises real control-plane code for replay-policy selection, durable intent/effect/settlement checkpoints, uncertain recovery, round evaluation, stop guarding, loop fingerprints, exact mutations, approval expiry/consumption, authoritative evidence after compaction, and process-level checkpoint restore.
 
-## Next evaluation work
+## External evidence still required
 
-1. Add real GitHub Actions runs with immutable run IDs and commit SHAs.
-2. Add live Daytona reproduction records.
-3. Measure tool calls, latency, token use, retries, and human interventions from TrueForge events.
-4. Compare at least one model configuration without changing the deterministic gate.
-5. Preserve all failed runs, not only successful demonstrations.
+These deterministic results do not establish:
+
+- live TrueForge/model reliability;
+- real GitHub MCP incident reads or pull-request reconciliation;
+- Daytona provisioning or isolation success;
+- Qodo review quality;
+- arbitrary-repository generalization;
+- live token, cost, or end-to-end latency characteristics.
+
+Those remain blocked until credentialed runs with immutable runtime, GitHub, and sandbox identifiers are captured. Failed live runs must be retained alongside successes.

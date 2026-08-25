@@ -51,7 +51,7 @@
 - [x] typecheck passes locally.
 - [x] 58 EvidenceForge tests pass locally.
 - [x] 3 fixture tests pass locally.
-- [x] five-case smoke eval passes.
+- [x] 15-case same-input baseline comparison passes.
 - [x] false-success metric implemented.
 - [x] failure-injection cases implemented.
 - [x] CI workflow added.

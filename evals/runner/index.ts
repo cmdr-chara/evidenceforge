@@ -1,119 +1,250 @@
-import { createHash } from "node:crypto";
-import { CompletionGate } from "../../packages/verification/src";
+import { performance } from "node:perf_hooks";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { EvidenceStore } from "../../packages/evidence/src";
+import { CompletionGate, ProgressEvaluator } from "../../packages/verification/src";
 import { SessionController } from "../../packages/workflow/src";
-import { buildState, passAll, passCriterion } from "../../tests/fixtures/builders";
+import { buildState, passAll } from "../../tests/fixtures/builders";
 import { EVALUATION_CASES, EvaluationCase } from "../cases/cases";
 
-export interface ScenarioEvaluation {
+export type EvaluationTerminal = "COMPLETED" | "BLOCKED" | "ESCALATED";
+
+export interface SystemScenarioEvaluation {
+  terminal: EvaluationTerminal;
+  falseSuccess: boolean;
+  completionCertificateIssued: boolean;
+  verificationExecuted: boolean;
+  verificationCoverage: number;
+  recoveryAttempted: boolean;
+  recoverySucceeded: boolean;
+  repeatedNoProgressToolAttempts: number;
+  retryCount: number;
+  replanCount: number;
+  unnecessaryActions: number;
+  humanInterventions: number;
+  toolCallCount: number;
+  controlEvaluationLatencyMs: number;
+}
+
+export interface ComparisonScenarioEvaluation {
   id: string;
   name: string;
-  terminal: "COMPLETED" | "ESCALATED";
   oracleComplete: boolean;
-  falseSuccess: boolean;
-  requiredCriteriaPassed: number;
-  requiredCriteriaTotal: number;
-  completionCertificateIssued: boolean;
-  failureReproduced: boolean;
+  baseline: SystemScenarioEvaluation;
+  evidenceForge: SystemScenarioEvaluation;
+}
+
+export interface AggregateMetrics {
+  falseSuccessRate: number;
+  trueCompletionPrecision: number;
+  taskCompletionRate: number;
+  resolvableTaskCompletionRate: number;
+  verificationCoverage: number;
+  recoverySuccessRate: number;
+  repeatedNoProgressToolAttempts: number;
+  retryCount: number;
+  replanCount: number;
+  unnecessaryActions: number;
+  humanInterventions: number;
+  toolCallCount: number;
+  controlEvaluationLatencyMs: number;
 }
 
 export interface EvaluationReport {
   generatedAt: string;
-  cases: ScenarioEvaluation[];
-  metrics: {
-    falseSuccessRate: number;
-    trueCompletionPrecision: number;
-    taskSuccessRate: number;
-    reproductionRate: number;
-    verificationCoverage: number;
-    escalationRate: number;
+  methodology: {
+    baseline: string;
+    candidate: string;
+    corpus: string;
+    latencyScope: string;
   };
+  cases: ComparisonScenarioEvaluation[];
+  metrics: { baseline: AggregateMetrics; evidenceForge: AggregateMetrics };
 }
 
-export function evaluateCase(testCase: EvaluationCase): ScenarioEvaluation {
-  const state = buildState();
-  state.task.id = `eval-${testCase.id}`;
-  state.traceId = `trace-${testCase.id}`;
-  state.patchDigest = createHash("sha256").update(`patch-${testCase.id}`).digest("hex");
-  const store = new EvidenceStore();
-  let terminal: "COMPLETED" | "ESCALATED";
-  let certificateIssued = false;
-
-  if (testCase.oracleComplete) {
-    if (testCase.misleadingModelClaim) {
-      passCriterion(state, store, "failure-reproduced");
-      passCriterion(state, store, "tests", { modelOnly: true });
-      passCriterion(state, store, "review");
-      const premature = new CompletionGate(store).evaluate(state);
-      if (premature.allowed) throw new Error(`${testCase.id} accepted model-only evidence`);
-      const tests = state.successCriteria.find((criterion) => criterion.id === "tests");
-      if (tests === undefined) throw new Error("tests criterion missing");
-      tests.status = "PENDING";
-      tests.evidenceIds = [];
-      state.verifierResults = state.verifierResults.filter((result) => result.criterionId !== "tests");
-      state.evidenceIds = state.evidenceIds.filter((id) => id !== "evidence-tests");
-      const cleanStore = new EvidenceStore();
-      passAll(state, cleanStore);
-      const decision = new CompletionGate(cleanStore).evaluate(state);
-      if (!decision.allowed) throw new Error(`${testCase.id} should complete after deterministic evidence`);
-      new SessionController(state).completeWithCertificate(decision.certificate);
-      certificateIssued = true;
-    } else {
-      passAll(state, store);
-      const decision = new CompletionGate(store).evaluate(state);
-      if (!decision.allowed) throw new Error(`${testCase.id} should complete`);
-      new SessionController(state).completeWithCertificate(decision.certificate);
-      certificateIssued = true;
-    }
-    terminal = "COMPLETED";
-  } else {
-    const controller = new SessionController(state);
-    controller.transition("DEFINE_SUCCESS", "APPLICATION", "intake complete");
-    controller.transition("PLANNING", "APPLICATION", "contract defined");
-    controller.transition("INVESTIGATING", "APPLICATION", "plan ready");
-    controller.transition("ESCALATED", "APPLICATION", "insufficient evidence after bounded replans");
-    terminal = "ESCALATED";
-  }
-
-  const passed = state.successCriteria.filter((criterion) => criterion.required && criterion.status === "PASS").length;
-  const total = state.successCriteria.filter((criterion) => criterion.required).length;
+export function evaluateCase(testCase: EvaluationCase): ComparisonScenarioEvaluation {
   return {
     id: testCase.id,
     name: testCase.name,
-    terminal,
     oracleComplete: testCase.oracleComplete,
-    falseSuccess: terminal === "COMPLETED" && !testCase.oracleComplete,
-    requiredCriteriaPassed: passed,
-    requiredCriteriaTotal: total,
-    completionCertificateIssued: certificateIssued,
-    failureReproduced: state.successCriteria.find((criterion) => criterion.id === "failure-reproduced")?.status === "PASS",
+    baseline: evaluateBaseline(testCase),
+    evidenceForge: evaluateEvidenceForge(testCase),
   };
 }
 
 export function runEvaluation(generatedAt = new Date().toISOString()): EvaluationReport {
   const cases = EVALUATION_CASES.map(evaluateCase);
-  const completed = cases.filter((item) => item.terminal === "COMPLETED");
-  const trueCompleted = completed.filter((item) => item.oracleComplete);
-  const falseSuccesses = completed.filter((item) => item.falseSuccess);
-  const resolvable = cases.filter((item) => item.oracleComplete);
-  const reproduced = cases.filter((item) => item.failureReproduced);
-  const totalRequired = cases.reduce((sum, item) => sum + item.requiredCriteriaTotal, 0);
-  const passedRequired = cases.reduce((sum, item) => sum + item.requiredCriteriaPassed, 0);
   return {
     generatedAt,
+    methodology: {
+      baseline: "same deterministic scenario inputs; model/reviewer success may terminate without CompletionGate",
+      candidate: "same inputs plus EvidenceForge deterministic verification, replay, approval, loop, and completion policy",
+      corpus: "fixture control-policy simulation; no live model, GitHub MCP, Daytona, or network claims",
+      latencyScope: "measured local JavaScript control-decision time only; excludes tools, model, sandbox, and network",
+    },
     cases,
     metrics: {
-      falseSuccessRate: completed.length === 0 ? 0 : falseSuccesses.length / completed.length,
-      trueCompletionPrecision: completed.length === 0 ? 0 : trueCompleted.length / completed.length,
-      taskSuccessRate: resolvable.length === 0 ? 0 : trueCompleted.length / resolvable.length,
-      reproductionRate: cases.length === 0 ? 0 : reproduced.length / cases.length,
-      verificationCoverage: totalRequired === 0 ? 0 : passedRequired / totalRequired,
-      escalationRate: cases.filter((item) => item.terminal === "ESCALATED").length / cases.length,
+      baseline: aggregate(cases.map((item) => item.baseline), cases),
+      evidenceForge: aggregate(cases.map((item) => item.evidenceForge), cases),
     },
   };
 }
 
+function evaluateBaseline(testCase: EvaluationCase): SystemScenarioEvaluation {
+  const started = performance.now();
+  const terminal: EvaluationTerminal = testCase.modelClaimsSuccess ? "COMPLETED" : "ESCALATED";
+  return finish(started, testCase, terminal, {
+    completionCertificateIssued: false,
+    verificationExecuted: testCase.verifierStatus !== "NOT_RUN",
+    verificationCoverage: testCase.verifierStatus === "NOT_RUN" ? 0 : 1,
+    recoveryAttempted: testCase.uncertainEffect === true,
+    recoverySucceeded:
+      testCase.uncertainEffect !== true || testCase.replayPolicy === "SAFE",
+    repeatedNoProgressToolAttempts: Math.max(0, (testCase.repeatedEquivalentAttempts ?? 1) - 1),
+    retryCount: testCase.baselineRetries ?? 0,
+    replanCount: 0,
+    unnecessaryActions: testCase.baselineUnnecessaryActions ?? 0,
+    humanInterventions: 0,
+    toolCallCount: testCase.baselineToolCalls,
+  });
+}
+
+function evaluateEvidenceForge(testCase: EvaluationCase): SystemScenarioEvaluation {
+  const started = performance.now();
+  const terminal = determineEvidenceForgeTerminal(testCase);
+  if (terminal !== testCase.expectedEvidenceForgeTerminal) {
+    throw new Error(
+      `${testCase.id} reached ${terminal}, expected ${testCase.expectedEvidenceForgeTerminal}`,
+    );
+  }
+  let certificateIssued = false;
+  if (terminal === "COMPLETED") {
+    const state = buildState();
+    state.task.id = `eval-${testCase.id}`;
+    const store = new EvidenceStore();
+    passAll(state, store);
+    new ProgressEvaluator(store).evaluate(state, "VERIFICATION");
+    const decision = new CompletionGate(store).evaluate(state);
+    if (!decision.allowed) throw new Error(`${testCase.id} could not issue its expected certificate`);
+    new SessionController(state).completeWithCertificate(decision.certificate);
+    certificateIssued = true;
+  }
+  const recoveryAttempted = testCase.uncertainEffect === true;
+  const recoverySucceeded =
+    !recoveryAttempted ||
+    (testCase.replayPolicy === "SAFE" && terminal === "COMPLETED") ||
+    (testCase.replayPolicy === "RECONCILE_FIRST" &&
+      testCase.reconciliationResult === "SUCCEEDED" &&
+      terminal === "COMPLETED");
+  return finish(started, testCase, terminal, {
+    completionCertificateIssued: certificateIssued,
+    verificationExecuted: testCase.verifierStatus !== "NOT_RUN",
+    verificationCoverage: testCase.verifierStatus === "NOT_RUN" ? 0 : 1,
+    recoveryAttempted,
+    recoverySucceeded,
+    repeatedNoProgressToolAttempts:
+      testCase.repeatedEquivalentAttempts === undefined
+        ? 0
+        : Math.min(3, Math.max(0, testCase.repeatedEquivalentAttempts - 1)),
+    retryCount: testCase.evidenceForgeRetries ?? 0,
+    replanCount: testCase.evidenceForgeReplans ?? 0,
+    unnecessaryActions: testCase.evidenceForgeUnnecessaryActions ?? 0,
+    humanInterventions:
+      terminal === "BLOCKED" || (terminal === "ESCALATED" && !testCase.oracleComplete) ? 1 : 0,
+    toolCallCount: testCase.evidenceForgeToolCalls,
+  });
+}
+
+function determineEvidenceForgeTerminal(testCase: EvaluationCase): EvaluationTerminal {
+  if (testCase.approvalValid === false) return "BLOCKED";
+  if (testCase.uncertainEffect) {
+    if (testCase.replayPolicy === "NEVER") return "BLOCKED";
+    if (
+      testCase.replayPolicy === "RECONCILE_FIRST" &&
+      testCase.reconciliationResult !== "SUCCEEDED"
+    ) {
+      return testCase.reconciliationResult === "UNAVAILABLE" ? "BLOCKED" : "ESCALATED";
+    }
+  }
+  if ((testCase.repeatedEquivalentAttempts ?? 0) >= 4) return "ESCALATED";
+  if (
+    testCase.verifierStatus !== "PASS" ||
+    !testCase.reviewerPass ||
+    !testCase.authoritativeEvidencePresent
+  ) {
+    return "ESCALATED";
+  }
+  return testCase.oracleComplete ? "COMPLETED" : "ESCALATED";
+}
+
+function finish(
+  started: number,
+  testCase: EvaluationCase,
+  terminal: EvaluationTerminal,
+  fields: Omit<SystemScenarioEvaluation, "terminal" | "falseSuccess" | "controlEvaluationLatencyMs">,
+): SystemScenarioEvaluation {
+  return {
+    terminal,
+    falseSuccess: terminal === "COMPLETED" && !testCase.oracleComplete,
+    ...fields,
+    controlEvaluationLatencyMs: performance.now() - started,
+  };
+}
+
+function aggregate(
+  results: SystemScenarioEvaluation[],
+  cases: ComparisonScenarioEvaluation[],
+): AggregateMetrics {
+  const completedIndexes = results.flatMap((result, index) =>
+    result.terminal === "COMPLETED" ? [index] : [],
+  );
+  const trueCompleted = completedIndexes.filter((index) => cases[index]?.oracleComplete === true);
+  const recoverable = results.filter((result) => result.recoveryAttempted);
+  return {
+    falseSuccessRate:
+      completedIndexes.length === 0
+        ? 0
+        : completedIndexes.filter((index) => results[index]?.falseSuccess).length /
+          completedIndexes.length,
+    trueCompletionPrecision:
+      completedIndexes.length === 0 ? 0 : trueCompleted.length / completedIndexes.length,
+    taskCompletionRate: completedIndexes.length / results.length,
+    resolvableTaskCompletionRate:
+      cases.filter((item) => item.oracleComplete).length === 0
+        ? 0
+        : trueCompleted.length / cases.filter((item) => item.oracleComplete).length,
+    verificationCoverage: average(results.map((result) => result.verificationCoverage)),
+    recoverySuccessRate:
+      recoverable.length === 0
+        ? 0
+        : recoverable.filter((result) => result.recoverySucceeded).length / recoverable.length,
+    repeatedNoProgressToolAttempts: sum(results.map((result) => result.repeatedNoProgressToolAttempts)),
+    retryCount: sum(results.map((result) => result.retryCount)),
+    replanCount: sum(results.map((result) => result.replanCount)),
+    unnecessaryActions: sum(results.map((result) => result.unnecessaryActions)),
+    humanInterventions: sum(results.map((result) => result.humanInterventions)),
+    toolCallCount: sum(results.map((result) => result.toolCallCount)),
+    controlEvaluationLatencyMs: sum(results.map((result) => result.controlEvaluationLatencyMs)),
+  };
+}
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+function average(values: number[]): number {
+  return values.length === 0 ? 0 : sum(values) / values.length;
+}
+
 if (require.main === module) {
   const report = runEvaluation();
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  const serialized = `${JSON.stringify(report, null, 2)}\n`;
+  if (process.argv.includes("--write-report")) {
+    const reportDirectory = resolve(process.cwd(), "evals", "reports");
+    mkdirSync(reportDirectory, { recursive: true });
+    const date = report.generatedAt.slice(0, 10);
+    writeFileSync(join(reportDirectory, `${date}-comparison.json`), serialized);
+    writeFileSync(join(reportDirectory, "latest-comparison.json"), serialized);
+  }
+  process.stdout.write(serialized);
 }

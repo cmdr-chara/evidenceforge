@@ -228,3 +228,36 @@ GitHub Actions run `32888882163` passed:
 - 3 / 3 healthy demo-fixture tests.
 
 Three new tests cover argument substitution, unrelated approval reuse, and approval replay. No Qodo response was observed after two `/agentic_review` requests; Qodo remains an external blocker.
+
+## 2026-08-25 — durable harness hardening
+
+### Implemented
+
+- Added explicit per-tool replay policy: `SAFE`, `RECONCILE_FIRST`, or `NEVER`.
+- Added a persisted operation program counter covering durable intent, effect start, uncertainty, and settlement. The settlement stores authoritative result, runtime event, evidence, and next phase; no exactly-once claim is made.
+- Added round-level progress evaluation and a supervisor stop guard. `CompletionGate` now also rejects stale/missing round evaluation and unresolved uncertain effects.
+- Added semantic no-progress fingerprints and staged reconsider, replan, and escalation evidence.
+- Added exact base-verified, non-overlapping, same-file-serialized structured edits with patch metadata.
+- Bound approvals to exact action digest, arguments, repository/revision, risk, originating operation, expiry, and one-shot consumption.
+- Separated bounded model-facing evidence projections from the full authoritative evidence store.
+- Extended TrueForge projection so an approved tool effect is marked started before resume and settles only from its correlated tool response.
+
+### Deterministic evaluation
+
+The previous five-case one-sided evaluator was replaced by a 15-case same-input comparison between an unenforced completion baseline and EvidenceForge. The recorded fixture report shows:
+
+- baseline false-success rate `0.5714`; EvidenceForge `0.0000`;
+- true completion precision `0.4286` versus `1.0000`;
+- resolvable-task completion `1.0000` for both;
+- recovery success `0.3333` versus `0.6667`;
+- retries `11` versus `2` and unnecessary actions `8` versus `0`.
+
+The report explicitly labels tool calls, interventions, retries, and latency as deterministic control-policy instrumentation. No live model, TrueForge, GitHub MCP, Daytona, or network performance is inferred.
+
+### Attribution and rejected ideas
+
+ADR 0007 records the public Pi, ZCode, Claude Code, OpenCode, Codex, Kimi Code, and DeepSeek Harness ideas used as references. TrueForge remains the runtime. Importing a competing runtime, trusting prose as verification, universal blind retry, exactly-once claims, summary-only evidence, and removal of necessary shell access were rejected.
+
+### External blockers
+
+Credentialed TrueForge/model, GitHub MCP, Daytona, live approval pause/resume, EvidenceForge-created PR reconciliation, genuine Qodo review, final human merge, and public submission remain blocked without external evidence.

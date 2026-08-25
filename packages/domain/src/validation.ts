@@ -1,5 +1,6 @@
 import {
   CriterionStatus,
+  REPLAY_POLICIES,
   RISK_LEVELS,
   SessionState,
   SuccessCriterion,
@@ -73,6 +74,20 @@ export function validateSessionState(state: SessionState): SessionState {
     if (!RISK_LEVELS.includes(step.riskCeiling)) issues.push(`invalid risk ceiling on ${step.id}`);
     for (const dependency of step.dependencies) {
       if (!planIds.has(dependency)) issues.push(`unknown dependency ${dependency} on ${step.id}`);
+    }
+  }
+  const operationIds = new Set<string>();
+  for (const operation of state.operations) {
+    if (operationIds.has(operation.id)) issues.push(`duplicate operation id: ${operation.id}`);
+    operationIds.add(operation.id);
+    if (!REPLAY_POLICIES.includes(operation.replayPolicy)) {
+      issues.push(`invalid replay policy on ${operation.id}`);
+    }
+    if (operation.status === "SETTLED" && operation.settlement === undefined) {
+      issues.push(`settled operation ${operation.id} is missing settlement`);
+    }
+    if (operation.status !== "SETTLED" && operation.settlement !== undefined) {
+      issues.push(`unsettled operation ${operation.id} has settlement data`);
     }
   }
   if (state.phase === "COMPLETED" && state.status !== "COMPLETED") {

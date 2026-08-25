@@ -6,7 +6,8 @@ export type FailureClass =
   | "SEMANTIC_FAILURE"
   | "POLICY_DENIED"
   | "ENVIRONMENT_FAILURE"
-  | "BUDGET_EXHAUSTED";
+  | "BUDGET_EXHAUSTED"
+  | "NO_PROGRESS";
 
 export interface RecoveryBudget {
   transientAttempts: number;
@@ -83,6 +84,17 @@ export class RecoveryPlanner {
         };
       case "BUDGET_EXHAUSTED":
         return this.escalate(next, "overall iteration budget exhausted");
+      case "NO_PROGRESS":
+        if (next.replanAttempts >= this.maxMajorReplans) {
+          return this.escalate(next, "no-progress replan budget exhausted");
+        }
+        next.replanAttempts += 1;
+        return {
+          action: "REPLAN",
+          nextPhase: "REPLANNING",
+          reason: "equivalent attempts produced no new evidence or state; change the plan",
+          budget: next,
+        };
     }
   }
 

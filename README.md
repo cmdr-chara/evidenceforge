@@ -4,7 +4,7 @@
 
 EvidenceForge is an evidence-gated CI incident resolution agent built on TrueForge. It investigates failed GitHub Actions runs, reproduces failures in an isolated Daytona sandbox, generates and verifies a patch, pauses before external writes, and refuses to mark a task complete until required evidence exists.
 
-> **Current repository status:** the deterministic EvidenceForge control plane, incident console, five-case evaluation corpus, failure-injection suite, TrueForge SDK adapter, skills, and demo fixture are implemented and locally verified. Live TrueForge, GitHub MCP, Daytona, and Qodo runs require external credentials or app installation and are deliberately reported as blocked until observed.
+> **Current repository status:** the deterministic EvidenceForge control plane, incident console, 15-case baseline-comparison corpus, failure-injection suite, TrueForge SDK adapter, skills, and demo fixture are implemented and locally verified. Live TrueForge, GitHub MCP, Daytona, and Qodo runs require external credentials or app installation and are deliberately reported as blocked until observed.
 
 ## Why this is not another chat wrapper
 
@@ -17,6 +17,10 @@ The interface is an incident console, not a chat transcript. It exposes:
 - deterministic verifiers whose failures override reviewer confidence;
 - a visible human checkpoint before GitHub pull-request creation;
 - external-state reconciliation before completion;
+- persisted per-tool replay policy and intent → effect → settlement program counters;
+- round-level progress evaluation and a supervisor stop guard;
+- no-progress fingerprints that route reconsider → replan → escalate;
+- exact, base-verified, serialized structured mutation;
 - an application-issued completion certificate.
 
 The model may say “fixed.” That statement never sets `COMPLETED`.
@@ -74,12 +78,12 @@ packages/policies        Risk, approval, prompt-injection, external action safet
 packages/workflow        State machine, success contracts, recovery, hypotheses
 packages/trueforge       Agent spec, SDK adapter, reconnect/resume runtime
 packages/specialists     Three diagnostic definitions and isolated reviewer
-packages/tools           Narrow bounded tool contracts
-packages/persistence     Durable JSON session state
+packages/tools           Bounded contracts, replay metadata, exact mutation
+packages/persistence     Durable checkpoints and operation settlement runner
 packages/telemetry       Append-only runtime event journal
 skills                    Four TrueForge SKILL.md procedure packs
 tests                     Unit, integration, scenario, and failure-injection tests
-evals                     Five-case false-success evaluation
+evals                     15-case unenforced-baseline comparison
 demo/incident-fixture    Healthy/resettable configuration-order regression fixture
 ```
 
@@ -138,11 +142,12 @@ See [docs/TRUEFORGE_SETUP.md](docs/TRUEFORGE_SETUP.md) and [docs/DEMO.md](docs/D
 - a deterministic FAIL overrides reviewer PASS;
 - a fabricated certificate cannot complete the state machine;
 - external writes require approval and reconciliation;
+- unresolved uncertain operations and stale round evaluations block completion;
 - failed verification can end in `BLOCKED` or `ESCALATED`.
 
 ## Evaluation
 
-The current local evaluation contains five deterministic cases, including misleading evidence and one intentionally unresolved case. The latest measured run is documented in [docs/EVALUATION.md](docs/EVALUATION.md). It reported zero false-success completions; the unresolved case escalated instead of being marked complete.
+The current local evaluation applies the same 15 deterministic scenario inputs to an unenforced TrueForge-style baseline and to the EvidenceForge control layer. The latest measured fixture run is documented in [docs/EVALUATION.md](docs/EVALUATION.md): baseline false-success rate was `0.5714`; EvidenceForge false-success rate was `0`, with resolvable-task completion rate `1.0` for both. Correct blocking or escalation is not counted as task completion.
 
 These are fixture results, not claims about live sponsor infrastructure or general production performance.
 

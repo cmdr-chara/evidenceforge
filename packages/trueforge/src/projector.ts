@@ -5,8 +5,15 @@ import {
   ToolResult,
   VerificationResult,
 } from "../../domain/src/types";
+import { digestCanonical } from "../../domain/src/canonical";
 import { EvidenceStore } from "../../evidence/src";
 import { RiskPolicy } from "../../policies/src";
+import { replayPolicyForRisk } from "../../tools/src";
+import {
+  appendOperationIntent,
+  createOperationIntent,
+  settleOperation,
+} from "../../workflow/src";
 import { TrueForgeEventIndex } from "./event-index";
 import { TrueForgeVerifierProjector } from "./verifier-projection";
 
@@ -62,6 +69,22 @@ export class TrueForgeEventProjector {
           throw new Error(`correlated tool call ${toolResult.callId} disappeared from the index`);
         }
         const verification = this.verifierProjector?.project(state, toolCall, toolResult);
+        const approval = state.approvals.find((candidate) => candidate.toolCallId === toolCall.id);
+        const operation = state.operations.find(
+          (candidate) => candidate.id === approval?.provenance?.originatingOperationId,
+        );
+        if (
+          operation !== undefined &&
+          (operation.status === "EFFECT_STARTED" || operation.status === "EFFECT_UNCERTAIN")
+        ) {
+          settleOperation(state, operation.id, {
+            authoritativeResult: structuredClone(toolResult),
+            runtimeEventId: event.id,
+            evidenceIds: [...toolResult.evidenceIds],
+            nextWorkflowState: state.phase,
+            settledAt: event.timestamp,
+          });
+        }
         return {
           toolResult,
           verificationResult: verification?.result,
@@ -90,6 +113,25 @@ export class TrueForgeEventProjector {
             tool,
             arguments: normalizedArguments,
           });
+          const operationId = `operation-${event.id}-${call.id}`;
+          const operation = createOperationIntent(
+            {
+              id: operationId,
+              actionType: tool,
+              tool,
+              normalizedArguments,
+              repository: state.task.repository,
+              revision: state.task.revision,
+              risk: decision.risk,
+              replayPolicy: replayPolicyForRisk(decision.risk),
+              expectedEvidence: [`runtime-event:${call.id}`],
+              idempotencyKey: call.id,
+            },
+            event.timestamp,
+          );
+          if (!state.operations.some((candidate) => candidate.id === operationId)) {
+            appendOperationIntent(state, operation);
+          }
           const approval: ApprovalRequest = {
             id,
             action: tool,
@@ -100,6 +142,15 @@ export class TrueForgeEventProjector {
             status: decision.deniedByDefault ? "DENIED" : "PENDING",
             toolCallId: call.id,
             threadId: indexed.threadId,
+            provenance: {
+              actionDigest: digestCanonical(normalizedArguments),
+              repository: state.task.repository,
+              revision: state.task.revision,
+              risk: decision.risk,
+              originatingOperationId: operationId,
+              issuedAt: event.timestamp,
+              expiresAt: new Date(Date.parse(event.timestamp) + 15 * 60 * 1_000).toISOString(),
+            },
           };
           state.approvals.push(approval);
           state.version += 1;

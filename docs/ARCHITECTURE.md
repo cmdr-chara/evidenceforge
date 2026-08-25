@@ -168,8 +168,10 @@ The gate rejects completion when any of these conditions holds:
 - the patch digest is missing;
 - the reviewer verdict is `BLOCK` or absent;
 - a prepared external action is not reconciled.
+- no current round-level evaluation makes completion admissible;
+- an effect is still `EFFECT_STARTED` or `EFFECT_UNCERTAIN` without durable settlement.
 
-A reviewer PASS cannot override deterministic failure. A valid certificate is generated only inside the gate and is tracked by a module-private issuance registry.
+A reviewer PASS cannot override the latest deterministic failure. A valid certificate is generated only inside the gate and is tracked by a module-private issuance registry. `StopGuard` evaluates the current round before any natural successful stop and routes incomplete work to verification, replan, blocking, or escalation.
 
 ## 10. Subagent design
 
@@ -193,7 +195,7 @@ search_repository({ query, paths, maxResults: 20 })
 get_incident_context({ repository, runId })
 ```
 
-Raw shell is confined to the sandbox and uses explicit argv, cwd, timeout, network policy, and output bounds. `sudo` is rejected.
+Raw shell is confined to the sandbox and uses explicit argv, cwd, timeout, network policy, and output bounds. `sudo` is rejected. Structured text edits use exact single-match targets, reject overlap and stale base digests, serialize writes to the same file, and emit before/after and patch SHA-256 metadata. Shell access remains available because real repository work cannot be reduced to structured edits alone.
 
 ## 12. Context strategy
 
@@ -208,7 +210,7 @@ The supervisor retains:
 - verifier status;
 - blockers and retry budget.
 
-Large logs, repository files, and command output become artifacts. TrueForge compaction and large-response offloading are enabled. No vector database is introduced.
+Large logs, repository files, and command output become artifacts. TrueForge compaction and large-response offloading are enabled. The authoritative `EvidenceStore` retains complete event-correlated facts and artifact references; `modelFacingView` creates a bounded, lossy projection without mutating that store. No vector database is introduced.
 
 ## 13. Persistence and reconnect
 
@@ -222,6 +224,8 @@ EvidenceForge persists:
 - active turn ID;
 - last SSE sequence number;
 - final certificate.
+- operation journal with exact arguments, replay policy, effect program counter, and settlement;
+- round evaluations and no-progress attempt fingerprints.
 
 Reconnect uses `getTurn`. A running turn resumes through `subscribeToTurn(afterSequenceNumber)`; a completed turn can be rebuilt from `listTurnEvents`.
 
@@ -235,6 +239,16 @@ Reconnect uses `getTurn`. A running turn resumes through `subscribeToTurn(afterS
 | policy denied | safe alternative or `BLOCKED` |
 | environment failure | recreate exact revision and restore known patch artifact |
 | budget exhausted | `ESCALATED` |
+| repeated no progress | fingerprint tool, normalized arguments, revision/state, and result; reconsider, replan, then escalate |
+
+Every consequential operation uses an explicit durable program counter:
+
+```text
+INTENT_DURABLE → EFFECT_STARTED → SETTLED
+                              ↘ EFFECT_UNCERTAIN
+```
+
+The intent records exact normalized arguments and digest, repository/revision, risk, replay policy, expected evidence, and any idempotency key. Settlement records the authoritative result, runtime event, evidence IDs, next workflow phase, and time. Recovery may replay `SAFE`, must inspect authoritative state for `RECONCILE_FIRST`, and blocks automatic repetition for `NEVER`. This is not a claim of exactly-once delivery; it makes uncertainty explicit where external systems cannot provide it.
 
 ## 15. External-action protocol
 
@@ -248,7 +262,7 @@ flowchart LR
     E --> G[CompletionGate]
 ```
 
-The idempotency key is `SHA-256(sessionId + ":" + patchDigest)`. If PR creation times out after possible success, the workflow reconciles before retrying.
+The idempotency key is `SHA-256(sessionId + ":" + patchDigest)`. The approval is bound to exact normalized arguments and digest, repository/revision, risk, originating operation, expiry, and one-shot consumption. If PR creation times out after possible success, the workflow reconciles before retrying.
 
 ## 16. Deterministic fixture vs live mode
 

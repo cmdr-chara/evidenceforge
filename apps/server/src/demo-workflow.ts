@@ -13,7 +13,7 @@ import {
 import { createEvidence, EvidenceStore } from "../../../packages/evidence/src";
 import { ExternalActionCoordinator } from "../../../packages/policies/src";
 import { DIAGNOSTIC_SPECIALISTS } from "../../../packages/specialists/src";
-import { CompletionGate } from "../../../packages/verification/src";
+import { CompletionGate, ProgressEvaluator } from "../../../packages/verification/src";
 import { buildCiSuccessContract, SessionController } from "../../../packages/workflow/src";
 
 interface TimelineItem {
@@ -334,6 +334,7 @@ export class DemoWorkflow {
       identifier: "#219",
       evidenceId: externalEvidence,
     };
+    new ProgressEvaluator(this.evidenceStore).evaluate(this.state, "VERIFICATION");
     const decision = new CompletionGate(this.evidenceStore).evaluate(this.state);
     if (!decision.allowed) {
       throw new Error(`fixture completion gate blocked: ${decision.failures.map((failure) => failure.message).join("; ")}`);

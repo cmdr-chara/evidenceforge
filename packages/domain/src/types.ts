@@ -9,6 +9,9 @@ export const RISK_LEVELS = [
 
 export type RiskLevel = (typeof RISK_LEVELS)[number];
 
+export const REPLAY_POLICIES = ["SAFE", "RECONCILE_FIRST", "NEVER"] as const;
+export type ReplayPolicy = (typeof REPLAY_POLICIES)[number];
+
 export const WORKFLOW_PHASES = [
   "INTAKE",
   "DEFINE_SUCCESS",
@@ -213,6 +216,18 @@ export interface ApprovalRequest {
   status: "PENDING" | "APPROVED" | "DENIED";
   toolCallId?: string;
   threadId?: string;
+  provenance?: ApprovalProvenance;
+}
+
+export interface ApprovalProvenance {
+  actionDigest: string;
+  repository: string;
+  revision: string;
+  risk: RiskLevel;
+  originatingOperationId: string;
+  issuedAt: string;
+  expiresAt: string;
+  consumedAt?: string;
 }
 
 export interface AgentResult {
@@ -226,6 +241,8 @@ export interface AgentResult {
 export interface ExternalActionState {
   type: "pull_request";
   idempotencyKey: string;
+  operationId: string;
+  replayPolicy: "RECONCILE_FIRST";
   preparedArguments: {
     repository: string;
     base: string;
@@ -239,6 +256,80 @@ export interface ExternalActionState {
   evidenceId?: string;
 }
 
+export type OperationStatus =
+  | "INTENT_DURABLE"
+  | "EFFECT_STARTED"
+  | "EFFECT_UNCERTAIN"
+  | "SETTLED";
+
+export interface OperationRecord {
+  id: string;
+  actionType: string;
+  tool: string;
+  normalizedArguments: unknown;
+  argumentDigest: string;
+  repository: string;
+  revision: string;
+  risk: RiskLevel;
+  replayPolicy: ReplayPolicy;
+  expectedEvidence: string[];
+  idempotencyKey?: string;
+  status: OperationStatus;
+  intentPersistedAt: string;
+  effectStartedAt?: string;
+  uncertainAt?: string;
+  settlement?: OperationSettlement;
+}
+
+export interface OperationSettlement {
+  authoritativeResult: unknown;
+  runtimeEventId: string;
+  evidenceIds: string[];
+  nextWorkflowState: WorkflowPhase;
+  settledAt: string;
+}
+
+export interface RoundCriterionEvaluation {
+  criterionId: string;
+  status: CriterionStatus;
+  admissibleEvidenceIds: string[];
+  missingEvidence: string[];
+}
+
+export type NextWorkflowAction =
+  | "CONTINUE"
+  | "VERIFY"
+  | "RETRY"
+  | "REPLAN"
+  | "BLOCK"
+  | "ESCALATE"
+  | "COMPLETE_CANDIDATE";
+
+export interface RoundProgressEvaluation {
+  id: string;
+  kind: "PATCH" | "REPLAN" | "VERIFICATION";
+  sessionVersion: number;
+  patchDigest?: string;
+  criteria: RoundCriterionEvaluation[];
+  deterministicFailures: string[];
+  missingEvidence: string[];
+  nextAction: NextWorkflowAction;
+  evaluatedAt: string;
+}
+
+export interface ToolAttemptRecord {
+  id: string;
+  fingerprint: string;
+  tool: string;
+  normalizedArguments: unknown;
+  workspaceRevision: string;
+  resultSignature: string;
+  evidenceIds: string[];
+  stateDigest: string;
+  outcome: "PROGRESS" | "RECONSIDER" | "REPLAN" | "ESCALATE";
+  timestamp: string;
+}
+
 export interface SessionState {
   version: number;
   task: Task;
@@ -249,6 +340,9 @@ export interface SessionState {
   evidenceIds: string[];
   approvals: ApprovalRequest[];
   verifierResults: VerificationResult[];
+  operations: OperationRecord[];
+  roundEvaluations: RoundProgressEvaluation[];
+  toolAttempts: ToolAttemptRecord[];
   patchAttempts: number;
   replanAttempts: number;
   transientAttempts: number;
@@ -291,7 +385,9 @@ export interface GateFailure {
     | "REVIEW_BLOCKED"
     | "PATCH_DIGEST_MISSING"
     | "ORIGINAL_FAILURE_NOT_REPRODUCED"
-    | "EXTERNAL_ACTION_NOT_RECONCILED";
+    | "EXTERNAL_ACTION_NOT_RECONCILED"
+    | "ROUND_VERIFICATION_MISSING_OR_STALE"
+    | "UNCERTAIN_OPERATION_UNRESOLVED";
   message: string;
   criterionId?: string;
 }

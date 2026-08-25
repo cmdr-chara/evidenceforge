@@ -7,6 +7,7 @@ import {
   VerificationResult,
 } from "../../domain/src/types";
 import { EvidenceStore } from "../../evidence/src";
+import { roundEvaluationMatchesState } from "./progress-evaluator";
 
 const issuedCertificates = new WeakSet<object>();
 
@@ -21,6 +22,29 @@ export class CompletionGate {
     const failures: GateFailure[] = [];
     const required = state.successCriteria.filter((criterion) => criterion.required);
     const acceptedEvidenceIds = new Map<string, string[]>();
+    const latestRound = state.roundEvaluations.at(-1);
+
+    if (
+      latestRound === undefined ||
+      latestRound.nextAction !== "COMPLETE_CANDIDATE" ||
+      !roundEvaluationMatchesState(state, latestRound)
+    ) {
+      failures.push({
+        code: "ROUND_VERIFICATION_MISSING_OR_STALE",
+        message: "a current round-level progress evaluation must make completion admissible",
+      });
+    }
+
+    const unresolvedOperation = state.operations.find(
+      (operation) =>
+        operation.status === "EFFECT_STARTED" || operation.status === "EFFECT_UNCERTAIN",
+    );
+    if (unresolvedOperation !== undefined) {
+      failures.push({
+        code: "UNCERTAIN_OPERATION_UNRESOLVED",
+        message: `operation ${unresolvedOperation.id} has no durable settlement`,
+      });
+    }
 
     for (const criterion of required) {
       if (criterion.status !== "PASS") {

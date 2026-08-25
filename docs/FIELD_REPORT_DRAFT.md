@@ -134,7 +134,7 @@ The intentionally ambiguous scenario proves that the agent can stop with insuffi
 
 ## 14. False-success evaluation
 
-The first local evaluation ran five deterministic cases. Four resolvable cases completed with certificates. The ambiguous case escalated. False Success Rate was 0.00 for that fixture corpus.
+The current local evaluation runs 15 deterministic cases through the same-input unenforced baseline and EvidenceForge. Six oracle-resolvable cases complete under both; the baseline also falsely completes eight incomplete/unsafe cases. Baseline False Success Rate is 0.5714 versus 0.00 for EvidenceForge. These are fixture control-policy results, not live runtime or model claims.
 
 The result is deliberately scoped. It does not claim general model performance or live sponsor reliability.
 
@@ -158,7 +158,7 @@ Fixture mode is clearly labeled. Live mode is the submission target and must sho
 
 - Live sponsor infrastructure has not yet been executed in the current environment.
 - The persistence layer is single-node JSON, not a multi-writer database.
-- The initial evaluation corpus is small and deterministic.
+- The evaluation corpus is deterministic and remains too small for generalization claims.
 - GitHub MCP tool names must be validated against the configured server.
 - The P0 policy does not merge, deploy, delete, or perform privileged actions.
 

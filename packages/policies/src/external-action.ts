@@ -6,6 +6,7 @@ import {
   RuntimeEvent,
   SessionState,
 } from "../../domain/src/types";
+import { digestCanonical } from "../../domain/src/canonical";
 import { createEvidence, EvidenceStore } from "../../evidence/src";
 import { ApprovalPolicy } from "./approval-policy";
 
@@ -18,6 +19,8 @@ export interface PreparePullRequestInput {
   body: string;
   expectedHeadSha: string;
   patchDigest: string;
+  now?: string;
+  approvalTtlMs?: number;
 }
 
 export class ExternalActionCoordinator {
@@ -33,9 +36,12 @@ export class ExternalActionCoordinator {
     const idempotencyKey = createHash("sha256")
       .update(`${input.sessionId}:${input.patchDigest}`)
       .digest("hex");
+    const operationId = `operation-${idempotencyKey.slice(0, 24)}`;
     const action: ExternalActionState = {
       type: "pull_request",
       idempotencyKey,
+      operationId,
+      replayPolicy: "RECONCILE_FIRST",
       preparedArguments: {
         repository: input.repository,
         base: input.base,
@@ -46,6 +52,10 @@ export class ExternalActionCoordinator {
       },
       status: "PREPARED",
     };
+    const issuedAt = input.now ?? new Date().toISOString();
+    const expiresAt = new Date(
+      Date.parse(issuedAt) + (input.approvalTtlMs ?? 15 * 60 * 1_000),
+    ).toISOString();
     const approval: ApprovalRequest = {
       id: `approval-${randomUUID()}`,
       action: "github.create_pull_request",
@@ -54,16 +64,30 @@ export class ExternalActionCoordinator {
       reason: "Creating a pull request is an externally visible GitHub write",
       reversible: true,
       status: "PENDING",
+      provenance: {
+        actionDigest: digestCanonical(action.preparedArguments),
+        repository: input.repository,
+        revision: input.expectedHeadSha,
+        risk: "EXTERNAL_REVERSIBLE",
+        originatingOperationId: operationId,
+        issuedAt,
+        expiresAt,
+      },
     };
     return { action, approval };
   }
 
-  public applyApproval(action: ExternalActionState, approval: ApprovalRequest): ExternalActionState {
-    assertApprovalMatches(action, approval);
+  public applyApproval(
+    action: ExternalActionState,
+    approval: ApprovalRequest,
+    now = new Date().toISOString(),
+  ): ExternalActionState {
+    assertApprovalMatches(action, approval, now);
     const outcome = this.approvalPolicy.authorize(approval);
     if (!outcome.allowed) {
       return { ...action, status: approval.status === "DENIED" ? "DENIED" : action.status };
     }
+    if (approval.provenance !== undefined) approval.provenance.consumedAt = now;
     return { ...action, status: "APPROVED" };
   }
 
@@ -114,7 +138,11 @@ export class ExternalActionCoordinator {
   }
 }
 
-function assertApprovalMatches(action: ExternalActionState, approval: ApprovalRequest): void {
+function assertApprovalMatches(
+  action: ExternalActionState,
+  approval: ApprovalRequest,
+  now: string,
+): void {
   if (action.status !== "PREPARED") {
     throw new Error(`approval can only be applied to a PREPARED action, received ${action.status}`);
   }
@@ -126,5 +154,18 @@ function assertApprovalMatches(action: ExternalActionState, approval: ApprovalRe
   }
   if (!isDeepStrictEqual(approval.normalizedArguments, action.preparedArguments)) {
     throw new Error("approval arguments do not match the prepared pull-request action");
+  }
+  const provenance = approval.provenance;
+  if (provenance === undefined) throw new Error("external approval is missing provenance");
+  if (provenance.consumedAt !== undefined) throw new Error("approval has already been consumed");
+  if (Date.parse(now) >= Date.parse(provenance.expiresAt)) throw new Error("approval has expired");
+  if (
+    provenance.actionDigest !== digestCanonical(action.preparedArguments) ||
+    provenance.repository !== action.preparedArguments.repository ||
+    provenance.revision !== action.preparedArguments.expectedHeadSha ||
+    provenance.risk !== approval.risk ||
+    provenance.originatingOperationId !== action.operationId
+  ) {
+    throw new Error("approval provenance does not match the prepared operation");
   }
 }

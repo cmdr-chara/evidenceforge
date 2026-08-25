@@ -4,6 +4,8 @@ import { assertLiveApprovalReady } from "../../apps/server/src/live-service";
 import { ApprovalRequest } from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
 import { buildState, passAll } from "../fixtures/builders";
+import { createOperationIntent } from "../../packages/workflow/src";
+import { digestCanonical } from "../../packages/domain/src";
 
 function approval(overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
   return {
@@ -21,6 +23,20 @@ function approval(overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
     status: "PENDING",
     toolCallId: "call-pr",
     threadId: "main",
+    provenance: {
+      actionDigest: digestCanonical({
+        owner: "cmdr-chara",
+        repo: "evidenceforge",
+        base: "determination",
+        head: "fix/demo",
+      }),
+      repository: "cmdr-chara/evidenceforge-fixture",
+      revision: "abc123",
+      risk: "EXTERNAL_REVERSIBLE",
+      originatingOperationId: "operation-live-pr",
+      issuedAt: new Date(Date.now() - 1_000).toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    },
     ...overrides,
   };
 }
@@ -29,6 +45,20 @@ function readyState() {
   const state = buildState();
   const evidence = new EvidenceStore();
   passAll(state, evidence);
+  state.operations.push(
+    createOperationIntent({
+      id: "operation-live-pr",
+      actionType: "github.create_pull_request",
+      tool: "github.create_pull_request",
+      normalizedArguments: approval().normalizedArguments,
+      repository: state.task.repository,
+      revision: state.task.revision,
+      risk: "EXTERNAL_REVERSIBLE",
+      replayPolicy: "RECONCILE_FIRST",
+      expectedEvidence: ["pull request"],
+    }),
+  );
+  state.approvals.push(approval());
   state.phase = "AWAITING_APPROVAL";
   return { state, evidence };
 }

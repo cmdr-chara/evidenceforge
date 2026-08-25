@@ -102,6 +102,9 @@ function parseCheckpoint(value: unknown): PersistedRuntimeCheckpoint {
   if (!Array.isArray(value.evidence.events) || !Array.isArray(value.evidence.evidence)) {
     throw new Error("runtime checkpoint evidence payload must contain arrays");
   }
+  value.state.operations ??= [];
+  value.state.roundEvaluations ??= [];
+  value.state.toolAttempts ??= [];
   return value as unknown as PersistedRuntimeCheckpoint;
 }
 
@@ -125,6 +128,18 @@ function validateEvidenceReferences(
     }
     if (state.completionCertificate.externalAction !== undefined) {
       referenced.add(state.completionCertificate.externalAction.evidenceId);
+    }
+  }
+  for (const operation of state.operations) {
+    const settlement = operation.settlement;
+    for (const evidenceId of settlement?.evidenceIds ?? []) referenced.add(evidenceId);
+    if (
+      settlement !== undefined &&
+      evidenceStore.getEvent(settlement.runtimeEventId) === undefined
+    ) {
+      throw new Error(
+        `operation ${operation.id} settlement references missing runtime event ${settlement.runtimeEventId}`,
+      );
     }
   }
 

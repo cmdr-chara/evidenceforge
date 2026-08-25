@@ -44,6 +44,24 @@ Status values: `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`.
 | Human merge | reviewed PR merged by human authority | BLOCKED | PR #2 is open and mergeable; Qodo/live acceptance gates remain open |
 | Submission | official form complete | BLOCKED | requires live evidence, demo/publication assets, and human account action |
 
+## Harness-hardening completion ledger (2026-08-25)
+
+Status values: `OPEN`, `PASS`, `BLOCKED`, `WAIVED`.
+
+| Gate | Check / deciding evidence | Expectation | Status |
+|---|---|---|---|
+| H1 Replay and durable operation protocol | deterministic unit and crash-boundary integration tests | replay metadata is persisted; uncertain effects are replayed, reconciled, or stopped strictly by policy | PASS |
+| H2 Round verification and stop guard | adversarial completion/stop tests | every meaningful round classifies criteria/evidence and natural success is impossible without a current issuable certificate | PASS |
+| H3 No-progress detection | equivalent-attempt and bounded-escalation tests | repeated attempts without new state/evidence route reconsider → replan → escalate | PASS |
+| H4 Narrow mutation semantics | exact-target, ambiguity, overlap, base-state, serialization, and digest tests | mutations fail closed and emit verifiable patch metadata | PASS |
+| H5 Approval provenance | substitution, stale revision, expiry, origin, and one-shot tests | an approval authorizes exactly one matching operation and cannot be replayed | PASS |
+| H6 Evidence/context separation | compaction and checkpoint-restart tests | bounded model context never replaces or destroys authoritative evidence | PASS |
+| H7 Recovery correctness | restart tests around intent/effect/settlement boundaries | recovery has an explicit durable program counter and legal next action | PASS |
+| H8 Comparative evaluation | `pnpm eval:smoke` and report inspection | same deterministic corpus reports baseline and gated metrics without fabricated live measurements | PASS |
+| H9 Documentation synchronization | architecture/security/evaluation/ADR/journal/gate review | adopted/rejected reference ideas, TrueForge boundary, methodology, results, and blockers are truthful | PASS |
+| H10 Integrated verification | full local check ladder, dependency audit, exact-head GitHub CI | all applicable checks pass on the pushed candidate SHA | OPEN |
+| H11 Qodo and human/external gates | GitHub PR reviews/checks and live runtime artifacts | remains `BLOCKED` unless public/runtime evidence appears; no merge without human authorization | BLOCKED |
+
 ## Minimum human/external actions for blocked P0 gates
 
 1. Install or authorize Qodo for `cmdr-chara/evidenceforge` so Agentic Review can actually respond on PR #2.

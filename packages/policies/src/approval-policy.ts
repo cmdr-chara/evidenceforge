@@ -19,7 +19,18 @@ export class ApprovalPolicy {
     if (request.risk === "READ_ONLY" || request.risk === "SANDBOX_MUTATION") {
       return { allowed: true, automatic: true };
     }
-    if (request.status === "APPROVED") return { allowed: true, automatic: false };
+    if (request.status === "APPROVED") {
+      if (request.provenance === undefined) {
+        return { allowed: false, automatic: false, reason: "external approval lacks provenance" };
+      }
+      if (request.provenance.risk !== request.risk) {
+        return { allowed: false, automatic: false, reason: "approval risk provenance is stale" };
+      }
+      if (request.provenance.consumedAt !== undefined) {
+        return { allowed: false, automatic: false, reason: "approval was already consumed" };
+      }
+      return { allowed: true, automatic: false };
+    }
     return {
       allowed: false,
       automatic: false,

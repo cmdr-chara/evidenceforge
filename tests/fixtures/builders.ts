@@ -9,6 +9,7 @@ import {
   VerificationResult,
 } from "../../packages/domain/src";
 import { createEvidence, EvidenceStore } from "../../packages/evidence/src";
+import { ProgressEvaluator } from "../../packages/verification/src";
 
 export function baseCriteria(): SuccessCriterion[] {
   return [
@@ -100,4 +101,5 @@ export function passCriterion(
 
 export function passAll(state: SessionState, store: EvidenceStore): void {
   for (const criterion of state.successCriteria) passCriterion(state, store, criterion.id);
+  new ProgressEvaluator(store).evaluate(state, "VERIFICATION", "2026-08-25T18:02:00.000Z");
 }

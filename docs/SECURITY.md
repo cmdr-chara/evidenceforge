@@ -103,11 +103,19 @@ An evidence record is rejected unless its source runtime event is already regist
 - External action reconciliation is mandatory when an action is prepared.
 - Failure to prove correctness ends as `BLOCKED` or `ESCALATED`.
 
+## Replay and uncertain-effect safety
+
+Every operation persists one of `SAFE`, `RECONCILE_FIRST`, or `NEVER` with its exact normalized arguments and risk. A crash after effect start is not converted to success or ordinary failure: it becomes `EFFECT_UNCERTAIN`. Reads may be replayed; possible external writes require authoritative reconciliation; unsafe mutations cannot be repeated automatically. EvidenceForge deliberately does not claim exactly-once semantics for systems that cannot supply it.
+
 ## External-write safety
 
 Pull-request creation follows `PREPARE → APPROVE → COMMIT → RECONCILE`.
 
-The approval card shows exact repository, base, head, title, body, expected head SHA, risk, and reversibility. A denial is persisted. A possible timeout after the write triggers reconciliation before any retry.
+The approval card shows exact repository, base, head, title, body, expected head SHA, risk, and reversibility. Approval provenance also binds the action digest, repository/revision, risk, originating operation, expiry, and one-shot consumption. A denial is persisted. A possible timeout after the write triggers reconciliation before any retry.
+
+## Mutation integrity
+
+Structured edits require an exact, unique target and expected base digest. Overlapping edits and multiple matches fail closed. Mutations to the same file are serialized and produce before/after and patch digests. The sandbox shell remains available for operations that cannot be expressed safely as structured replacement.
 
 ## Auditability
 
@@ -132,6 +140,7 @@ The append-only JSONL journal records observable actions and state, not private 
 - sandbox output is bounded;
 - turns have an iteration limit;
 - retry, patch, and replan budgets are bounded.
+- repeated equivalent tool attempts are fingerprinted; no-progress routes reconsider → replan → escalate instead of consuming only a numeric retry budget.
 
 ## Known limitations
 

@@ -3,10 +3,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ApprovalRequest, RuntimeEvent } from "../../packages/domain/src";
+import { ApprovalRequest, digestCanonical, RuntimeEvent } from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
 import { JsonSessionStore } from "../../packages/persistence/src";
 import { EventJournal } from "../../packages/telemetry/src";
+import { createOperationIntent } from "../../packages/workflow/src";
 import {
   ApprovalResponse,
   DurableTrueForgeRuntime,
@@ -92,7 +93,32 @@ function decidedApproval(status: "APPROVED" | "DENIED"): ApprovalRequest {
     status,
     toolCallId: "call-pr",
     threadId: "main",
+    provenance: {
+      actionDigest: digestCanonical({ head: "fix/demo" }),
+      repository: "cmdr-chara/evidenceforge-fixture",
+      revision: "abc123",
+      risk: "EXTERNAL_REVERSIBLE",
+      originatingOperationId: "operation-runtime",
+      issuedAt: new Date(Date.now() - 1_000).toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    },
   };
+}
+
+function addRuntimeOperation(state: ReturnType<typeof buildState>): void {
+  state.operations.push(
+    createOperationIntent({
+      id: "operation-runtime",
+      actionType: "github.create_pull_request",
+      tool: "github.create_pull_request",
+      normalizedArguments: { head: "fix/demo" },
+      repository: state.task.repository,
+      revision: state.task.revision,
+      risk: "EXTERNAL_REVERSIBLE",
+      replayPolicy: "RECONCILE_FIRST",
+      expectedEvidence: ["tool result"],
+    }),
+  );
 }
 
 test("durable runtime submits the exact approved TrueForge tool call and persists its cursor", async () => {
@@ -108,6 +134,7 @@ test("durable runtime submits the exact approved TrueForge tool call and persist
     );
     const state = buildState();
     state.trueForgeSessionId = "tf-session";
+    addRuntimeOperation(state);
     state.approvals.push(decidedApproval("APPROVED"));
 
     const updated = await runtime.submitApproval(

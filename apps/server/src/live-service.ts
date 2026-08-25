@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import {
   ApprovalRequest,
+  digestCanonical,
   createSessionState,
   createTask,
   Evidence,
@@ -250,13 +251,44 @@ export function assertLiveApprovalReady(
   evidenceStore: EvidenceStore,
   policy = new ApprovalPolicy(),
 ): void {
-  const authorization = policy.authorize({ ...approval, status: "APPROVED" });
-  if (!authorization.allowed) throw new Error(authorization.reason);
-
-  if (approval.risk !== "EXTERNAL_REVERSIBLE" && approval.risk !== "UNKNOWN") return;
+  if (
+    approval.risk === "PRIVILEGED" ||
+    approval.risk === "EXTERNAL_DESTRUCTIVE" ||
+    approval.risk === "READ_ONLY" ||
+    approval.risk === "SANDBOX_MUTATION"
+  ) {
+    const authorization = policy.authorize({ ...approval, status: "APPROVED" });
+    if (!authorization.allowed) throw new Error(authorization.reason);
+    return;
+  }
   if (!/(^|\.)(create_pull_request)$/i.test(approval.action)) {
     throw new Error(`P0 live publishing supports only pull-request creation, not ${approval.action}`);
   }
+  const provenance = approval.provenance;
+  if (provenance === undefined) throw new Error("external approval lacks provenance");
+  const persistedApproval = state.approvals.find((candidate) => candidate.id === approval.id);
+  const operation = state.operations.find(
+    (candidate) => candidate.id === provenance.originatingOperationId,
+  );
+  if (
+    provenance.actionDigest !== digestCanonical(approval.normalizedArguments) ||
+    persistedApproval === undefined ||
+    persistedApproval.provenance?.originatingOperationId !== provenance.originatingOperationId ||
+    digestCanonical(persistedApproval.normalizedArguments) !== provenance.actionDigest ||
+    provenance.repository !== state.task.repository ||
+    provenance.revision !== state.task.revision ||
+    provenance.risk !== approval.risk ||
+    provenance.consumedAt !== undefined ||
+    Date.parse(provenance.expiresAt) <= Date.now() ||
+    operation?.actionType !== approval.action ||
+    operation.argumentDigest !== provenance.actionDigest ||
+    operation.repository !== provenance.repository ||
+    operation.revision !== provenance.revision
+  ) {
+    throw new Error("external approval provenance is stale, substituted, expired, or consumed");
+  }
+  const authorization = policy.authorize({ ...approval, status: "APPROVED" });
+  if (!authorization.allowed) throw new Error(authorization.reason);
   if (state.phase !== "AWAITING_APPROVAL") {
     throw new Error(`external approval requires AWAITING_APPROVAL, received ${state.phase}`);
   }

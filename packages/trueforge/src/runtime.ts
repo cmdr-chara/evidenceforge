@@ -1,4 +1,4 @@
-import { ApprovalRequest, RuntimeEvent, SessionState } from "../../domain/src/types";
+import { ApprovalRequest, digestCanonical, RuntimeEvent, SessionState } from "../../domain/src";
 import { EvidenceStore } from "../../evidence/src";
 import { isRuntimeCheckpointStore, SessionStore } from "../../persistence/src";
 import { EventJournal } from "../../telemetry/src";
@@ -9,6 +9,7 @@ import {
   TrueForgeSdkAdapter,
 } from "./client";
 import { TrueForgeEventProjector } from "./projector";
+import { markEffectStarted, markEffectUncertain } from "../../workflow/src";
 
 export interface TrueForgeRuntimeAdapter {
   createSession(): Promise<string>;
@@ -67,25 +68,70 @@ export class DurableTrueForgeRuntime {
     if (state.trueForgeSessionId === undefined) {
       throw new Error("approval cannot be submitted without a TrueForge session ID");
     }
-    if (approval.toolCallId === undefined || approval.threadId === undefined) {
+    const persistedApproval = state.approvals.find((candidate) => candidate.id === approval.id);
+    if (persistedApproval === undefined) throw new Error(`unknown persisted approval ${approval.id}`);
+    if (
+      persistedApproval.action !== approval.action ||
+      digestCanonical(persistedApproval.normalizedArguments) !==
+        digestCanonical(approval.normalizedArguments)
+    ) {
+      throw new Error("submitted approval differs from persisted approval");
+    }
+    if (persistedApproval.toolCallId === undefined || persistedApproval.threadId === undefined) {
       throw new Error("approval is missing its TrueForge tool-call correlation");
     }
-    if (approval.status !== decision) {
-      throw new Error(`persisted approval status ${approval.status} does not match ${decision}`);
+    if (persistedApproval.status !== decision) {
+      throw new Error(`persisted approval status ${persistedApproval.status} does not match ${decision}`);
+    }
+    let startedOperationId: string | undefined;
+    if (decision === "APPROVED" && persistedApproval.risk !== "READ_ONLY") {
+      const provenance = persistedApproval.provenance;
+      if (provenance === undefined) throw new Error("approved effect is missing approval provenance");
+      const operation = state.operations.find(
+        (candidate) => candidate.id === provenance.originatingOperationId,
+      );
+      if (
+        provenance.actionDigest !== digestCanonical(persistedApproval.normalizedArguments) ||
+        provenance.repository !== state.task.repository ||
+        provenance.revision !== state.task.revision ||
+        provenance.risk !== persistedApproval.risk ||
+        provenance.consumedAt !== undefined ||
+        Date.parse(provenance.expiresAt) <= Date.now() ||
+        operation?.actionType !== persistedApproval.action ||
+        operation.argumentDigest !== provenance.actionDigest
+      ) {
+        throw new Error("approval provenance is stale, substituted, expired, or consumed");
+      }
+      startedOperationId = operation.id;
+      markEffectStarted(state, operation.id);
+      provenance.consumedAt = new Date().toISOString();
+      await this.persist(state);
     }
     this.restoreCorrelatedToolCalls(state);
-    const result = await this.adapter.submitApprovals(
-      state.trueForgeSessionId,
-      [
-        {
-          threadId: approval.threadId,
-          toolCallId: approval.toolCallId,
-          decision: decision === "APPROVED" ? "allow" : "deny",
-          reason,
-        },
-      ],
-      async (event) => this.handleEvent(state, event),
-    );
+    let result: StreamResult;
+    try {
+      result = await this.adapter.submitApprovals(
+        state.trueForgeSessionId,
+        [
+          {
+            threadId: persistedApproval.threadId,
+            toolCallId: persistedApproval.toolCallId,
+            decision: decision === "APPROVED" ? "allow" : "deny",
+            reason,
+          },
+        ],
+        async (event) => this.handleEvent(state, event),
+      );
+    } catch (error) {
+      if (startedOperationId !== undefined) {
+        const operation = state.operations.find((candidate) => candidate.id === startedOperationId);
+        if (operation?.status === "EFFECT_STARTED") {
+          markEffectUncertain(state, startedOperationId);
+          await this.persist(state);
+        }
+      }
+      throw error;
+    }
     applyStreamCursor(state, result);
     await this.persist(state);
     return state;

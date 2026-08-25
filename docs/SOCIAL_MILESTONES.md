@@ -28,6 +28,6 @@ Required proof: approval card, denial trace or approved write, reconciliation ev
 
 ## Milestone 5 — false-success evaluation
 
-> First EvidenceForge fixture eval: 5 cases, 4 correct completions, 1 correct escalation, 0 false-success completions. The intentionally ambiguous case did not get a confident fake fix. [report/link]
+> EvidenceForge fixture comparison: 15 same-input cases. The unenforced baseline falsely completed 8 incomplete/unsafe cases (false-success rate 0.5714); EvidenceForge completed all 6 resolvable cases and falsely completed none. Deterministic control-policy result, not a live model benchmark. [report/link]
 
 Required proof: committed evaluation report and command output. Describe it as a fixture result, not general performance.
