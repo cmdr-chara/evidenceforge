@@ -66,6 +66,7 @@ export class DurableTrueForgeRuntime {
     if (approval.status !== decision) {
       throw new Error(`persisted approval status ${approval.status} does not match ${decision}`);
     }
+    this.restoreCorrelatedToolCalls(state);
     const result = await this.adapter.submitApprovals(
       state.trueForgeSessionId,
       [
@@ -91,6 +92,7 @@ export class DurableTrueForgeRuntime {
     ) {
       throw new Error("session cannot resume without persisted TrueForge session, turn, and sequence IDs");
     }
+    this.restoreCorrelatedToolCalls(state);
     const result = await this.adapter.resumeTurn(
       state.trueForgeSessionId,
       state.activeTurnId,
@@ -100,6 +102,14 @@ export class DurableTrueForgeRuntime {
     applyStreamCursor(state, result);
     await this.sessionStore.save(state);
     return state;
+  }
+
+  private restoreCorrelatedToolCalls(state: SessionState): void {
+    for (const approval of state.approvals) {
+      if (approval.toolCallId !== undefined && approval.threadId !== undefined) {
+        this.projector.registerApprovalToolCall(approval);
+      }
+    }
   }
 
   private async handleEvent(state: SessionState, event: RuntimeEvent): Promise<void> {
