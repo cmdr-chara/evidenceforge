@@ -8,6 +8,7 @@ import {
 } from "../../domain/src/types";
 import { validateSessionState } from "../../domain/src/validation";
 import { isIssuedCompletionCertificate } from "../../verification/src/completion-gate";
+import { completionSubjectDigest } from "../../verification/src/completion-subject";
 
 export type TransitionActor = "APPLICATION" | "MODEL";
 
@@ -79,6 +80,9 @@ export class SessionController {
     if (certificate.taskId !== this.state.task.id) {
       throw new InvalidTransitionError("certificate task does not match session task");
     }
+    if (certificate.subjectDigest !== completionSubjectDigest(this.state)) {
+      throw new InvalidTransitionError("completion certificate subject no longer matches session state");
+    }
     this.state.phase = "COMPLETED";
     this.state.status = "COMPLETED";
     this.state.completionCertificate = structuredClone(certificate);
@@ -100,8 +104,13 @@ export class SessionController {
   }
 
   public setPatchDigest(digest: string): SessionState {
+    if (this.state.status !== "ACTIVE") {
+      throw new Error("patch digest can change only while the session is active");
+    }
     if (!/^[a-f0-9]{64}$/i.test(digest)) throw new Error("patch digest must be a SHA-256 hex string");
-    this.state.patchDigest = digest.toLowerCase();
+    const normalized = digest.toLowerCase();
+    if (this.state.patchDigest !== normalized) this.invalidatePatchBoundVerification();
+    this.state.patchDigest = normalized;
     this.state.version += 1;
     return this.snapshot();
   }
@@ -140,5 +149,30 @@ export class SessionController {
 
   public replaceState(state: SessionState): void {
     this.state = structuredClone(validateSessionState(state));
+  }
+
+  private invalidatePatchBoundVerification(): void {
+    const patchBoundCriterionIds = new Set(
+      this.state.successCriteria
+        .filter(
+          (criterion) =>
+            criterion.verifier.kind !== "FAILURE_SIGNATURE" &&
+            !(
+              criterion.verifier.kind === "COMMAND" &&
+              criterion.verifier.purpose === "REPRODUCTION"
+            ),
+        )
+        .map((criterion) => criterion.id),
+    );
+    for (const criterion of this.state.successCriteria) {
+      if (!patchBoundCriterionIds.has(criterion.id)) continue;
+      criterion.status = "PENDING";
+      criterion.evidenceIds = [];
+    }
+    this.state.verifierResults = this.state.verifierResults.filter(
+      (result) => !patchBoundCriterionIds.has(result.criterionId),
+    );
+    this.state.roundEvaluations = [];
+    this.state.reviewerVerdict = undefined;
   }
 }

@@ -90,8 +90,15 @@ const TIMELINE_ORDER: WorkflowPhase[] = [
   "COMPLETED",
 ];
 
+export function resolveEvidenceForgeDataDirectory(
+  cwd = process.cwd(),
+  configured = process.env.EVIDENCEFORGE_DATA_DIR,
+): string {
+  return resolve(cwd, configured?.trim() || ".data");
+}
+
 export class LiveIncidentService {
-  private readonly root = resolve(process.cwd(), ".evidenceforge");
+  private readonly root = resolveEvidenceForgeDataDirectory();
   private readonly checkpoints = new JsonRuntimeCheckpointStore(
     join(this.root, "checkpoints"),
   );

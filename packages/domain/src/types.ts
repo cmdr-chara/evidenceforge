@@ -373,6 +373,7 @@ export interface CompletionCertificateData {
     identifier: string;
     evidenceId: string;
   };
+  subjectDigest: string;
   traceId: string;
   generatedAt: string;
 }

@@ -40,8 +40,11 @@ cp .env.example .env
 export TRUEFORGE_BASE_URL=http://localhost:8790
 export TRUEFORGE_MODEL=openai/gpt-5.2
 export TRUEFORGE_GITHUB_MCP_NAME=github
+export EVIDENCEFORGE_DATA_DIR=.data
 # export TRUEFORGE_TOKEN=...  # only when OIDC is enabled
 ```
+
+`EVIDENCEFORGE_DATA_DIR` controls the durable checkpoint and runtime-event directory. Blank or unset values default to `.data/`.
 
 ## Validate
 
@@ -60,7 +63,7 @@ Start the EvidenceForge console:
 pnpm dev
 ```
 
-Use the live form with `owner/repository`, GitHub Actions run ID, and exact failing commit SHA. The session state persists under `.data/` and includes TrueForge session, turn, and sequence IDs for resume.
+Use the live form with `owner/repository`, GitHub Actions run ID, and exact failing commit SHA. The session state persists under `EVIDENCEFORGE_DATA_DIR` (default `.data/`) and includes TrueForge session, turn, and sequence IDs for resume.
 
 ## Approval behavior
 

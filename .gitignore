@@ -2,6 +2,7 @@ node_modules/
 .firecrawl/
 dist/
 .data/
+.evidenceforge/
 .env
 .env.*
 !.env.example

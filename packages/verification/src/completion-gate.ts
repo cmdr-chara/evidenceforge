@@ -7,6 +7,7 @@ import {
   VerificationResult,
 } from "../../domain/src/types";
 import { EvidenceStore } from "../../evidence/src";
+import { completionSubjectDigest } from "./completion-subject";
 import { roundEvaluationMatchesState } from "./progress-evaluator";
 
 const issuedCertificates = new WeakSet<object>();
@@ -190,6 +191,7 @@ export class CompletionGate {
               evidenceId: externalAction.evidenceId,
             }
           : undefined,
+      subjectDigest: completionSubjectDigest(state),
       traceId: state.traceId,
       generatedAt,
     });
