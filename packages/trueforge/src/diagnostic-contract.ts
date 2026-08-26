@@ -1,0 +1,195 @@
+import { RuntimeEvent, SessionState } from "../../domain/src";
+import { TRUEFORGE_SPECIALIST_TOOL_BUDGET } from "./agent-spec";
+
+export const REQUIRED_DIAGNOSTIC_SPECIALISTS = [
+  "Repository Investigator",
+  "Failure / Log Investigator",
+  "Dependency / Configuration Investigator",
+] as const;
+
+export interface DiagnosticContractViolation {
+  code:
+    | "UNEXPECTED_SPECIALIST"
+    | "DUPLICATE_SPECIALIST"
+    | "INVALID_PARENT"
+    | "UNKNOWN_SPECIALIST_THREAD"
+    | "FAILED_SPECIALIST"
+    | "TOOL_BUDGET_EXCEEDED"
+    | "INCOMPLETE_FAN_OUT";
+  reason: string;
+}
+
+export class DiagnosticContractGuard {
+  private turnCount = 0;
+  private requiredTurn = false;
+  private readonly specialists = new Map<string, string>();
+  private readonly observedNames = new Set<string>();
+  private readonly completedThreads = new Set<string>();
+  private readonly toolResults = new Map<string, number>();
+  private violation: DiagnosticContractViolation | undefined;
+
+  public constructor(events: RuntimeEvent[] = []) {
+    for (const event of events) this.observe(event);
+  }
+
+  public observe(event: RuntimeEvent): DiagnosticContractViolation | undefined {
+    if (event.type === "TURN_CREATED") {
+      this.turnCount += 1;
+      this.requiredTurn = this.turnCount === 1;
+      this.resetTurn();
+      return undefined;
+    }
+    if (this.violation !== undefined) return this.violation;
+
+    if (event.type === "THREAD_CREATED") {
+      if (!this.requiredTurn) {
+        return this.fail(
+          "DUPLICATE_SPECIALIST",
+          "TrueForge created a diagnostic specialist outside the initial fan-out",
+        );
+      }
+      const payload = asRecord(event.payload);
+      const parent = asRecord(payload.parent);
+      const parentThreadId = readString(parent, "threadId") ?? readString(parent, "thread_id");
+      const agentInfo = asRecord(payload.agentInfo ?? payload.agent_info);
+      const name = readString(agentInfo, "name") ?? readString(payload, "title");
+      const threadId =
+        event.threadId ?? readString(payload, "threadId") ?? readString(payload, "thread_id");
+
+      if (parentThreadId !== "main") {
+        return this.fail(
+          "INVALID_PARENT",
+          "TrueForge diagnostic fan-out created a non-supervisor child thread",
+        );
+      }
+      if (
+        name === undefined ||
+        threadId === undefined ||
+        !REQUIRED_DIAGNOSTIC_SPECIALISTS.includes(
+          name as (typeof REQUIRED_DIAGNOSTIC_SPECIALISTS)[number],
+        )
+      ) {
+        return this.fail(
+          "UNEXPECTED_SPECIALIST",
+          "TrueForge diagnostic fan-out created an unexpected specialist",
+        );
+      }
+      if (this.observedNames.has(name) || this.specialists.has(threadId)) {
+        return this.fail(
+          "DUPLICATE_SPECIALIST",
+          "TrueForge diagnostic fan-out created a duplicate specialist",
+        );
+      }
+      this.observedNames.add(name);
+      this.specialists.set(threadId, name);
+      return undefined;
+    }
+
+    if (!this.requiredTurn) return undefined;
+
+    if (event.type === "TOOL_RESULT" && event.threadId !== undefined) {
+      if (event.threadId === "main") return undefined;
+      if (!this.specialists.has(event.threadId)) {
+        return this.fail(
+          "UNKNOWN_SPECIALIST_THREAD",
+          "TrueForge emitted a tool result for an unknown diagnostic thread",
+        );
+      }
+      const count = (this.toolResults.get(event.threadId) ?? 0) + 1;
+      this.toolResults.set(event.threadId, count);
+      if (count > TRUEFORGE_SPECIALIST_TOOL_BUDGET) {
+        return this.fail(
+          "TOOL_BUDGET_EXCEEDED",
+          `TrueForge diagnostic specialist exceeded the ${TRUEFORGE_SPECIALIST_TOOL_BUDGET}-tool budget`,
+        );
+      }
+      return undefined;
+    }
+
+    if (event.type === "THREAD_DONE" && event.threadId !== undefined) {
+      if (!this.specialists.has(event.threadId)) {
+        return this.fail(
+          "UNKNOWN_SPECIALIST_THREAD",
+          "TrueForge completed an unknown diagnostic thread",
+        );
+      }
+      const status = readString(asRecord(asRecord(event.payload).state), "status");
+      if (status !== undefined && status !== "done") {
+        return this.fail(
+          "FAILED_SPECIALIST",
+          "TrueForge diagnostic specialist did not complete successfully",
+        );
+      }
+      this.completedThreads.add(event.threadId);
+      return undefined;
+    }
+
+    if (event.type === "TURN_DONE" && terminalStatus(event) === "done") {
+      if (
+        this.specialists.size !== REQUIRED_DIAGNOSTIC_SPECIALISTS.length ||
+        [...this.specialists.keys()].some(
+          (threadId) => !this.completedThreads.has(threadId),
+        )
+      ) {
+        return this.fail(
+          "INCOMPLETE_FAN_OUT",
+          "TrueForge turn ended without exactly three completed diagnostic specialists",
+        );
+      }
+    }
+
+    return undefined;
+  }
+
+  private resetTurn(): void {
+    this.specialists.clear();
+    this.observedNames.clear();
+    this.completedThreads.clear();
+    this.toolResults.clear();
+    this.violation = undefined;
+  }
+
+  private fail(
+    code: DiagnosticContractViolation["code"],
+    reason: string,
+  ): DiagnosticContractViolation {
+    this.violation = { code, reason };
+    return this.violation;
+  }
+}
+
+export function evaluateDiagnosticContract(
+  events: RuntimeEvent[],
+): DiagnosticContractViolation | undefined {
+  const guard = new DiagnosticContractGuard();
+  let violation: DiagnosticContractViolation | undefined;
+  for (const event of events) violation = guard.observe(event) ?? violation;
+  return violation;
+}
+
+export function blockForDiagnosticViolation(
+  state: SessionState,
+  violation: DiagnosticContractViolation,
+): boolean {
+  if (state.status !== "ACTIVE") return false;
+  state.phase = "BLOCKED";
+  state.status = "BLOCKED";
+  state.blockedReason = violation.reason;
+  state.version += 1;
+  return true;
+}
+
+function terminalStatus(event: RuntimeEvent): string | undefined {
+  return readString(asRecord(asRecord(event.payload).state), "status");
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function readString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}

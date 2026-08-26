@@ -1,6 +1,6 @@
 import { TrueForgeRuntimeConfig } from "./config";
 
-export const TRUEFORGE_LLM_ITERATION_LIMIT = 32;
+export const TRUEFORGE_LLM_ITERATION_LIMIT = 36;
 export const TRUEFORGE_MAX_OUTPUT_TOKENS = 8_192;
 export const TRUEFORGE_SPECIALIST_TOOL_BUDGET = 8;
 

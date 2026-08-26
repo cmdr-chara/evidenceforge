@@ -1,6 +1,7 @@
 export * from "./agent-spec";
 export * from "./client";
 export * from "./config";
+export * from "./diagnostic-contract";
 export * from "./event-index";
 export * from "./event-normalizer";
 export * from "./projector";

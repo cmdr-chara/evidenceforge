@@ -20,6 +20,8 @@ import {
 import { buildCiSuccessContract } from "../../packages/workflow/src";
 
 class VerifierAdapter implements TrueForgeRuntimeAdapter {
+  public async cancelSession(): Promise<void> {}
+
   public async createSession(): Promise<string> {
     return "tf-checkpoint-session";
   }

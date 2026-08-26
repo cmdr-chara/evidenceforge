@@ -10,9 +10,14 @@ import {
 } from "./client";
 import { TrueForgeEventProjector } from "./projector";
 import { markEffectStarted, markEffectUncertain } from "../../workflow/src";
+import {
+  blockForDiagnosticViolation,
+  DiagnosticContractGuard,
+} from "./diagnostic-contract";
 
 export interface TrueForgeRuntimeAdapter {
   createSession(): Promise<string>;
+  cancelSession(sessionId: string): Promise<void>;
   runTurn(input: RunTurnInput): Promise<StreamResult>;
   submitApprovals(
     sessionId: string,
@@ -29,6 +34,8 @@ export interface TrueForgeRuntimeAdapter {
 
 export class DurableTrueForgeRuntime {
   private readonly projector: TrueForgeEventProjector;
+  private readonly diagnosticGuard: DiagnosticContractGuard;
+  private readonly cancelledSessions = new Set<string>();
 
   public constructor(
     private readonly adapter: TrueForgeRuntimeAdapter | TrueForgeSdkAdapter,
@@ -42,6 +49,7 @@ export class DurableTrueForgeRuntime {
     projector?: TrueForgeEventProjector,
   ) {
     this.projector = projector ?? new TrueForgeEventProjector(undefined, evidenceStore);
+    this.diagnosticGuard = new DiagnosticContractGuard(evidenceStore.listEvents());
   }
 
   public async start(state: SessionState, message: string): Promise<SessionState> {
@@ -168,6 +176,8 @@ export class DurableTrueForgeRuntime {
   private async handleEvent(state: SessionState, event: RuntimeEvent): Promise<void> {
     const isNewEvent = this.evidenceStore.getEvent(event.id) === undefined;
     if (isNewEvent) this.evidenceStore.recordEvent(event);
+    const violation = isNewEvent ? this.diagnosticGuard.observe(event) : undefined;
+    if (violation !== undefined) blockForDiagnosticViolation(state, violation);
     this.projector.project(state, event);
     if (event.type === "TURN_CREATED") {
       state.activeTurnId = readTurnId(event.payload) ?? state.activeTurnId;
@@ -175,7 +185,21 @@ export class DurableTrueForgeRuntime {
     if (event.sequenceNumber !== undefined) state.lastSequenceNumber = event.sequenceNumber;
     if (isNewEvent) await this.journal.append(event);
     await this.persist(state);
+    if (violation !== undefined && state.trueForgeSessionId !== undefined) {
+      await this.cancelOnce(state.trueForgeSessionId);
+    }
     if (isNewEvent) await this.onEvent?.(event, structuredClone(state));
+  }
+
+  private async cancelOnce(sessionId: string): Promise<void> {
+    if (this.cancelledSessions.has(sessionId)) return;
+    this.cancelledSessions.add(sessionId);
+    try {
+      await this.adapter.cancelSession(sessionId);
+    } catch {
+      // The durable BLOCKED state is authoritative even if the best-effort cancel races
+      // with a terminal server event or the transport is unavailable.
+    }
   }
 
   private async persist(state: SessionState): Promise<void> {

@@ -16,6 +16,7 @@ interface MetadataStream {
 
 interface SessionApi {
   create(input: unknown): Promise<{ data: { id: string } }>;
+  cancel(sessionId: string): Promise<unknown>;
   createTurnStream(sessionId: string, input: unknown): Promise<MetadataStream>;
   getTurn(sessionId: string, turnId: string): Promise<{ data: UnknownRecord }>;
   subscribeToTurn(
@@ -72,6 +73,11 @@ export class TrueForgeSdkAdapter {
       agent: { spec: buildEvidenceForgeAgentSpec(this.config) },
     });
     return data.id;
+  }
+
+  public async cancelSession(sessionId: string): Promise<void> {
+    const client = await this.client();
+    await client.sessions.cancel(sessionId);
   }
 
   public async runTurn(input: RunTurnInput): Promise<StreamResult> {

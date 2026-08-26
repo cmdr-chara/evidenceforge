@@ -20,6 +20,8 @@ import { buildState } from "../fixtures/builders";
 class FakeAdapter implements TrueForgeRuntimeAdapter {
   public submitted: ApprovalResponse[] = [];
 
+  public async cancelSession(): Promise<void> {}
+
   public async createSession(): Promise<string> {
     return "tf-session";
   }

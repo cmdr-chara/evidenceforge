@@ -206,9 +206,14 @@ function terminalTurnFailureReason(
       : "TrueForge turn was cancelled";
   }
   if (status === "error") {
-    return readString(turnState, "message") === "max_tokens breached"
-      ? "TrueForge turn exceeded the configured model output token limit"
-      : "TrueForge turn ended with an execution error";
+    const message = readString(turnState, "message");
+    if (message === "max_tokens breached") {
+      return "TrueForge turn exceeded the configured model output token limit";
+    }
+    if (message?.startsWith("You have reached iteration limit") === true) {
+      return "TrueForge turn reached the bounded iteration limit";
+    }
+    return "TrueForge turn ended with an execution error";
   }
   if (status === "failed") return "TrueForge turn failed";
   return "TrueForge turn ended without a valid terminal status";

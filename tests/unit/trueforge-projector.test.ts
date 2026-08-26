@@ -180,6 +180,29 @@ test("TrueForge model output-limit errors block without exposing arbitrary runti
   assert.doesNotMatch(state.blockedReason ?? "", /59045/);
 });
 
+test("TrueForge iteration-limit errors use a stable bounded reason", () => {
+  const state = buildState();
+  const projector = new TrueForgeEventProjector();
+
+  projector.project(state, {
+    id: "turn-iteration-limit",
+    type: "TURN_DONE",
+    source: "trueforge:turn.done",
+    timestamp: "2026-08-26T14:23:55.635Z",
+    payload: {
+      type: "turn.done",
+      id: "turn-iteration-limit",
+      state: {
+        status: "error",
+        message: "You have reached iteration limit of 32, please request again",
+      },
+    },
+  });
+
+  assert.equal(state.status, "BLOCKED");
+  assert.equal(state.blockedReason, "TrueForge turn reached the bounded iteration limit");
+});
+
 test("unknown TrueForge terminal states fail closed while done remains non-terminal", () => {
   const doneState = buildState();
   new TrueForgeEventProjector().project(

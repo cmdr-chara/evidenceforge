@@ -31,7 +31,7 @@ test("TrueForge agent spec bounds per-thread work and requires convergence", () 
   });
 
   assert.equal(spec.config.iteration_limit, TRUEFORGE_LLM_ITERATION_LIMIT);
-  assert.equal(TRUEFORGE_LLM_ITERATION_LIMIT, 32);
+  assert.equal(TRUEFORGE_LLM_ITERATION_LIMIT, 36);
   assert.equal(spec.model.params.max_tokens, TRUEFORGE_MAX_OUTPUT_TOKENS);
   assert.equal(TRUEFORGE_MAX_OUTPUT_TOKENS, 8_192);
   assert.equal(spec.model.params.parallel_tool_calls, true);
