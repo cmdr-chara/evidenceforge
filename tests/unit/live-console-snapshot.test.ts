@@ -113,3 +113,22 @@ test("cancelled turn activity reports a timeout without forwarding turn metrics"
   assert.equal(activity.label, "TrueForge turn timed out");
   assert.doesNotMatch(JSON.stringify(activity), /totalTokens|1000000/);
 });
+
+test("live snapshot rebuilds sanitized activity from persisted runtime events", () => {
+  const state = buildState();
+  const store = new EvidenceStore();
+  store.recordEvent({
+    id: "event-sandbox-ready",
+    type: "SANDBOX_CREATED",
+    source: "trueforge:sandbox.created",
+    timestamp: "2026-08-26T12:30:00.000Z",
+    sequenceNumber: 9,
+    payload: { sandboxId: "must-not-reach-the-browser" },
+  });
+
+  const snapshot = buildLiveConsoleSnapshot(state, store);
+
+  assert.equal(snapshot.activity.length, 1);
+  assert.equal(snapshot.activity[0]?.label, "Daytona sandbox ready");
+  assert.doesNotMatch(JSON.stringify(snapshot.activity), /must-not-reach-the-browser/);
+});

@@ -250,6 +250,21 @@ export function buildLiveConsoleSnapshot(
   activity: LiveActivityItem[] = [],
 ): LiveConsoleSnapshot {
   const evidenceIds = new Set(state.evidenceIds);
+  const persistedActivity = evidenceStore
+    .listEvents()
+    .map((event) => toLiveActivity(event, state.phase))
+    .filter((item): item is LiveActivityItem => item !== undefined);
+  const activityById = new Map(
+    [...persistedActivity, ...activity].map((item) => [item.id, item]),
+  );
+  const recentActivity = [...activityById.values()]
+    .sort((left, right) => {
+      if (left.sequenceNumber !== undefined && right.sequenceNumber !== undefined) {
+        return left.sequenceNumber - right.sequenceNumber;
+      }
+      return Date.parse(left.timestamp) - Date.parse(right.timestamp);
+    })
+    .slice(-80);
   return {
     mode: "LIVE_TRUEFORGE",
     notice:
@@ -277,7 +292,7 @@ export function buildLiveConsoleSnapshot(
     trueForgeSessionId: state.trueForgeSessionId,
     activeTurnId: state.activeTurnId,
     lastSequenceNumber: state.lastSequenceNumber,
-    activity: structuredClone(activity),
+    activity: structuredClone(recentActivity),
   };
 }
 
