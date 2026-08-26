@@ -49,7 +49,10 @@ connectEvents();
 
 async function load() {
   try {
-    render(await request('/api/demo/session'));
+    const taskId = new URL(window.location.href).searchParams.get('task');
+    render(await request(taskId === null
+      ? '/api/demo/session'
+      : `/api/live/session/${encodeURIComponent(taskId)}`));
   } catch (error) {
     showConnection('Disconnected', 'danger');
     elements.notice.textContent = error.message;
@@ -124,6 +127,7 @@ function connectEvents() {
 function render(input) {
   const snapshot = normalizeSnapshot(input);
   state.snapshot = snapshot;
+  syncLocation(snapshot);
   elements.mode.textContent = snapshot.mode.replaceAll('_', ' ');
   elements.mode.className = `status-pill ${snapshot.mode === 'LIVE_TRUEFORGE' ? 'active' : 'warning'}`;
   elements.phase.textContent = snapshot.phase;
@@ -149,6 +153,13 @@ function render(input) {
     elements.liveStatus.textContent = `Live task ${snapshot.task.id} · ${snapshot.phase} · cursor ${snapshot.lastSequenceNumber ?? '—'}`;
   }
   syncControls();
+}
+
+function syncLocation(snapshot) {
+  const url = new URL(window.location.href);
+  if (snapshot.mode === 'LIVE_TRUEFORGE') url.searchParams.set('task', snapshot.task.id);
+  else url.searchParams.delete('task');
+  if (url.href !== window.location.href) window.history.replaceState(null, '', url);
 }
 
 function normalizeSnapshot(snapshot) {
