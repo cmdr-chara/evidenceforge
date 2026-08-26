@@ -15,12 +15,15 @@ export interface DiagnosticContractViolation {
     | "UNKNOWN_SPECIALIST_THREAD"
     | "FAILED_SPECIALIST"
     | "TOOL_BUDGET_EXCEEDED"
-    | "INCOMPLETE_FAN_OUT";
+    | "INCOMPLETE_FAN_OUT"
+    | "INVALID_TURN_ORDER"
+    | "MALFORMED_EVENT";
   reason: string;
 }
 
 export class DiagnosticContractGuard {
   private turnCount = 0;
+  private turnOpen = false;
   private requiredTurn = false;
   private readonly specialists = new Map<string, string>();
   private readonly observedNames = new Set<string>();
@@ -33,16 +36,30 @@ export class DiagnosticContractGuard {
   }
 
   public observe(event: RuntimeEvent): DiagnosticContractViolation | undefined {
+    if (this.violation !== undefined) return this.violation;
     if (event.type === "TURN_CREATED") {
+      if (this.turnOpen) {
+        return this.fail(
+          "INVALID_TURN_ORDER",
+          "TrueForge started a new turn before the active turn ended",
+        );
+      }
       this.turnCount += 1;
       this.requiredTurn = this.turnCount === 1;
+      this.turnOpen = true;
       this.resetTurn();
       return undefined;
     }
-    if (this.violation !== undefined) return this.violation;
+
+    if (event.type === "TURN_DONE" && !this.turnOpen) {
+      return this.fail(
+        "INVALID_TURN_ORDER",
+        "TrueForge ended a turn that was never started",
+      );
+    }
 
     if (event.type === "THREAD_CREATED") {
-      if (!this.requiredTurn) {
+      if (!this.turnOpen || !this.requiredTurn) {
         return this.fail(
           "DUPLICATE_SPECIALIST",
           "TrueForge created a diagnostic specialist outside the initial fan-out",
@@ -52,7 +69,10 @@ export class DiagnosticContractGuard {
       const parent = asRecord(payload.parent);
       const parentThreadId = readString(parent, "threadId") ?? readString(parent, "thread_id");
       const agentInfo = asRecord(payload.agentInfo ?? payload.agent_info);
-      const name = readString(agentInfo, "name") ?? readString(payload, "title");
+      const agentType = readString(agentInfo, "type");
+      const name = readString(agentInfo, "name");
+      const parentToolCallId =
+        readString(parent, "toolCallId") ?? readString(parent, "tool_call_id");
       const threadId =
         event.threadId ?? readString(payload, "threadId") ?? readString(payload, "thread_id");
 
@@ -64,7 +84,12 @@ export class DiagnosticContractGuard {
       }
       if (
         name === undefined ||
+        name.trim().length === 0 ||
+        agentType !== "dynamic" ||
         threadId === undefined ||
+        threadId.trim().length === 0 ||
+        parentToolCallId === undefined ||
+        parentToolCallId.trim().length === 0 ||
         !REQUIRED_DIAGNOSTIC_SPECIALISTS.includes(
           name as (typeof REQUIRED_DIAGNOSTIC_SPECIALISTS)[number],
         )
@@ -87,7 +112,13 @@ export class DiagnosticContractGuard {
 
     if (!this.requiredTurn) return undefined;
 
-    if (event.type === "TOOL_RESULT" && event.threadId !== undefined) {
+    if (event.type === "TOOL_RESULT") {
+      if (event.threadId === undefined) {
+        return this.fail(
+          "MALFORMED_EVENT",
+          "TrueForge emitted a tool result without a diagnostic thread ID",
+        );
+      }
       if (event.threadId === "main") return undefined;
       if (!this.specialists.has(event.threadId)) {
         return this.fail(
@@ -106,7 +137,13 @@ export class DiagnosticContractGuard {
       return undefined;
     }
 
-    if (event.type === "THREAD_DONE" && event.threadId !== undefined) {
+    if (event.type === "THREAD_DONE") {
+      if (event.threadId === undefined) {
+        return this.fail(
+          "MALFORMED_EVENT",
+          "TrueForge completed a diagnostic thread without a thread ID",
+        );
+      }
       if (!this.specialists.has(event.threadId)) {
         return this.fail(
           "UNKNOWN_SPECIALIST_THREAD",
@@ -114,7 +151,7 @@ export class DiagnosticContractGuard {
         );
       }
       const status = readString(asRecord(asRecord(event.payload).state), "status");
-      if (status !== undefined && status !== "done") {
+      if (status !== "done") {
         return this.fail(
           "FAILED_SPECIALIST",
           "TrueForge diagnostic specialist did not complete successfully",
@@ -137,6 +174,8 @@ export class DiagnosticContractGuard {
         );
       }
     }
+
+    if (event.type === "TURN_DONE") this.turnOpen = false;
 
     return undefined;
   }

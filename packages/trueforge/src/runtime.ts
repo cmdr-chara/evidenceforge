@@ -175,20 +175,21 @@ export class DurableTrueForgeRuntime {
 
   private async handleEvent(state: SessionState, event: RuntimeEvent): Promise<void> {
     const isNewEvent = this.evidenceStore.getEvent(event.id) === undefined;
-    if (isNewEvent) this.evidenceStore.recordEvent(event);
-    const violation = isNewEvent ? this.diagnosticGuard.observe(event) : undefined;
+    if (!isNewEvent) return;
+    this.evidenceStore.recordEvent(event);
+    const violation = this.diagnosticGuard.observe(event);
     if (violation !== undefined) blockForDiagnosticViolation(state, violation);
     this.projector.project(state, event);
     if (event.type === "TURN_CREATED") {
       state.activeTurnId = readTurnId(event.payload) ?? state.activeTurnId;
     }
     if (event.sequenceNumber !== undefined) state.lastSequenceNumber = event.sequenceNumber;
-    if (isNewEvent) await this.journal.append(event);
+    await this.journal.append(event);
     await this.persist(state);
     if (violation !== undefined && state.trueForgeSessionId !== undefined) {
       await this.cancelOnce(state.trueForgeSessionId);
     }
-    if (isNewEvent) await this.onEvent?.(event, structuredClone(state));
+    await this.onEvent?.(event, structuredClone(state));
   }
 
   private async cancelOnce(sessionId: string): Promise<void> {

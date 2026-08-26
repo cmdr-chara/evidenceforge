@@ -118,8 +118,8 @@ function threadCreated(threadId: string, name: string): RuntimeEvent {
     ...event(`created-${threadId}`, "THREAD_CREATED", {
       type: "thread.created",
       threadId,
-      agentInfo: { name },
-      parent: { threadId: "main" },
+      agentInfo: { type: "dynamic", name },
+      parent: { threadId: "main", toolCallId: `call-${threadId}` },
     }),
     threadId,
   };

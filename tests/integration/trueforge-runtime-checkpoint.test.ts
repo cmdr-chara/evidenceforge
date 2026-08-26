@@ -43,8 +43,22 @@ class VerifierAdapter implements TrueForgeRuntimeAdapter {
     throw new Error("not used");
   }
 
-  public async resumeTurn(): Promise<StreamResult> {
-    throw new Error("not used");
+  public async resumeTurn(
+    sessionId: string,
+    turnId: string,
+    afterSequenceNumber: number,
+    onEvent?: RunTurnInput["onEvent"],
+  ): Promise<StreamResult> {
+    const events = verifierEvents();
+    for (const event of events) await onEvent?.(event);
+    return {
+      sessionId,
+      turnId,
+      lastSequenceNumber: afterSequenceNumber,
+      events,
+      paused: false,
+      requiredActions: [],
+    };
   }
 }
 
@@ -94,6 +108,17 @@ test("TrueForge verifier evidence survives a process-level checkpoint restore", 
       ),
       true,
     );
+
+    const resumedRuntime = new DurableTrueForgeRuntime(
+      new VerifierAdapter(),
+      checkpoints,
+      afterRestart.evidenceStore,
+      new EventJournal(join(directory, "events.jsonl")),
+    );
+    await resumedRuntime.resume(afterRestart.state);
+    assert.equal(afterRestart.evidenceStore.listEvents().length, 2);
+    assert.equal(afterRestart.evidenceStore.listEvidence().length, 1);
+    assert.equal(afterRestart.state.verifierResults.length, 1);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

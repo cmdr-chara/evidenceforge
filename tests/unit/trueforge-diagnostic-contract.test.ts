@@ -38,6 +38,40 @@ test("diagnostic contract rejects a failed specialist", () => {
   assert.equal(evaluateDiagnosticContract([turnCreated(), created, done])?.code, "FAILED_SPECIALIST");
 });
 
+test("diagnostic contract rejects a completed specialist without terminal status", () => {
+  const done = threadDone("thread-1");
+  delete (done.payload as { state?: unknown }).state;
+  assert.equal(
+    evaluateDiagnosticContract([
+      turnCreated(),
+      threadCreated("thread-1", REQUIRED_DIAGNOSTIC_SPECIALISTS[0]),
+      done,
+    ])?.code,
+    "FAILED_SPECIALIST",
+  );
+});
+
+test("diagnostic contract rejects missing thread correlation", () => {
+  const result = toolResult("thread-1", 0);
+  delete result.threadId;
+  assert.equal(
+    evaluateDiagnosticContract([
+      turnCreated(),
+      threadCreated("thread-1", REQUIRED_DIAGNOSTIC_SPECIALISTS[0]),
+      result,
+    ])?.code,
+    "MALFORMED_EVENT",
+  );
+});
+
+test("diagnostic contract rejects invalid turn ordering", () => {
+  assert.equal(evaluateDiagnosticContract([turnDone()])?.code, "INVALID_TURN_ORDER");
+  assert.equal(
+    evaluateDiagnosticContract([turnCreated(), turnCreated("turn-2")])?.code,
+    "INVALID_TURN_ORDER",
+  );
+});
+
 test("diagnostic contract rejects a successful turn with an incomplete fan-out", () => {
   const events = [
     turnCreated(),
@@ -112,8 +146,8 @@ function threadCreated(
     ...event(`created-${threadId}`, "THREAD_CREATED", {
       type: "thread.created",
       threadId,
-      agentInfo: { name },
-      parent: { threadId: parentThreadId },
+      agentInfo: { type: "dynamic", name },
+      parent: { threadId: parentThreadId, toolCallId: `call-${threadId}` },
     }),
     threadId,
   };
