@@ -24,7 +24,7 @@ test("diagnostic contract rejects child threads not parented by the supervisor",
 });
 
 test("diagnostic contract rejects a specialist after its tool budget", () => {
-  const events = [turnCreated(), threadCreated("thread-1", REQUIRED_DIAGNOSTIC_SPECIALISTS[0])];
+  const events = [turnCreated(), ...fanOut()];
   for (let index = 0; index <= TRUEFORGE_SPECIALIST_TOOL_BUDGET; index += 1) {
     events.push(toolResult("thread-1", index));
   }
@@ -32,10 +32,12 @@ test("diagnostic contract rejects a specialist after its tool budget", () => {
 });
 
 test("diagnostic contract rejects a failed specialist", () => {
-  const created = threadCreated("thread-1", REQUIRED_DIAGNOSTIC_SPECIALISTS[0]);
   const done = threadDone("thread-1");
   (done.payload as { state?: { status: string } }).state = { status: "error" };
-  assert.equal(evaluateDiagnosticContract([turnCreated(), created, done])?.code, "FAILED_SPECIALIST");
+  assert.equal(
+    evaluateDiagnosticContract([turnCreated(), ...fanOut(), done])?.code,
+    "FAILED_SPECIALIST",
+  );
 });
 
 test("diagnostic contract rejects a completed specialist without terminal status", () => {
@@ -44,7 +46,7 @@ test("diagnostic contract rejects a completed specialist without terminal status
   assert.equal(
     evaluateDiagnosticContract([
       turnCreated(),
-      threadCreated("thread-1", REQUIRED_DIAGNOSTIC_SPECIALISTS[0]),
+      ...fanOut(),
       done,
     ])?.code,
     "FAILED_SPECIALIST",
@@ -72,11 +74,29 @@ test("diagnostic contract rejects invalid turn ordering", () => {
   );
 });
 
+test("diagnostic contract rejects sequential specialist execution", () => {
+  assert.equal(
+    evaluateDiagnosticContract([
+      turnCreated(),
+      threadCreated("thread-1", REQUIRED_DIAGNOSTIC_SPECIALISTS[0]),
+      toolResult("thread-1", 0),
+    ])?.code,
+    "NON_PARALLEL_FAN_OUT",
+  );
+  assert.equal(
+    evaluateDiagnosticContract([
+      turnCreated(),
+      threadCreated("thread-1", REQUIRED_DIAGNOSTIC_SPECIALISTS[0]),
+      threadDone("thread-1"),
+    ])?.code,
+    "NON_PARALLEL_FAN_OUT",
+  );
+});
+
 test("diagnostic contract rejects a successful turn with an incomplete fan-out", () => {
   const events = [
     turnCreated(),
     threadCreated("thread-1", REQUIRED_DIAGNOSTIC_SPECIALISTS[0]),
-    threadDone("thread-1"),
     turnDone(),
   ];
   assert.equal(evaluateDiagnosticContract(events)?.code, "INCOMPLETE_FAN_OUT");
@@ -97,7 +117,7 @@ test("diagnostic contract forbids a later diagnostic fan-out", () => {
 });
 
 test("diagnostic contract restores the current tool budget from checkpoint events", () => {
-  const events = [turnCreated(), threadCreated("thread-1", REQUIRED_DIAGNOSTIC_SPECIALISTS[0])];
+  const events = [turnCreated(), ...fanOut()];
   for (let index = 0; index < TRUEFORGE_SPECIALIST_TOOL_BUDGET - 1; index += 1) {
     events.push(toolResult("thread-1", index));
   }
@@ -123,6 +143,12 @@ function validTurn(turnId = "turn-1"): RuntimeEvent[] {
     ),
     turnDone(turnId),
   ];
+}
+
+function fanOut(): RuntimeEvent[] {
+  return REQUIRED_DIAGNOSTIC_SPECIALISTS.map((name, index) =>
+    threadCreated(`thread-${index + 1}`, name),
+  );
 }
 
 function turnCreated(turnId = "turn-1"): RuntimeEvent {

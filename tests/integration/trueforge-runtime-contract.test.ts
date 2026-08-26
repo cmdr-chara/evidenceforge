@@ -71,6 +71,8 @@ test("runtime blocks and cancels once when TrueForge starts a second fan-out", a
     assert.equal(state.phase, "BLOCKED");
     assert.equal(state.blockedReason, "TrueForge diagnostic fan-out created a duplicate specialist");
     assert.equal(adapter.cancellations, 1);
+    assert.equal(state.approvals.length, 0);
+    assert.equal(state.operations.length, 0);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -108,7 +110,18 @@ function duplicateFanOut(): RuntimeEvent[] {
   }
   events.push(threadCreated("thread-4", REQUIRED_DIAGNOSTIC_SPECIALISTS[0]));
   events.push(
-    event("after-violation", "MODEL_MESSAGE", { type: "model.message", threadId: "main" }),
+    event("after-violation", "APPROVAL", {
+      type: "tool.approval_required",
+      threadId: "main",
+      toolCalls: [
+        {
+          id: "call-after-violation",
+          name: "create_pull_request",
+          arguments: "{}",
+          toolInfo: { type: "mcp", serverName: "github" },
+        },
+      ],
+    }),
   );
   return events.map((candidate, index) => ({ ...candidate, sequenceNumber: index + 1 }));
 }

@@ -73,6 +73,9 @@ export class DurableTrueForgeRuntime {
     decision: "APPROVED" | "DENIED",
     reason?: string,
   ): Promise<SessionState> {
+    if (state.status !== "ACTIVE") {
+      throw new Error("approval cannot be submitted for a non-active session");
+    }
     if (state.trueForgeSessionId === undefined) {
       throw new Error("approval cannot be submitted without a TrueForge session ID");
     }
@@ -179,7 +182,7 @@ export class DurableTrueForgeRuntime {
     this.evidenceStore.recordEvent(event);
     const violation = this.diagnosticGuard.observe(event);
     if (violation !== undefined) blockForDiagnosticViolation(state, violation);
-    this.projector.project(state, event);
+    if (violation === undefined) this.projector.project(state, event);
     if (event.type === "TURN_CREATED") {
       state.activeTurnId = readTurnId(event.payload) ?? state.activeTurnId;
     }

@@ -17,7 +17,8 @@ export interface DiagnosticContractViolation {
     | "TOOL_BUDGET_EXCEEDED"
     | "INCOMPLETE_FAN_OUT"
     | "INVALID_TURN_ORDER"
-    | "MALFORMED_EVENT";
+    | "MALFORMED_EVENT"
+    | "NON_PARALLEL_FAN_OUT";
   reason: string;
 }
 
@@ -126,6 +127,12 @@ export class DiagnosticContractGuard {
           "TrueForge emitted a tool result for an unknown diagnostic thread",
         );
       }
+      if (this.specialists.size !== REQUIRED_DIAGNOSTIC_SPECIALISTS.length) {
+        return this.fail(
+          "NON_PARALLEL_FAN_OUT",
+          "TrueForge began specialist work before the three-way fan-out was created",
+        );
+      }
       const count = (this.toolResults.get(event.threadId) ?? 0) + 1;
       this.toolResults.set(event.threadId, count);
       if (count > TRUEFORGE_SPECIALIST_TOOL_BUDGET) {
@@ -148,6 +155,12 @@ export class DiagnosticContractGuard {
         return this.fail(
           "UNKNOWN_SPECIALIST_THREAD",
           "TrueForge completed an unknown diagnostic thread",
+        );
+      }
+      if (this.specialists.size !== REQUIRED_DIAGNOSTIC_SPECIALISTS.length) {
+        return this.fail(
+          "NON_PARALLEL_FAN_OUT",
+          "TrueForge completed a specialist before the three-way fan-out was created",
         );
       }
       const status = readString(asRecord(asRecord(event.payload).state), "status");

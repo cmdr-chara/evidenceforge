@@ -187,3 +187,28 @@ test("durable runtime maps a denied decision to a TrueForge deny response", asyn
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("durable runtime rejects approval submission after the session is blocked", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-runtime-blocked-approval-"));
+  try {
+    const runtime = new DurableTrueForgeRuntime(
+      new FakeAdapter(),
+      new JsonSessionStore(join(root, "sessions")),
+      new EvidenceStore(),
+      new EventJournal(join(root, "events.jsonl")),
+    );
+    const state = buildState();
+    state.trueForgeSessionId = "tf-session";
+    state.status = "BLOCKED";
+    state.phase = "BLOCKED";
+    const approval = decidedApproval("APPROVED");
+    state.approvals.push(approval);
+
+    await assert.rejects(
+      runtime.submitApproval(state, approval, "APPROVED"),
+      /non-active session/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
