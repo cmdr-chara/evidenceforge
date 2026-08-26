@@ -32,6 +32,10 @@ const elements = {
   reject: byId('reject-button'),
   liveForm: byId('live-form'),
   liveStatus: byId('live-status'),
+  activityPanel: byId('activity-panel'),
+  activityLog: byId('activity-log'),
+  activityCount: byId('activity-count'),
+  activitySummary: byId('activity-summary'),
 };
 
 elements.advance.addEventListener('click', () => mutate('/api/demo/advance'));
@@ -110,8 +114,9 @@ function connectEvents() {
   source.addEventListener('demo-state', (event) => render(JSON.parse(event.data)));
   source.addEventListener('live-state', (event) => render(JSON.parse(event.data)));
   source.addEventListener('runtime-event', (event) => {
-    const runtimeEvent = JSON.parse(event.data);
-    elements.liveStatus.textContent = `TrueForge: ${runtimeEvent.source} · event ${runtimeEvent.id}`;
+    const activity = normalizeActivity(JSON.parse(event.data));
+    if (activity === null) return;
+    renderActivity([...(state.snapshot?.activity ?? []), activity].slice(-80));
   });
   source.onerror = () => showConnection('Reconnecting', 'warning');
 }
@@ -134,6 +139,7 @@ function render(input) {
   renderSpecialists(snapshot.specialists);
   renderHypotheses(snapshot.hypotheses);
   renderEvidence(snapshot.evidence);
+  renderActivity(snapshot.activity ?? []);
   renderPatch(snapshot.patch);
   renderApproval(snapshot.approvals, snapshot.phase);
   renderCertificate(snapshot.completionCertificate);
@@ -157,6 +163,7 @@ function normalizeSnapshot(snapshot) {
     approvals: snapshot.approvals ?? [],
     hypotheses: snapshot.hypotheses ?? [],
     successCriteria: snapshot.successCriteria ?? [],
+    activity: snapshot.activity ?? [],
   };
 }
 
@@ -268,6 +275,89 @@ function renderEvidence(evidence) {
   }));
 }
 
+function renderActivity(activity) {
+  const isLive = state.snapshot?.mode === 'LIVE_TRUEFORGE';
+  elements.activityPanel.classList.toggle('hidden', !isLive);
+  if (!isLive) return;
+
+  const log = elements.activityLog;
+  const followsLatest = log.scrollHeight - log.scrollTop - log.clientHeight < 56;
+  elements.activityCount.textContent = `${activity.length} ${activity.length === 1 ? 'event' : 'events'}`;
+  if (activity.length === 0) {
+    replace(log, [el('li', 'Waiting for sanitized runtime events…')]);
+    log.firstElementChild.className = 'activity-empty';
+    elements.activitySummary.textContent = 'Waiting for live activity.';
+    return;
+  }
+
+  replace(log, activity.map((item) => {
+    const row = el('li');
+    row.className = `activity-item tone-${item.tone.toLowerCase()}`;
+    const parsedTime = Date.parse(item.timestamp);
+    const time = el('time', Number.isNaN(parsedTime)
+      ? '—'
+      : new Date(parsedTime).toLocaleTimeString([], { hour12: false }));
+    if (!Number.isNaN(parsedTime)) time.dateTime = new Date(parsedTime).toISOString();
+    const label = el('span', item.label);
+    label.className = 'activity-label';
+    const meta = el('span', `${item.phase.replaceAll('_', ' ')}${item.sequenceNumber === undefined ? '' : ` · #${item.sequenceNumber}`}`);
+    meta.className = 'activity-meta';
+    row.append(time, label, meta);
+    return row;
+  }));
+  const latest = activity.at(-1);
+  elements.activitySummary.textContent = latest === undefined ? 'No live activity.' : latest.label;
+  state.snapshot.activity = activity;
+  if (followsLatest) requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
+}
+
+function normalizeActivity(input) {
+  if (!isPlainObject(input)) return null;
+  const labels = {
+    'trueforge:turn.created': 'TrueForge turn started',
+    'trueforge:mcp.initialize': 'MCP connectors initialized',
+    'trueforge:sandbox.created': 'Daytona sandbox ready',
+    'trueforge:model.message': 'Model checkpoint received',
+    'trueforge:thread.created': 'Diagnostic thread started',
+    'trueforge:thread.done': 'Diagnostic thread completed',
+    'trueforge:tool.response': 'Tool execution completed',
+    'trueforge:tool.approval_required': 'Human approval required',
+    'trueforge:tool.response_required': 'Human approval required',
+    'trueforge:mcp.auth_required': 'Connector authentication required',
+    'trueforge:turn.done': 'TrueForge turn completed',
+  };
+  const turnState = isPlainObject(input.payload) && isPlainObject(input.payload.state)
+    ? input.payload.state
+    : null;
+  const turnTimedOut = input.source === 'trueforge:turn.done'
+    && turnState?.status === 'cancelled'
+    && turnState?.reason === 'server-execution-timeout';
+  const label = typeof input.label === 'string'
+    ? input.label
+    : turnTimedOut
+      ? 'TrueForge turn timed out'
+      : labels[input.source];
+  if (label === undefined) return null;
+  const warningSources = new Set(['trueforge:tool.approval_required', 'trueforge:tool.response_required']);
+  const tone = typeof input.tone === 'string'
+    ? input.tone
+    : input.source === 'trueforge:mcp.auth_required' || turnTimedOut
+      ? 'ERROR'
+      : warningSources.has(input.source)
+        ? 'WARNING'
+        : input.source === 'trueforge:turn.created' || input.source === 'trueforge:model.message'
+          ? 'INFO'
+          : 'SUCCESS';
+  return {
+    id: typeof input.id === 'string' ? input.id : `activity-${Date.now()}`,
+    timestamp: typeof input.timestamp === 'string' ? input.timestamp : new Date().toISOString(),
+    sequenceNumber: Number.isFinite(input.sequenceNumber) ? input.sequenceNumber : undefined,
+    phase: typeof input.phase === 'string' ? input.phase : state.snapshot?.phase ?? 'INTAKE',
+    tone,
+    label,
+  };
+}
+
 function renderPatch(patch) {
   elements.patchPanel.classList.toggle('hidden', !patch);
   if (!patch) return;
@@ -331,6 +421,7 @@ function syncControls() {
   const isFixture = snapshot?.mode === 'DETERMINISTIC_FIXTURE';
   const pendingApproval = snapshot?.approvals.some((item) => item.status === 'PENDING') ?? false;
   elements.advance.disabled = state.busy || !isFixture || snapshot?.status !== 'ACTIVE' || snapshot?.phase === 'AWAITING_APPROVAL';
+  elements.advance.classList.toggle('hidden', !isFixture);
   elements.reset.disabled = state.busy;
   elements.approve.disabled = state.busy || !pendingApproval || snapshot?.phase !== 'AWAITING_APPROVAL';
   elements.reject.disabled = state.busy || !pendingApproval || snapshot?.phase !== 'AWAITING_APPROVAL';

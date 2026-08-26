@@ -136,3 +136,23 @@ test("turn creation enters DEFINE_SUCCESS but cannot skip to a terminal phase", 
   assert.equal(state.phase, "DEFINE_SUCCESS");
   assert.equal(state.status, "ACTIVE");
 });
+
+test("cancelled TrueForge turn blocks the workflow with a bounded reason", () => {
+  const state = buildState();
+  const projection = new TrueForgeEventProjector().project(
+    state,
+    event("TURN_DONE", "turn-timeout", {
+      type: "turn.done",
+      id: "turn-timeout",
+      state: {
+        status: "cancelled",
+        reason: "server-execution-timeout",
+      },
+    }),
+  );
+
+  assert.deepEqual(projection.approvalIds, []);
+  assert.equal(state.phase, "BLOCKED");
+  assert.equal(state.status, "BLOCKED");
+  assert.equal(state.blockedReason, "TrueForge turn exceeded the server execution timeout");
+});

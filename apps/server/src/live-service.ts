@@ -5,6 +5,7 @@ import {
   createSessionState,
   createTask,
   Evidence,
+  RuntimeEvent,
   SessionState,
   WorkflowPhase,
 } from "../../../packages/domain/src";
@@ -43,6 +44,15 @@ interface LiveSpecialistStatus {
   status: "PENDING" | "RUNNING" | "PARTIAL" | "COMPLETE" | "FAILED";
 }
 
+export interface LiveActivityItem {
+  id: string;
+  timestamp: string;
+  sequenceNumber?: number;
+  phase: WorkflowPhase;
+  tone: "INFO" | "SUCCESS" | "WARNING" | "ERROR";
+  label: string;
+}
+
 export interface LiveConsoleSnapshot {
   mode: "LIVE_TRUEFORGE";
   notice: string;
@@ -63,6 +73,7 @@ export interface LiveConsoleSnapshot {
   trueForgeSessionId?: string;
   activeTurnId?: string;
   lastSequenceNumber?: number;
+  activity: LiveActivityItem[];
 }
 
 const TIMELINE_ORDER: WorkflowPhase[] = [
@@ -86,6 +97,7 @@ export class LiveIncidentService {
   );
   private readonly journal = new EventJournal(join(this.root, "events.jsonl"));
   private readonly approvalPolicy = new ApprovalPolicy();
+  private readonly activityByTask = new Map<string, LiveActivityItem[]>();
 
   public constructor(private readonly broker: SseBroker) {}
 
@@ -100,10 +112,19 @@ export class LiveIncidentService {
       constraints: input.constraints,
     });
     const state = createSessionState(task, buildCiSuccessContract(task));
+    this.activityByTask.set(task.id, [
+      {
+        id: `activity-${task.id}`,
+        timestamp: task.createdAt,
+        phase: state.phase,
+        tone: "INFO",
+        label: "Incident accepted by the control plane",
+      },
+    ]);
     const evidenceStore = new EvidenceStore();
     const verifierManifest = buildVerifierManifest(state.successCriteria);
     await this.checkpoints.saveCheckpoint(state, evidenceStore);
-    const runtime = this.createRuntime(evidenceStore);
+    const runtime = this.createRuntime(evidenceStore, task.id);
     const message = [
       `Investigate GitHub Actions run ${task.source.runId} for ${task.repository} at ${task.revision}.`,
       "Define the success contract before patching.",
@@ -114,17 +135,17 @@ export class LiveIncidentService {
       "Do not claim completion; the application CompletionGate owns that decision.",
     ].join("\n");
     const updated = await runtime.start(state, message);
-    const snapshot = buildLiveConsoleSnapshot(updated, evidenceStore);
+    const snapshot = this.snapshot(updated, evidenceStore);
     this.broker.publish("live-state", snapshot);
     return snapshot;
   }
 
   public async resume(taskId: string): Promise<LiveConsoleSnapshot> {
     const checkpoint = await this.requireCheckpoint(taskId);
-    const updated = await this.createRuntime(checkpoint.evidenceStore).resume(
+    const updated = await this.createRuntime(checkpoint.evidenceStore, taskId).resume(
       checkpoint.state,
     );
-    const snapshot = buildLiveConsoleSnapshot(updated, checkpoint.evidenceStore);
+    const snapshot = this.snapshot(updated, checkpoint.evidenceStore);
     this.broker.publish("live-state", snapshot);
     return snapshot;
   }
@@ -154,7 +175,7 @@ export class LiveIncidentService {
 
     const decided = updated.approvals.find((approval) => approval.id === approvalId);
     if (decided === undefined) throw new Error(`approval ${approvalId} disappeared after persistence`);
-    updated = await this.createRuntime(evidenceStore).submitApproval(
+    updated = await this.createRuntime(evidenceStore, taskId).submitApproval(
       updated,
       decided,
       decision,
@@ -174,7 +195,7 @@ export class LiveIncidentService {
       );
       await this.checkpoints.saveCheckpoint(updated, evidenceStore);
     }
-    const snapshot = buildLiveConsoleSnapshot(updated, evidenceStore);
+    const snapshot = this.snapshot(updated, evidenceStore);
     this.broker.publish("live-state", snapshot);
     return snapshot;
   }
@@ -183,7 +204,7 @@ export class LiveIncidentService {
     const checkpoint = await this.checkpoints.loadCheckpoint(taskId);
     return checkpoint === undefined
       ? undefined
-      : buildLiveConsoleSnapshot(checkpoint.state, checkpoint.evidenceStore);
+      : this.snapshot(checkpoint.state, checkpoint.evidenceStore);
   }
 
   private async requireCheckpoint(taskId: string): Promise<RuntimeCheckpoint> {
@@ -192,7 +213,7 @@ export class LiveIncidentService {
     return checkpoint;
   }
 
-  private createRuntime(evidenceStore: EvidenceStore): DurableTrueForgeRuntime {
+  private createRuntime(evidenceStore: EvidenceStore, taskId: string): DurableTrueForgeRuntime {
     const config = loadTrueForgeConfig();
     return new DurableTrueForgeRuntime(
       new TrueForgeSdkAdapter(config),
@@ -200,12 +221,25 @@ export class LiveIncidentService {
       evidenceStore,
       this.journal,
       (event, state) => {
-        this.broker.publish("runtime-event", event);
+        const activity = toLiveActivity(event, state.phase);
+        if (activity !== undefined) {
+          const recent = [...(this.activityByTask.get(taskId) ?? []), activity].slice(-80);
+          this.activityByTask.set(taskId, recent);
+          this.broker.publish("runtime-event", activity);
+        }
         this.broker.publish(
           "live-state",
-          buildLiveConsoleSnapshot(state, evidenceStore),
+          this.snapshot(state, evidenceStore),
         );
       },
+    );
+  }
+
+  private snapshot(state: SessionState, evidenceStore: EvidenceStore): LiveConsoleSnapshot {
+    return buildLiveConsoleSnapshot(
+      state,
+      evidenceStore,
+      this.activityByTask.get(state.task.id) ?? [],
     );
   }
 }
@@ -213,6 +247,7 @@ export class LiveIncidentService {
 export function buildLiveConsoleSnapshot(
   state: SessionState,
   evidenceStore: EvidenceStore,
+  activity: LiveActivityItem[] = [],
 ): LiveConsoleSnapshot {
   const evidenceIds = new Set(state.evidenceIds);
   return {
@@ -242,7 +277,72 @@ export function buildLiveConsoleSnapshot(
     trueForgeSessionId: state.trueForgeSessionId,
     activeTurnId: state.activeTurnId,
     lastSequenceNumber: state.lastSequenceNumber,
+    activity: structuredClone(activity),
   };
+}
+
+export function toLiveActivity(
+  event: RuntimeEvent,
+  phase: WorkflowPhase,
+): LiveActivityItem | undefined {
+  const base = {
+    id: event.id,
+    timestamp: event.timestamp,
+    sequenceNumber: event.sequenceNumber,
+    phase,
+  };
+  switch (event.source) {
+    case "trueforge:turn.created":
+      return { ...base, tone: "INFO", label: "TrueForge turn started" };
+    case "trueforge:mcp.initialize":
+      return { ...base, tone: "SUCCESS", label: "MCP connectors initialized" };
+    case "trueforge:sandbox.created":
+      return { ...base, tone: "SUCCESS", label: "Daytona sandbox ready" };
+    case "trueforge:model.message":
+      return { ...base, tone: "INFO", label: "Model checkpoint received" };
+    case "trueforge:thread.created":
+      return { ...base, tone: "INFO", label: "Diagnostic thread started" };
+    case "trueforge:thread.done":
+      return { ...base, tone: "SUCCESS", label: "Diagnostic thread completed" };
+    case "trueforge:tool.response":
+      return { ...base, tone: "SUCCESS", label: "Tool execution completed" };
+    case "trueforge:tool.approval_required":
+    case "trueforge:tool.response_required":
+      return { ...base, tone: "WARNING", label: "Human approval required" };
+    case "trueforge:mcp.auth_required":
+      return { ...base, tone: "ERROR", label: "Connector authentication required" };
+    case "trueforge:turn.done":
+      return turnEndedActivity(event, base);
+    default:
+      return undefined;
+  }
+}
+
+function turnEndedActivity(
+  event: RuntimeEvent,
+  base: Omit<LiveActivityItem, "tone" | "label">,
+): LiveActivityItem {
+  const payload = asUnknownRecord(event.payload);
+  const turnState = asUnknownRecord(payload.state);
+  const status = typeof turnState.status === "string" ? turnState.status : undefined;
+  const reason = typeof turnState.reason === "string" ? turnState.reason : undefined;
+  if (status === "cancelled" || status === "failed") {
+    return {
+      ...base,
+      tone: "ERROR",
+      label:
+        reason === "server-execution-timeout"
+          ? "TrueForge turn timed out"
+          : "TrueForge turn failed",
+    };
+  }
+  return { ...base, tone: "SUCCESS", label: "TrueForge turn completed" };
+}
+
+function asUnknownRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 export function assertLiveApprovalReady(

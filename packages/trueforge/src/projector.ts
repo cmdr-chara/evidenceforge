@@ -61,6 +61,21 @@ export class TrueForgeEventProjector {
       state.version += 1;
     }
 
+    if (event.type === "TURN_DONE") {
+      const payload = asRecord(event.payload);
+      const turnState = asRecord(payload.state);
+      const turnStatus = readString(turnState, "status");
+      if (turnStatus === "cancelled" || turnStatus === "failed") {
+        const reason = readString(turnState, "reason");
+        block(
+          state,
+          reason === "server-execution-timeout"
+            ? "TrueForge turn exceeded the server execution timeout"
+            : `TrueForge turn ended with status ${turnStatus}`,
+        );
+      }
+    }
+
     if (event.type === "TOOL_RESULT") {
       try {
         const toolResult = this.eventIndex.toolResultFrom(event.payload);
@@ -209,4 +224,15 @@ function block(state: SessionState, reason: string): void {
   state.status = "BLOCKED";
   state.blockedReason = reason;
   state.version += 1;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function readString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
 }

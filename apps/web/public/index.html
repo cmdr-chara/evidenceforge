@@ -148,6 +148,17 @@
         <p id="live-status" class="live-status" aria-live="polite">
           Credentials required · GitHub MCP + Daytona sandbox · fails closed if infrastructure is absent.
         </p>
+        <section id="activity-panel" class="live-activity hidden" aria-labelledby="activity-heading">
+          <div class="activity-header">
+            <div>
+              <p class="eyebrow">Sanitized runtime telemetry</p>
+              <h3 id="activity-heading">Live activity</h3>
+            </div>
+            <span id="activity-count" class="metric">0 events</span>
+          </div>
+          <ol id="activity-log" class="activity-log" role="log" aria-live="off" aria-label="Recent TrueForge activity"></ol>
+          <p id="activity-summary" class="sr-only" aria-live="polite">No live activity yet.</p>
+        </section>
       </section>
     </main>
 
