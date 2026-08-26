@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
+import { isEventDelta, mergeEventDelta } from "@truefoundry/trueforge-sdk";
 import { ToolResult } from "../../domain/src/types";
 
 type UnknownRecord = Record<string, unknown>;
@@ -21,11 +22,37 @@ export interface IndexedApproval {
 
 export class TrueForgeEventIndex {
   private readonly toolCalls = new Map<string, IndexedToolCall>();
+  private readonly streamedModelMessages = new Map<string, UnknownRecord>();
 
   public ingest(raw: unknown): void {
     const event = asRecord(raw);
-    if (readString(event, "type") !== "model.message") return;
+    const type = readString(event, "type");
+    if (type === "model.message.delta") {
+      this.ingestModelMessageDelta(event);
+      return;
+    }
+    if (type !== "model.message") return;
 
+    const sourceEventId = requireString(event, "id");
+    const snapshot = structuredClone(event);
+    this.streamedModelMessages.set(sourceEventId, snapshot);
+    this.indexModelMessage(snapshot);
+  }
+
+  private ingestModelMessageDelta(event: UnknownRecord): void {
+    const sourceEventId = requireString(event, "id");
+    const message = this.streamedModelMessages.get(sourceEventId);
+    const delta = event as unknown as Parameters<typeof mergeEventDelta>[1];
+    if (message === undefined || !isEventDelta(delta)) return;
+
+    mergeEventDelta(
+      message as unknown as Parameters<typeof mergeEventDelta>[0],
+      delta,
+    );
+    if (event.finishReason !== undefined) this.indexModelMessage(message);
+  }
+
+  private indexModelMessage(event: UnknownRecord): void {
     const sourceEventId = requireString(event, "id");
     const threadId = readStringFrom(event, ["threadId", "thread_id"]) ?? "main";
     const calls = event.toolCalls ?? event.tool_calls;

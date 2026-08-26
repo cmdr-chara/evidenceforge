@@ -66,6 +66,49 @@ test("TrueForge tool response correlates with the originating model tool call", 
   assert.deepEqual(result.artifactRefs, ["artifact://stdout"]);
 });
 
+test("streamed model-message deltas are merged before a tool response is correlated", () => {
+  const index = new TrueForgeEventIndex();
+  index.ingest({
+    type: "model.message",
+    id: "message-streamed",
+    threadId: "main",
+  });
+  index.ingest({
+    type: "model.message.delta",
+    id: "message-streamed",
+    toolCalls: [
+      {
+        index: 0,
+        id: "call-streamed",
+        function: { name: "exec", arguments: '{"command":"pnpm' },
+        toolInfo: { type: "truefoundry-system", name: "sandbox" },
+      },
+    ],
+  });
+  index.ingest({
+    type: "model.message.delta",
+    id: "message-streamed",
+    toolCalls: [{ index: 0, function: { arguments: ' test"}' } }],
+    finishReason: "tool_calls",
+  });
+
+  const result = index.toolResultFrom({
+    type: "tool.response",
+    id: "response-streamed",
+    threadId: "main",
+    toolCallId: "call-streamed",
+    content: JSON.stringify({
+      success: true,
+      response: { exitCode: 0, result: "tests passed" },
+    }),
+  });
+
+  assert.equal(result.tool, "sandbox.exec");
+  assert.equal(result.status, "OK");
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stdoutPreview, "tests passed");
+});
+
 test("authoritative TrueForge sandbox success decodes the nested command result", () => {
   const result = indexSandboxExec().toolResultFrom({
     type: "tool.response",
