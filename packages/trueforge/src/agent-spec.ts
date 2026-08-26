@@ -1,5 +1,9 @@
 import { TrueForgeRuntimeConfig } from "./config";
 
+export const TRUEFORGE_LLM_ITERATION_LIMIT = 32;
+export const TRUEFORGE_MAX_OUTPUT_TOKENS = 4_096;
+export const TRUEFORGE_SPECIALIST_TOOL_BUDGET = 8;
+
 export interface TrueForgeAgentSpec {
   model: { name: string; params: Record<string, unknown> };
   instructions: string;
@@ -27,7 +31,11 @@ export function buildEvidenceForgeAgentSpec(config: TrueForgeRuntimeConfig): Tru
   return {
     model: {
       name: config.model,
-      params: { temperature: 0.1, parallel_tool_calls: true },
+      params: {
+        temperature: 0.1,
+        max_tokens: TRUEFORGE_MAX_OUTPUT_TOKENS,
+        parallel_tool_calls: true,
+      },
     },
     instructions: `You are the TrueForge supervisor for EvidenceForge, an evidence-gated CI incident resolution system.
 
@@ -52,6 +60,14 @@ Create exactly three parallel, read-only subagents named:
 2. Failure / Log Investigator
 3. Dependency / Configuration Investigator
 They share the sandbox, so they must not edit files, install dependencies, patch, commit, or perform external writes. Return structured findings and evidence references only. After aggregation, reproduction and patching are serialized in the main thread.
+
+Budget and convergence protocol:
+- After retrieving the authoritative incident context and verifier manifest, launch the three named specialists immediately in one parallel fan-out. Do not perform a broad repository investigation in the supervisor first.
+- Include these limits in every specialist assignment: at most ${TRUEFORGE_SPECIALIST_TOOL_BUDGET} tool calls, at most 800 words, at most 10 evidence references, no nested subagents, and stop after one unsuccessful attempt that yields no new evidence.
+- Run at most one baseline reproduction for a revision. Do not repeat a semantically identical tool call unless the revision, workflow phase, or available evidence changed.
+- Run each post-patch manifest verifier once. A failure triggers re-planning or escalation, not an automatic retry.
+- Never poll a child thread, auto-resume a timed-out turn, or wait indefinitely for missing diagnostics. Aggregate available findings and BLOCK or ESCALATE when a specialist is partial, missing, or out of budget.
+- Only the initial diagnostic fan-out may be parallel. Reproduction, patching, verification, review, approval, publishing, and reconciliation are serialized.
 
 Workflow:
 UNDERSTAND -> DEFINE SUCCESS -> PLAN -> parallel INVESTIGATE -> REPRODUCE -> serialized PATCH -> VERIFY -> independent REVIEW -> request approval -> PUBLISH -> RECONCILE.
@@ -81,7 +97,7 @@ Use the attached skills for triage, reproduction, remediation, and review. Expos
         compaction: { enabled: true },
         large_tool_response: { enabled: true },
       },
-      iteration_limit: 80,
+      iteration_limit: TRUEFORGE_LLM_ITERATION_LIMIT,
     },
   };
 }
