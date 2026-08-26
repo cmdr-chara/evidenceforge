@@ -48,7 +48,7 @@ export interface LiveActivityItem {
   id: string;
   timestamp: string;
   sequenceNumber?: number;
-  phase: WorkflowPhase;
+  phase?: WorkflowPhase;
   tone: "INFO" | "SUCCESS" | "WARNING" | "ERROR";
   label: string;
 }
@@ -252,7 +252,7 @@ export function buildLiveConsoleSnapshot(
   const evidenceIds = new Set(state.evidenceIds);
   const persistedActivity = evidenceStore
     .listEvents()
-    .map((event) => toLiveActivity(event, state.phase))
+    .map((event) => toLiveActivity(event))
     .filter((item): item is LiveActivityItem => item !== undefined);
   const activityById = new Map(
     [...persistedActivity, ...activity].map((item) => [item.id, item]),
@@ -298,7 +298,7 @@ export function buildLiveConsoleSnapshot(
 
 export function toLiveActivity(
   event: RuntimeEvent,
-  phase: WorkflowPhase,
+  phase?: WorkflowPhase,
 ): LiveActivityItem | undefined {
   const base = {
     id: event.id,

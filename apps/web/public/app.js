@@ -300,7 +300,11 @@ function renderActivity(activity) {
     if (!Number.isNaN(parsedTime)) time.dateTime = new Date(parsedTime).toISOString();
     const label = el('span', item.label);
     label.className = 'activity-label';
-    const meta = el('span', `${item.phase.replaceAll('_', ' ')}${item.sequenceNumber === undefined ? '' : ` · #${item.sequenceNumber}`}`);
+    const metaParts = [
+      typeof item.phase === 'string' ? item.phase.replaceAll('_', ' ') : null,
+      item.sequenceNumber === undefined ? null : `#${item.sequenceNumber}`,
+    ].filter(Boolean);
+    const meta = el('span', metaParts.join(' · '));
     meta.className = 'activity-meta';
     row.append(time, label, meta);
     return row;
