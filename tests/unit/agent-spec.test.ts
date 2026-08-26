@@ -33,7 +33,7 @@ test("TrueForge agent spec bounds per-thread work and requires convergence", () 
   assert.equal(spec.config.iteration_limit, TRUEFORGE_LLM_ITERATION_LIMIT);
   assert.equal(TRUEFORGE_LLM_ITERATION_LIMIT, 32);
   assert.equal(spec.model.params.max_tokens, TRUEFORGE_MAX_OUTPUT_TOKENS);
-  assert.equal(TRUEFORGE_MAX_OUTPUT_TOKENS, 4_096);
+  assert.equal(TRUEFORGE_MAX_OUTPUT_TOKENS, 8_192);
   assert.equal(spec.model.params.parallel_tool_calls, true);
   assert.match(
     spec.instructions,
@@ -43,4 +43,5 @@ test("TrueForge agent spec bounds per-thread work and requires convergence", () 
   assert.match(spec.instructions, /Do not repeat a semantically identical tool call/i);
   assert.match(spec.instructions, /Never poll a child thread, auto-resume a timed-out turn/i);
   assert.match(spec.instructions, /Only the initial diagnostic fan-out may be parallel/i);
+  assert.match(spec.instructions, /supervisor response below 1,200 words/i);
 });

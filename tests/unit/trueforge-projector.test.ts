@@ -156,3 +156,48 @@ test("cancelled TrueForge turn blocks the workflow with a bounded reason", () =>
   assert.equal(state.status, "BLOCKED");
   assert.equal(state.blockedReason, "TrueForge turn exceeded the server execution timeout");
 });
+
+test("TrueForge model output-limit errors block without exposing arbitrary runtime messages", () => {
+  const state = buildState();
+  new TrueForgeEventProjector().project(
+    state,
+    event("TURN_DONE", "turn-error", {
+      type: "turn.done",
+      state: {
+        status: "error",
+        message: "max_tokens breached",
+        metrics: { totalTokens: 59_045 },
+      },
+    }),
+  );
+
+  assert.equal(state.phase, "BLOCKED");
+  assert.equal(state.status, "BLOCKED");
+  assert.equal(
+    state.blockedReason,
+    "TrueForge turn exceeded the configured model output token limit",
+  );
+  assert.doesNotMatch(state.blockedReason ?? "", /59045/);
+});
+
+test("unknown TrueForge terminal states fail closed while done remains non-terminal", () => {
+  const doneState = buildState();
+  new TrueForgeEventProjector().project(
+    doneState,
+    event("TURN_DONE", "turn-done", { type: "turn.done", state: { status: "done" } }),
+  );
+  assert.equal(doneState.status, "ACTIVE");
+
+  for (const status of [undefined, "running", "future-status"]) {
+    const state = buildState();
+    new TrueForgeEventProjector().project(
+      state,
+      event("TURN_DONE", `turn-${String(status)}`, {
+        type: "turn.done",
+        state: status === undefined ? {} : { status },
+      }),
+    );
+    assert.equal(state.status, "BLOCKED");
+    assert.equal(state.blockedReason, "TrueForge turn ended without a valid terminal status");
+  }
+});

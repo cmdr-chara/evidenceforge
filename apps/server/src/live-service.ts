@@ -341,17 +341,23 @@ function turnEndedActivity(
   const turnState = asUnknownRecord(payload.state);
   const status = typeof turnState.status === "string" ? turnState.status : undefined;
   const reason = typeof turnState.reason === "string" ? turnState.reason : undefined;
-  if (status === "cancelled" || status === "failed") {
+  if (status === "done") {
+    return { ...base, tone: "SUCCESS", label: "TrueForge turn completed" };
+  }
+  if (status === "cancelled") {
     return {
       ...base,
-      tone: "ERROR",
+      tone: reason === "server-execution-timeout" ? "ERROR" : "WARNING",
       label:
         reason === "server-execution-timeout"
           ? "TrueForge turn timed out"
-          : "TrueForge turn failed",
+          : "TrueForge turn cancelled",
     };
   }
-  return { ...base, tone: "SUCCESS", label: "TrueForge turn completed" };
+  if (status === "error" || status === "failed") {
+    return { ...base, tone: "ERROR", label: "TrueForge turn failed" };
+  }
+  return { ...base, tone: "ERROR", label: "TrueForge turn ended with an unknown status" };
 }
 
 function asUnknownRecord(value: unknown): Record<string, unknown> {

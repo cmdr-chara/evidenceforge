@@ -114,6 +114,55 @@ test("cancelled turn activity reports a timeout without forwarding turn metrics"
   assert.doesNotMatch(JSON.stringify(activity), /totalTokens|1000000/);
 });
 
+test("errored turn activity is never presented as completion or allowed to leak details", () => {
+  const activity = toLiveActivity(
+    {
+      id: "event-turn-error",
+      type: "TURN_DONE",
+      source: "trueforge:turn.done",
+      timestamp: "2026-08-26T13:16:45.421Z",
+      payload: {
+        state: {
+          status: "error",
+          message: "max_tokens breached with secret-token",
+          metrics: { totalOutputTokens: 59_045 },
+        },
+      },
+    },
+    "DEFINE_SUCCESS",
+  );
+
+  assert.ok(activity);
+  assert.equal(activity.tone, "ERROR");
+  assert.equal(activity.label, "TrueForge turn failed");
+  assert.doesNotMatch(JSON.stringify(activity), /completed|max_tokens|secret-token|59045/i);
+});
+
+test("turn activity uses a finite fail-closed terminal-state mapping", () => {
+  const cases = [
+    { status: "done", tone: "SUCCESS", label: "TrueForge turn completed" },
+    { status: "cancelled", tone: "WARNING", label: "TrueForge turn cancelled" },
+    { status: "failed", tone: "ERROR", label: "TrueForge turn failed" },
+    { status: "future", tone: "ERROR", label: "TrueForge turn ended with an unknown status" },
+  ] as const;
+
+  for (const candidate of cases) {
+    const activity = toLiveActivity(
+      {
+        id: `event-${candidate.status}`,
+        type: "TURN_DONE",
+        source: "trueforge:turn.done",
+        timestamp: "2026-08-26T13:20:00.000Z",
+        payload: { state: { status: candidate.status } },
+      },
+      "DEFINE_SUCCESS",
+    );
+    assert.ok(activity);
+    assert.equal(activity.tone, candidate.tone);
+    assert.equal(activity.label, candidate.label);
+  }
+});
+
 test("live snapshot rebuilds sanitized activity from persisted runtime events", () => {
   const state = buildState();
   const store = new EvidenceStore();

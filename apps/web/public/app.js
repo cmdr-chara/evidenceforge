@@ -347,17 +347,35 @@ function normalizeActivity(input) {
   const turnTimedOut = input.source === 'trueforge:turn.done'
     && turnState?.status === 'cancelled'
     && turnState?.reason === 'server-execution-timeout';
+  const turnCancelled = input.source === 'trueforge:turn.done'
+    && turnState?.status === 'cancelled'
+    && !turnTimedOut;
+  const turnFailed = input.source === 'trueforge:turn.done'
+    && (turnState?.status === 'error' || turnState?.status === 'failed');
+  const turnStatusUnknown = input.source === 'trueforge:turn.done'
+    && turnState?.status !== 'done'
+    && !turnTimedOut
+    && !turnCancelled
+    && !turnFailed;
   const label = typeof input.label === 'string'
     ? input.label
     : turnTimedOut
       ? 'TrueForge turn timed out'
-      : labels[input.source];
+      : turnCancelled
+        ? 'TrueForge turn cancelled'
+        : turnFailed
+          ? 'TrueForge turn failed'
+          : turnStatusUnknown
+            ? 'TrueForge turn ended with an unknown status'
+            : labels[input.source];
   if (label === undefined) return null;
   const warningSources = new Set(['trueforge:tool.approval_required', 'trueforge:tool.response_required']);
   const tone = typeof input.tone === 'string'
     ? input.tone
-    : input.source === 'trueforge:mcp.auth_required' || turnTimedOut
+    : input.source === 'trueforge:mcp.auth_required' || turnTimedOut || turnFailed || turnStatusUnknown
       ? 'ERROR'
+      : turnCancelled
+        ? 'WARNING'
       : warningSources.has(input.source)
         ? 'WARNING'
         : input.source === 'trueforge:turn.created' || input.source === 'trueforge:model.message'

@@ -65,14 +65,8 @@ export class TrueForgeEventProjector {
       const payload = asRecord(event.payload);
       const turnState = asRecord(payload.state);
       const turnStatus = readString(turnState, "status");
-      if (turnStatus === "cancelled" || turnStatus === "failed") {
-        const reason = readString(turnState, "reason");
-        block(
-          state,
-          reason === "server-execution-timeout"
-            ? "TrueForge turn exceeded the server execution timeout"
-            : `TrueForge turn ended with status ${turnStatus}`,
-        );
+      if (turnStatus !== "done") {
+        block(state, terminalTurnFailureReason(turnState, turnStatus));
       }
     }
 
@@ -199,6 +193,25 @@ export class TrueForgeEventProjector {
 
     return { approvalIds: [] };
   }
+}
+
+function terminalTurnFailureReason(
+  turnState: Record<string, unknown>,
+  status: string | undefined,
+): string {
+  const reason = readString(turnState, "reason");
+  if (status === "cancelled") {
+    return reason === "server-execution-timeout"
+      ? "TrueForge turn exceeded the server execution timeout"
+      : "TrueForge turn was cancelled";
+  }
+  if (status === "error") {
+    return readString(turnState, "message") === "max_tokens breached"
+      ? "TrueForge turn exceeded the configured model output token limit"
+      : "TrueForge turn ended with an execution error";
+  }
+  if (status === "failed") return "TrueForge turn failed";
+  return "TrueForge turn ended without a valid terminal status";
 }
 
 function splitToolName(action: string): { serverName?: string; name: string } {
