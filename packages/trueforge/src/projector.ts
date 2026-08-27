@@ -8,6 +8,7 @@ import {
 import { digestCanonical } from "../../domain/src/canonical";
 import { EvidenceStore } from "../../evidence/src";
 import { RiskPolicy } from "../../policies/src";
+import { artifactBindingFor } from "../../verification/src";
 import { replayPolicyForRisk } from "../../tools/src";
 import {
   appendOperationIntent,
@@ -35,6 +36,9 @@ export class TrueForgeEventProjector {
   ) {
     this.verifierProjector =
       evidenceStore === undefined ? undefined : new TrueForgeVerifierProjector(evidenceStore);
+    for (const event of evidenceStore?.listEvents() ?? []) {
+      this.eventIndex.ingest(event.payload);
+    }
   }
 
   public registerApprovalToolCall(approval: ApprovalRequest): void {
@@ -55,6 +59,7 @@ export class TrueForgeEventProjector {
 
   public project(state: SessionState, event: RuntimeEvent): RuntimeProjection {
     this.eventIndex.ingest(event.payload);
+    if (state.status !== "ACTIVE") return { approvalIds: [] };
 
     if (event.type === "TURN_CREATED" && state.phase === "INTAKE") {
       state.phase = "DEFINE_SUCCESS";
@@ -141,6 +146,10 @@ export class TrueForgeEventProjector {
           if (!state.operations.some((candidate) => candidate.id === operationId)) {
             appendOperationIntent(state, operation);
           }
+          const externalBinding =
+            decision.risk === "EXTERNAL_REVERSIBLE"
+              ? artifactBindingFor(state, "EXTERNAL")
+              : undefined;
           const approval: ApprovalRequest = {
             id,
             action: tool,
@@ -157,6 +166,7 @@ export class TrueForgeEventProjector {
               revision: state.task.revision,
               risk: decision.risk,
               originatingOperationId: operationId,
+              binding: externalBinding,
               issuedAt: event.timestamp,
               expiresAt: new Date(Date.parse(event.timestamp) + 15 * 60 * 1_000).toISOString(),
             },
