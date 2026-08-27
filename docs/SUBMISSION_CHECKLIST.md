@@ -1,104 +1,138 @@
 # Submission checklist
 
+**Last synchronized:** 2026-08-27
+
 ## Sponsor usage
 
-- [x] TrueForge SDK and current agent spec integrated in code.
+- [x] TrueForge SDK `0.1.3` integrated as the primary runtime boundary.
 - [x] GitHub MCP configured in the agent spec.
 - [x] Daytona sandbox enabled in the agent spec.
 - [x] Exactly three dynamic diagnostic specialists defined.
 - [x] Four TrueForge skills authored.
 - [x] Durable session/turn/sequence reconnect implemented.
+- [x] Restart-before-tool-response correlation implemented and tested.
 - [x] Human approval resume protocol implemented.
-- [ ] Real TrueForge session and turn observed.
+- [ ] Per-specialist pre-execution read-only tool enforcement — **BLOCKED by TrueForge SDK 0.1.3 API surface**.
+- [ ] Real TrueForge session and model turn observed.
 - [ ] Real GitHub MCP incident read observed.
 - [ ] Real Daytona reproduction observed.
 - [ ] Real skill materialization/use observed.
 - [ ] Real approval pause/resume observed.
 
-## Domain control
+## Domain/control plane
 
-- [x] Success contract before patch completion.
-- [x] Hypothesis support/refutation with evidence.
-- [x] Evidence provenance.
+- [x] Success contract before completion.
+- [x] Evidence provenance bound to task/repository/revision/current subject.
 - [x] Failure reproduction criterion.
 - [x] Deterministic verifier engine.
-- [x] Model prose cannot fake PASS.
-- [x] Certificate-only CompletionGate.
-- [x] `BLOCKED` and `ESCALATED` outcomes.
-- [x] Bounded retry, patch, and replan budgets.
-- [x] External-write idempotency and reconciliation.
+- [x] Model prose cannot fake PASS or COMPLETED.
+- [x] CompletionGate-only certificate path.
+- [x] Deep-immutable certificate with canonical payload digest.
+- [x] Certificate binds task, repo, revision, patch, state version/digest, contract and subject digest.
+- [x] Repatch preserves incident evidence and invalidates patch/external evidence.
+- [x] Repatch invalidates stale external approvals/actions/operations.
+- [x] Per-task approval decisions serialized; concurrent path has one submission.
+- [x] Approval provenance bound to current patch and exact operation.
+- [x] Exact PR reconciliation verifies repo/base/head/head SHA/operation/idempotency.
+- [x] Same SHA on a different target PR is rejected.
+- [x] Completed resume advances the maximum cursor and skips replayed history.
+- [x] Terminal cutoff prevents late actionable mutation/persistence.
+- [x] Collision-safe persistence and unique tempfiles.
+- [x] Legacy persistence read fallback retained without migration.
+- [x] Recovery success requires terminal `COMPLETED` for baseline and EvidenceForge.
 
-## Demo
+## Live activity / UI
 
-- [x] Resettable healthy configuration-order fixture.
-- [x] Script to seed the failing fixture.
-- [x] Incident console with all required panels.
-- [x] Deterministic approval deny/allow demonstration.
-- [x] Completion certificate display.
-- [ ] Dedicated red GitHub Actions run recorded.
-- [ ] Live parallel specialists visible in TrueForge.
-- [ ] Live Daytona command visible.
-- [ ] Real patch branch produced.
-- [ ] Real PR created after approval.
-- [ ] Real PR reconciliation recorded.
-- [ ] Browser refresh/reconnect demonstrated live.
-- [ ] 3–5 minute video recorded and uploaded.
+- [x] Task-scoped server SSE subscriptions.
+- [x] Snapshot reload on reconnect.
+- [x] Browser defense-in-depth task filtering.
+- [x] Malformed/non-zero/failed tool responses display ERROR rather than SUCCESS.
+- [x] Initial `Incident accepted` activity survives restart via deterministic reconstruction.
+- [x] Terminal activity distinguishes BLOCKED/FAILED/ESCALATED from SUCCESS.
+- [x] Skip link, visible focus, accessible log/live region.
+- [x] >=44px primary interactive targets.
+- [x] Long SHA/revision/trace values expose full accessible/title values.
+- [x] Responsive narrow-layout and reduced-motion rules.
+- [ ] Browser-observe 320px.
+- [ ] Browser-observe 375px.
+- [ ] Browser-observe 768px.
+- [ ] Browser-observe 1024px.
+- [ ] Browser-observe 1440px.
+- [ ] Browser-observe 200% zoom.
 
 ## Quality
 
-- [x] format checks pass locally.
-- [x] lint passes locally.
-- [x] typecheck passes locally.
-- [x] 58 EvidenceForge tests pass locally.
-- [x] 3 fixture tests pass locally.
-- [x] 15-case same-input baseline comparison passes.
-- [x] false-success metric implemented.
-- [x] failure-injection cases implemented.
-- [x] CI workflow added.
-- [ ] CI run observed green on GitHub.
-- [ ] Fresh-clone install run observed with network access.
-- [ ] Qodo installed.
-- [ ] Initial Qodo review completed.
-- [ ] Valid High findings resolved or documented.
-- [ ] Follow-up Qodo review completed.
-- [ ] Human merge completed.
+Verified implementation baseline: `628d4db9a19e50b142051fe3ae2793b0b9b704ad`, GitHub Actions run `33083635762`.
+
+- [x] `pnpm install --frozen-lockfile`.
+- [x] `pnpm format:check`.
+- [x] `pnpm lint`.
+- [x] `pnpm typecheck`.
+- [x] `pnpm test` — **159/159 passed**.
+- [x] `pnpm eval:smoke`.
+- [x] `pnpm demo:fixture`.
+- [x] `pnpm build`.
+- [x] `pnpm doctor`.
+- [x] `git diff --check`.
+- [x] GitHub Actions CI exists and a current reconstructed implementation SHA was observed green.
+- [ ] Final documentation-head CI observed green.
+
+## Qodo
+
+- [x] PR #2 exists and remains open/unmerged.
+- [x] Genuine Qodo Agentic Review observed: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
+- [x] Earlier follow-up request observed: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
+- [x] Every currently implementable open High/Medium finding has repository-side code + test remediation.
+- [x] Read-only pre-execution finding documented as SDK-blocked rather than falsely resolved.
+- [ ] Request `/agentic_review` on the final exact SHA.
+- [ ] Inspect final Qodo response and update dispositions from actual evidence.
+- [ ] Human merge after required review/live gates.
+
+## Demo vertical slice required before submission
+
+1. Start from a real failed GitHub Actions run and record run URL/SHA.
+2. Start a credentialed EvidenceForge live session through TrueForge.
+3. Show GitHub MCP retrieving authoritative incident context.
+4. Show three specialist diagnostics; do not claim pre-execution read-only isolation beyond SDK capabilities.
+5. Show Daytona checking out the exact failing revision and reproducing the stable failure.
+6. Show serialized patch creation and patch digest.
+7. Show deterministic verification and independent review.
+8. Show the exact approval payload and real `tool.approval_required` pause.
+9. Human approves the external PR write.
+10. Show the created PR and exact reconciliation identity.
+11. Show CompletionGate issuing the only accepted completion certificate.
+12. Refresh/reconnect the browser and show the task-scoped durable snapshot.
+13. Capture approximately three minutes of the real path; clearly label any fixture-only fallback footage.
 
 ## Documentation
 
-- [x] README.
-- [x] Architecture.
-- [x] Security.
-- [x] Evaluation.
-- [x] Demo.
-- [x] Current requirements.
-- [x] ADRs.
-- [x] Build journal.
-- [x] Qodo review log placeholder without fabricated findings.
-- [x] Field report draft.
-- [x] Social milestone drafts.
-- [x] Completion gate ledger.
-- [ ] README updated with representative merged Qodo-reviewed PR.
-- [ ] README updated with demo video/GIF.
-- [ ] Field report updated with live results and Qodo findings.
+- [x] README synchronized.
+- [x] Qodo review log contains real findings/status, not a placeholder.
+- [x] Hackathon requirements synchronized.
+- [x] Gate ledger synchronized.
+- [x] Submission checklist synchronized.
+- [x] Build journal synchronized with reconstruction evidence.
+- [x] Field report draft synchronized with Qodo/SDK limitations.
+- [ ] Add final live-run URLs and demo video URL after they genuinely exist.
+- [ ] Add final Qodo follow-up result after it genuinely exists.
 
 ## Repository hygiene
 
 - [x] Default branch remains `determination`.
-- [x] Bootstrap commit was minimal.
-- [x] Substantive work is on a feature branch.
-- [x] No secrets added.
-- [x] No force-push performed.
-- [x] Fixture default state is healthy.
-- [ ] First PR merged after review.
-- [ ] Default-branch CI confirmed green.
-- [ ] No dead experiments before submission.
+- [x] Substantive work stays on `feat/foundation-control-plane`.
+- [x] `.evidenceforge/` ignored and preserved.
+- [x] No force push used in this reconstruction.
+- [x] No merge performed.
+- [ ] Final secret/diff review before human merge.
 
 ## Submission
 
-- [ ] Public repository URL confirmed.
-- [ ] Short project description finalized.
+- [x] Public repository exists.
+- [ ] Credentialed live sponsor vertical slice complete.
+- [ ] Exact viewport/200% visual check complete.
+- [ ] Final Qodo re-review complete.
+- [ ] Human merge complete.
 - [ ] Demo video URL added.
 - [ ] Blog URL added if entering blog category.
-- [ ] Qodo evidence links added.
-- [ ] AI-assistance disclosure retained.
-- [ ] Official form submitted before August 30, 2026 20:00 Europe/London.
+- [x] AI-assistance disclosure retained.
+- [ ] Official submission completed before the observed deadline.
