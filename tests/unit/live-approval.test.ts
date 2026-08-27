@@ -1,22 +1,26 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assertLiveApprovalReady } from "../../apps/server/src/live-service";
-import { ApprovalRequest } from "../../packages/domain/src";
+import { ApprovalRequest, digestCanonical } from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
-import { buildState, passAll } from "../fixtures/builders";
+import { artifactBindingFor } from "../../packages/verification/src";
 import { createOperationIntent } from "../../packages/workflow/src";
-import { digestCanonical } from "../../packages/domain/src";
+import { buildState, passAll } from "../fixtures/builders";
 
-function approval(overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
+function approval(
+  state: ReturnType<typeof buildState>,
+  overrides: Partial<ApprovalRequest> = {},
+): ApprovalRequest {
+  const normalizedArguments = {
+    owner: "cmdr-chara",
+    repo: "evidenceforge",
+    base: "determination",
+    head: "fix/demo",
+  };
   return {
     id: "approval-live-pr",
     action: "github.create_pull_request",
-    normalizedArguments: {
-      owner: "cmdr-chara",
-      repo: "evidenceforge",
-      base: "determination",
-      head: "fix/demo",
-    },
+    normalizedArguments,
     risk: "EXTERNAL_REVERSIBLE",
     reason: "external write",
     reversible: true,
@@ -24,16 +28,12 @@ function approval(overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
     toolCallId: "call-pr",
     threadId: "main",
     provenance: {
-      actionDigest: digestCanonical({
-        owner: "cmdr-chara",
-        repo: "evidenceforge",
-        base: "determination",
-        head: "fix/demo",
-      }),
-      repository: "cmdr-chara/evidenceforge-fixture",
-      revision: "abc123",
+      actionDigest: digestCanonical(normalizedArguments),
+      repository: state.task.repository,
+      revision: state.task.revision,
       risk: "EXTERNAL_REVERSIBLE",
       originatingOperationId: "operation-live-pr",
+      binding: artifactBindingFor(state, "EXTERNAL"),
       issuedAt: new Date(Date.now() - 1_000).toISOString(),
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
     },
@@ -45,12 +45,13 @@ function readyState() {
   const state = buildState();
   const evidence = new EvidenceStore();
   passAll(state, evidence);
+  const pending = approval(state);
   state.operations.push(
     createOperationIntent({
       id: "operation-live-pr",
       actionType: "github.create_pull_request",
       tool: "github.create_pull_request",
-      normalizedArguments: approval().normalizedArguments,
+      normalizedArguments: pending.normalizedArguments,
       repository: state.task.repository,
       revision: state.task.revision,
       risk: "EXTERNAL_REVERSIBLE",
@@ -58,57 +59,57 @@ function readyState() {
       expectedEvidence: ["pull request"],
     }),
   );
-  state.approvals.push(approval());
+  state.approvals.push(pending);
   state.phase = "AWAITING_APPROVAL";
-  return { state, evidence };
+  return { state, evidence, pending };
 }
 
 test("live PR approval requires verified pre-publish state", () => {
-  const { state, evidence } = readyState();
-  assert.doesNotThrow(() => assertLiveApprovalReady(state, approval(), evidence));
+  const { state, evidence, pending } = readyState();
+  assert.doesNotThrow(() => assertLiveApprovalReady(state, pending, evidence));
 });
 
 test("live PR approval is blocked while any required criterion is not PASS", () => {
-  const { state, evidence } = readyState();
+  const { state, evidence, pending } = readyState();
   const criterion = state.successCriteria.find((item) => item.id === "tests");
   assert.ok(criterion);
   criterion.status = "FAIL";
 
   assert.throws(
-    () => assertLiveApprovalReady(state, approval(), evidence),
+    () => assertLiveApprovalReady(state, pending, evidence),
     /tests: status FAIL/,
   );
 });
 
 test("live PR approval is blocked when a verifier never ran", () => {
-  const { state, evidence } = readyState();
+  const { state, evidence, pending } = readyState();
   state.verifierResults = state.verifierResults.filter((result) => result.criterionId !== "tests");
 
   assert.throws(
-    () => assertLiveApprovalReady(state, approval(), evidence),
+    () => assertLiveApprovalReady(state, pending, evidence),
     /tests: verifier never ran/,
   );
 });
 
 test("live PR approval requires verifier-linked admissible evidence", () => {
-  const { state, evidence } = readyState();
+  const { state, evidence, pending } = readyState();
   const result = state.verifierResults.find((item) => item.criterionId === "tests");
   assert.ok(result);
   result.evidenceIds = ["evidence-review"];
 
   assert.throws(
-    () => assertLiveApprovalReady(state, approval(), evidence),
+    () => assertLiveApprovalReady(state, pending, evidence),
     /tests: latest PASS has no criterion-linked evidence/,
   );
 });
 
 test("live publishing rejects non-PR external writes in P0", () => {
-  const { state, evidence } = readyState();
+  const { state, evidence, pending } = readyState();
   assert.throws(
     () =>
       assertLiveApprovalReady(
         state,
-        approval({ action: "github.create_comment" }),
+        { ...pending, action: "github.create_comment" },
         evidence,
       ),
     /supports only pull-request creation/,
@@ -116,16 +117,17 @@ test("live publishing rejects non-PR external writes in P0", () => {
 });
 
 test("privileged live approvals remain denied by the P0 policy", () => {
-  const { state, evidence } = readyState();
+  const { state, evidence, pending } = readyState();
   assert.throws(
     () =>
       assertLiveApprovalReady(
         state,
-        approval({
+        {
+          ...pending,
           action: "github.read_secret",
           risk: "PRIVILEGED",
           reversible: false,
-        }),
+        },
         evidence,
       ),
     /denied by the P0 policy/,
@@ -134,15 +136,12 @@ test("privileged live approvals remain denied by the P0 policy", () => {
 
 test("read-only TrueForge approvals do not require patch completion", () => {
   const state = buildState();
+  const readOnly = approval(state, {
+    action: "github.get_repository",
+    risk: "READ_ONLY",
+    reversible: false,
+  });
   assert.doesNotThrow(() =>
-    assertLiveApprovalReady(
-      state,
-      approval({
-        action: "github.get_repository",
-        risk: "READ_ONLY",
-        reversible: false,
-      }),
-      new EvidenceStore(),
-    ),
+    assertLiveApprovalReady(state, readOnly, new EvidenceStore()),
   );
 });
