@@ -7,7 +7,7 @@ import {
   VerifierSpec,
 } from "../../domain/src/types";
 import { EvidenceStore } from "../../evidence/src";
-import { VerificationEngine } from "../../verification/src";
+import { artifactBindingFor, VerificationEngine } from "../../verification/src";
 import { IndexedToolCall } from "./event-index";
 
 export const VERIFIER_INTENT_PREFIX = "evidenceforge.verify:";
@@ -101,7 +101,8 @@ export class TrueForgeVerifierProjector {
       );
     }
 
-    const evaluation = this.engine.evaluateToolResult(criterion, event, toolResult);
+    const binding = artifactBindingFor(state, criterion.evidenceScope);
+    const evaluation = this.engine.evaluateToolResult(criterion, event, toolResult, binding);
     applyVerificationResult(state, criterion, evaluation.result);
     toolResult.evidenceIds = unique([
       ...toolResult.evidenceIds,
