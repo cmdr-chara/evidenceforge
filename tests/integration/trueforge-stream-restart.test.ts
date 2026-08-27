@@ -41,7 +41,7 @@ test("streamed tool-call correlation survives restart before tool response", () 
             function: {
               name: "exec",
               arguments: JSON.stringify({
-                intent: "evidenceforge.verify:targeted-tests",
+                intent: "evidenceforge.verify:tests",
                 command: "pnpm test",
                 cwd: "/workspace/repository",
               }),
@@ -96,7 +96,7 @@ test("streamed tool-call correlation survives restart before tool response", () 
   assert.equal(projection.toolResult?.status, "OK");
   assert.equal(projection.verificationResult?.status, "PASS");
   assert.equal(
-    state.successCriteria.find((criterion) => criterion.id === "targeted-tests")?.status,
+    state.successCriteria.find((criterion) => criterion.id === "tests")?.status,
     "PASS",
   );
   assert.equal(store.listEvents().length, 4);
