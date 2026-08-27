@@ -1,9 +1,9 @@
 import { join, resolve } from "node:path";
 import {
   ApprovalRequest,
-  digestCanonical,
   createSessionState,
   createTask,
+  digestCanonical,
   Evidence,
   RuntimeEvent,
   SessionState,
@@ -23,6 +23,10 @@ import {
   loadTrueForgeConfig,
   TrueForgeSdkAdapter,
 } from "../../../packages/trueforge/src";
+import {
+  artifactBindingFor,
+  artifactBindingMatchesState,
+} from "../../../packages/verification/src";
 import { buildCiSuccessContract, SessionController } from "../../../packages/workflow/src";
 import { SseBroker } from "./sse-broker";
 
@@ -49,7 +53,7 @@ export interface LiveActivityItem {
   timestamp: string;
   sequenceNumber?: number;
   phase?: WorkflowPhase;
-  tone: "INFO" | "SUCCESS" | "WARNING" | "ERROR";
+  tone: "INFO" | "SUCCESS" | "WARNING" | "ERROR" | "BLOCKED";
   label: string;
 }
 
@@ -105,6 +109,7 @@ export class LiveIncidentService {
   private readonly journal = new EventJournal(join(this.root, "events.jsonl"));
   private readonly approvalPolicy = new ApprovalPolicy();
   private readonly activityByTask = new Map<string, LiveActivityItem[]>();
+  private readonly taskLocks = new Map<string, Promise<void>>();
 
   public constructor(private readonly broker: SseBroker) {}
 
@@ -119,15 +124,6 @@ export class LiveIncidentService {
       constraints: input.constraints,
     });
     const state = createSessionState(task, buildCiSuccessContract(task));
-    this.activityByTask.set(task.id, [
-      {
-        id: `activity-${task.id}`,
-        timestamp: task.createdAt,
-        phase: state.phase,
-        tone: "INFO",
-        label: "Incident accepted by the control plane",
-      },
-    ]);
     const evidenceStore = new EvidenceStore();
     const verifierManifest = buildVerifierManifest(state.successCriteria);
     await this.checkpoints.saveCheckpoint(state, evidenceStore);
@@ -143,18 +139,20 @@ export class LiveIncidentService {
     ].join("\n");
     const updated = await runtime.start(state, message);
     const snapshot = this.snapshot(updated, evidenceStore);
-    this.broker.publish("live-state", snapshot);
+    this.broker.publish("live-state", snapshot, task.id);
     return snapshot;
   }
 
   public async resume(taskId: string): Promise<LiveConsoleSnapshot> {
-    const checkpoint = await this.requireCheckpoint(taskId);
-    const updated = await this.createRuntime(checkpoint.evidenceStore, taskId).resume(
-      checkpoint.state,
-    );
-    const snapshot = this.snapshot(updated, checkpoint.evidenceStore);
-    this.broker.publish("live-state", snapshot);
-    return snapshot;
+    return this.serializeTask(taskId, async () => {
+      const checkpoint = await this.requireCheckpoint(taskId);
+      const updated = await this.createRuntime(checkpoint.evidenceStore, taskId).resume(
+        checkpoint.state,
+      );
+      const snapshot = this.snapshot(updated, checkpoint.evidenceStore);
+      this.broker.publish("live-state", snapshot, taskId);
+      return snapshot;
+    });
   }
 
   public async decideApproval(
@@ -162,49 +160,59 @@ export class LiveIncidentService {
     approvalId: string,
     decision: "APPROVED" | "DENIED",
   ): Promise<LiveConsoleSnapshot> {
-    const checkpoint = await this.requireCheckpoint(taskId);
-    const evidenceStore = checkpoint.evidenceStore;
-    const state = checkpoint.state;
-    const existing = state.approvals.find((approval) => approval.id === approvalId);
-    if (existing === undefined) throw new Error(`unknown approval request: ${approvalId}`);
-    if (existing.status !== "PENDING") throw new Error(`approval ${approvalId} is already decided`);
-    if (decision === "APPROVED") {
-      assertLiveApprovalReady(state, existing, evidenceStore, this.approvalPolicy);
-    }
+    return this.serializeTask(taskId, async () => {
+      const checkpoint = await this.requireCheckpoint(taskId);
+      const evidenceStore = checkpoint.evidenceStore;
+      const existing = checkpoint.state.approvals.find((approval) => approval.id === approvalId);
+      if (existing === undefined) throw new Error(`unknown approval request: ${approvalId}`);
+      if (existing.status !== "PENDING") throw new Error(`approval ${approvalId} is already decided`);
+      if (decision === "APPROVED") {
+        assertLiveApprovalReady(
+          checkpoint.state,
+          existing,
+          evidenceStore,
+          this.approvalPolicy,
+        );
+      }
 
-    const controller = new SessionController(state);
-    let updated = controller.decideApproval(approvalId, decision);
-    if (decision === "DENIED" && updated.status === "ACTIVE") {
-      controller.replaceState(updated);
-      updated = controller.transition("BLOCKED", "APPLICATION", `approval ${approvalId} was denied`);
-    }
-    await this.checkpoints.saveCheckpoint(updated, evidenceStore);
-
-    const decided = updated.approvals.find((approval) => approval.id === approvalId);
-    if (decided === undefined) throw new Error(`approval ${approvalId} disappeared after persistence`);
-    updated = await this.createRuntime(evidenceStore, taskId).submitApproval(
-      updated,
-      decided,
-      decision,
-      decision === "DENIED" ? "denied by EvidenceForge user" : undefined,
-    );
-
-    if (
-      decision === "APPROVED" &&
-      updated.status === "ACTIVE" &&
-      updated.phase === "AWAITING_APPROVAL"
-    ) {
-      controller.replaceState(updated);
-      updated = controller.transition(
-        "PUBLISHING",
-        "APPLICATION",
-        `TrueForge accepted approval ${approvalId}`,
-      );
+      const controller = new SessionController(checkpoint.state);
+      let updated = controller.decideApproval(approvalId, decision);
       await this.checkpoints.saveCheckpoint(updated, evidenceStore);
-    }
-    const snapshot = this.snapshot(updated, evidenceStore);
-    this.broker.publish("live-state", snapshot);
-    return snapshot;
+
+      const decided = updated.approvals.find((approval) => approval.id === approvalId);
+      if (decided === undefined) throw new Error(`approval ${approvalId} disappeared after persistence`);
+      updated = await this.createRuntime(evidenceStore, taskId).submitApproval(
+        updated,
+        decided,
+        decision,
+        decision === "DENIED" ? "denied by EvidenceForge user" : undefined,
+      );
+
+      const postSubmit = new SessionController(updated);
+      if (decision === "DENIED" && updated.status === "ACTIVE") {
+        updated = postSubmit.transition(
+          "BLOCKED",
+          "APPLICATION",
+          `approval ${approvalId} was denied`,
+        );
+        await this.checkpoints.saveCheckpoint(updated, evidenceStore);
+      } else if (
+        decision === "APPROVED" &&
+        updated.status === "ACTIVE" &&
+        updated.phase === "AWAITING_APPROVAL"
+      ) {
+        updated = postSubmit.transition(
+          "PUBLISHING",
+          "APPLICATION",
+          `TrueForge accepted approval ${approvalId}`,
+        );
+        await this.checkpoints.saveCheckpoint(updated, evidenceStore);
+      }
+
+      const snapshot = this.snapshot(updated, evidenceStore);
+      this.broker.publish("live-state", snapshot, taskId);
+      return snapshot;
+    });
   }
 
   public async load(taskId: string): Promise<LiveConsoleSnapshot | undefined> {
@@ -232,11 +240,12 @@ export class LiveIncidentService {
         if (activity !== undefined) {
           const recent = [...(this.activityByTask.get(taskId) ?? []), activity].slice(-80);
           this.activityByTask.set(taskId, recent);
-          this.broker.publish("runtime-event", activity);
+          this.broker.publish("runtime-event", activity, taskId);
         }
         this.broker.publish(
           "live-state",
           this.snapshot(state, evidenceStore),
+          taskId,
         );
       },
     );
@@ -249,6 +258,23 @@ export class LiveIncidentService {
       this.activityByTask.get(state.task.id) ?? [],
     );
   }
+
+  private async serializeTask<T>(taskId: string, operation: () => Promise<T>): Promise<T> {
+    const previous = this.taskLocks.get(taskId) ?? Promise.resolve();
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(() => gate, () => gate);
+    this.taskLocks.set(taskId, tail);
+    await previous.catch(() => undefined);
+    try {
+      return await operation();
+    } finally {
+      release?.();
+      if (this.taskLocks.get(taskId) === tail) this.taskLocks.delete(taskId);
+    }
+  }
 }
 
 export function buildLiveConsoleSnapshot(
@@ -257,20 +283,30 @@ export function buildLiveConsoleSnapshot(
   activity: LiveActivityItem[] = [],
 ): LiveConsoleSnapshot {
   const evidenceIds = new Set(state.evidenceIds);
+  const acceptedActivity: LiveActivityItem = {
+    id: `activity-${state.task.id}`,
+    timestamp: state.task.createdAt,
+    phase: "INTAKE",
+    tone: "INFO",
+    label: "Incident accepted by the control plane",
+  };
   const persistedActivity = evidenceStore
     .listEvents()
+    .filter((event) => withinTerminalCutoff(event, state.terminalSequenceNumber))
     .map((event) => toLiveActivity(event))
     .filter((item): item is LiveActivityItem => item !== undefined);
+  const terminal = terminalActivity(state, persistedActivity);
   const activityById = new Map(
-    [...persistedActivity, ...activity].map((item) => [item.id, item]),
+    [acceptedActivity, ...persistedActivity, ...activity, ...(terminal === undefined ? [] : [terminal])]
+      .filter((item) =>
+        item.sequenceNumber === undefined ||
+        state.terminalSequenceNumber === undefined ||
+        item.sequenceNumber <= state.terminalSequenceNumber,
+      )
+      .map((item) => [item.id, item]),
   );
   const recentActivity = [...activityById.values()]
-    .sort((left, right) => {
-      if (left.sequenceNumber !== undefined && right.sequenceNumber !== undefined) {
-        return left.sequenceNumber - right.sequenceNumber;
-      }
-      return Date.parse(left.timestamp) - Date.parse(right.timestamp);
-    })
+    .sort(compareActivity)
     .slice(-80);
   return {
     mode: "LIVE_TRUEFORGE",
@@ -321,13 +357,14 @@ export function toLiveActivity(
     case "trueforge:sandbox.created":
       return { ...base, tone: "SUCCESS", label: "Daytona sandbox ready" };
     case "trueforge:model.message":
+    case "trueforge:model.message.delta":
       return { ...base, tone: "INFO", label: "Model checkpoint received" };
     case "trueforge:thread.created":
       return { ...base, tone: "INFO", label: "Diagnostic thread started" };
     case "trueforge:thread.done":
       return { ...base, tone: "SUCCESS", label: "Diagnostic thread completed" };
     case "trueforge:tool.response":
-      return { ...base, tone: "SUCCESS", label: "Tool execution completed" };
+      return toolResponseActivity(event, base);
     case "trueforge:tool.approval_required":
     case "trueforge:tool.response_required":
       return { ...base, tone: "WARNING", label: "Human approval required" };
@@ -340,14 +377,61 @@ export function toLiveActivity(
   }
 }
 
+function toolResponseActivity(
+  event: RuntimeEvent,
+  base: Omit<LiveActivityItem, "tone" | "label">,
+): LiveActivityItem {
+  const payload = asUnknownRecord(event.payload);
+  const content = payload.content;
+  if (typeof content !== "string") {
+    return { ...base, tone: "ERROR", label: "Tool response malformed" };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content) as unknown;
+  } catch {
+    return { ...base, tone: "ERROR", label: "Tool response malformed" };
+  }
+  const record = asUnknownRecord(parsed);
+  const candidate = pickToolResultRecord(record);
+  const explicitStatus = readString(candidate, "status")?.toUpperCase();
+  const success = readBoolean(record, "success") ?? readBoolean(candidate, "success");
+  const exitCode = readNumber(candidate, "exitCode") ?? readNumber(candidate, "exit_code");
+  if (
+    success === false ||
+    explicitStatus === "ERROR" ||
+    explicitStatus === "FAILED" ||
+    explicitStatus === "FAILURE" ||
+    explicitStatus === "TIMEOUT" ||
+    (exitCode !== undefined && exitCode !== 0) ||
+    candidate.error !== undefined
+  ) {
+    return { ...base, tone: "ERROR", label: "Tool execution failed" };
+  }
+  if (explicitStatus === "DENIED") {
+    return { ...base, tone: "WARNING", label: "Tool execution denied" };
+  }
+  return { ...base, tone: "SUCCESS", label: "Tool execution completed" };
+}
+
+function pickToolResultRecord(record: Record<string, unknown>): Record<string, unknown> {
+  const response = asUnknownRecord(record.response);
+  if (Object.keys(response).length > 0) return response;
+  const output = asUnknownRecord(record.output);
+  const nestedOutput = asUnknownRecord(output.result);
+  if (Object.keys(nestedOutput).length > 0) return nestedOutput;
+  const result = asUnknownRecord(record.result);
+  return Object.keys(result).length > 0 ? result : record;
+}
+
 function turnEndedActivity(
   event: RuntimeEvent,
   base: Omit<LiveActivityItem, "tone" | "label">,
 ): LiveActivityItem {
   const payload = asUnknownRecord(event.payload);
   const turnState = asUnknownRecord(payload.state);
-  const status = typeof turnState.status === "string" ? turnState.status : undefined;
-  const reason = typeof turnState.reason === "string" ? turnState.reason : undefined;
+  const status = readString(turnState, "status");
+  const reason = readString(turnState, "reason");
   if (status === "done") {
     return { ...base, tone: "SUCCESS", label: "TrueForge turn completed" };
   }
@@ -367,10 +451,39 @@ function turnEndedActivity(
   return { ...base, tone: "ERROR", label: "TrueForge turn ended with an unknown status" };
 }
 
-function asUnknownRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : {};
+function terminalActivity(
+  state: SessionState,
+  persisted: LiveActivityItem[],
+): LiveActivityItem | undefined {
+  if (state.status === "ACTIVE") return undefined;
+  const last = persisted.at(-1);
+  return {
+    id: `terminal-${state.task.id}`,
+    timestamp: last?.timestamp ?? state.task.createdAt,
+    sequenceNumber: state.terminalSequenceNumber,
+    phase: state.phase,
+    tone: state.status === "COMPLETED" ? "SUCCESS" : "BLOCKED",
+    label:
+      state.status === "COMPLETED"
+        ? "CompletionGate issued completion certificate"
+        : state.status === "ESCALATED"
+          ? "Workflow escalated"
+          : state.status === "FAILED"
+            ? "Workflow failed"
+            : "Workflow blocked",
+  };
+}
+
+function withinTerminalCutoff(event: RuntimeEvent, cutoff: number | undefined): boolean {
+  return cutoff === undefined ||
+    (event.sequenceNumber !== undefined && event.sequenceNumber <= cutoff);
+}
+
+function compareActivity(left: LiveActivityItem, right: LiveActivityItem): number {
+  if (left.sequenceNumber !== undefined && right.sequenceNumber !== undefined) {
+    return left.sequenceNumber - right.sequenceNumber;
+  }
+  return Date.parse(left.timestamp) - Date.parse(right.timestamp);
 }
 
 export function assertLiveApprovalReady(
@@ -379,6 +492,7 @@ export function assertLiveApprovalReady(
   evidenceStore: EvidenceStore,
   policy = new ApprovalPolicy(),
 ): void {
+  if (state.status !== "ACTIVE") throw new Error("approval requires an active session");
   if (
     approval.risk === "PRIVILEGED" ||
     approval.risk === "EXTERNAL_DESTRUCTIVE" ||
@@ -411,7 +525,8 @@ export function assertLiveApprovalReady(
     operation?.actionType !== approval.action ||
     operation.argumentDigest !== provenance.actionDigest ||
     operation.repository !== provenance.repository ||
-    operation.revision !== provenance.revision
+    operation.revision !== provenance.revision ||
+    !artifactBindingMatchesState(provenance.binding, state, "EXTERNAL")
   ) {
     throw new Error("external approval provenance is stale, substituted, expired, or consumed");
   }
@@ -447,6 +562,10 @@ export function assertLiveApprovalReady(
       );
       continue;
     }
+    if (!artifactBindingMatchesState(result.binding, state, criterion.evidenceScope)) {
+      failures.push(`${criterion.id}: verifier result is stale for the current subject`);
+      continue;
+    }
     if (criterion.verifier.kind !== "REVIEWER" && !result.deterministic) {
       failures.push(`${criterion.id}: verifier result is not deterministic`);
       continue;
@@ -456,15 +575,23 @@ export function assertLiveApprovalReady(
       failures.push(`${criterion.id}: latest PASS has no criterion-linked evidence`);
       continue;
     }
-    if (!linkedEvidenceIds.some((id) => evidenceStore.isAdmissibleForCriterion(id, criterion))) {
+    const expectedBinding = artifactBindingFor(state, criterion.evidenceScope);
+    if (
+      !linkedEvidenceIds.some((id) =>
+        evidenceStore.isAdmissibleForCriterion(id, criterion, expectedBinding),
+      )
+    ) {
       failures.push(`${criterion.id}: latest PASS has no admissible evidence`);
     }
   }
   if (failures.length > 0) {
     throw new Error(`external approval blocked by verification: ${failures.join("; ")}`);
   }
-  if (state.reviewerVerdict !== "PASS" && state.reviewerVerdict !== "PASS_WITH_WARNINGS") {
-    throw new Error("external approval requires an independent reviewer PASS");
+  if (
+    (state.reviewerVerdict !== "PASS" && state.reviewerVerdict !== "PASS_WITH_WARNINGS") ||
+    !artifactBindingMatchesState(state.reviewBinding, state, "PATCH")
+  ) {
+    throw new Error("external approval requires an independent reviewer PASS for the current patch");
   }
   if (state.patchDigest === undefined) {
     throw new Error("external approval requires a recorded patch digest");
@@ -480,8 +607,11 @@ function buildTimeline(
   const currentIndex = displayOrder.indexOf(effectiveCurrent);
   return displayOrder.map((phase, index) => {
     let itemStatus: TimelineItem["status"] = "PENDING";
-    if (phase === effectiveCurrent) itemStatus = status === "BLOCKED" ? "BLOCKED" : "ACTIVE";
-    else if (index < currentIndex || current === "COMPLETED") itemStatus = "COMPLETE";
+    if (phase === effectiveCurrent) {
+      itemStatus = status === "ACTIVE" ? "ACTIVE" : "BLOCKED";
+    } else if (index < currentIndex || current === "COMPLETED") {
+      itemStatus = "COMPLETE";
+    }
     if (currentIndex === -1 && status !== "ACTIVE") itemStatus = "BLOCKED";
     return { phase, status: itemStatus };
   });
@@ -497,4 +627,25 @@ function buildSpecialistStatuses(state: SessionState): LiveSpecialistStatus[] {
     else if (steps.some((step) => step.status === "DONE")) status = "PARTIAL";
     return { name: specialist.name, status };
   });
+}
+
+function asUnknownRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function readString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function readBoolean(record: Record<string, unknown>, key: string): boolean | undefined {
+  const value = record[key];
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function readNumber(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
