@@ -44,7 +44,14 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/events") {
-    broker.connect(response);
+    const taskId = url.searchParams.get("task")?.trim() || undefined;
+    const snapshot = taskId === undefined ? demo.snapshot() : await live.load(taskId);
+    broker.connect(response, taskId);
+    if (snapshot === undefined) {
+      broker.publishTo(response, "stream-error", { error: "session not found", taskId });
+    } else {
+      broker.publishTo(response, taskId === undefined ? "demo-state" : "live-state", snapshot);
+    }
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/demo/session") {
@@ -168,6 +175,9 @@ function readString(body: Record<string, unknown>, key: string): string | undefi
 }
 
 function sendJson(response: ServerResponse, status: number, body: unknown): void {
-  response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+  response.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
   response.end(`${JSON.stringify(body)}\n`);
 }
