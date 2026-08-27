@@ -7,6 +7,7 @@ import { ApprovalRequest, digestCanonical, RuntimeEvent } from "../../packages/d
 import { EvidenceStore } from "../../packages/evidence/src";
 import { JsonSessionStore } from "../../packages/persistence/src";
 import { EventJournal } from "../../packages/telemetry/src";
+import { artifactBindingFor } from "../../packages/verification/src";
 import { createOperationIntent } from "../../packages/workflow/src";
 import {
   ApprovalResponse,
@@ -84,7 +85,10 @@ class FakeAdapter implements TrueForgeRuntimeAdapter {
   }
 }
 
-function decidedApproval(status: "APPROVED" | "DENIED"): ApprovalRequest {
+function decidedApproval(
+  state: ReturnType<typeof buildState>,
+  status: "APPROVED" | "DENIED",
+): ApprovalRequest {
   return {
     id: "approval-runtime",
     action: "github.create_pull_request",
@@ -97,10 +101,11 @@ function decidedApproval(status: "APPROVED" | "DENIED"): ApprovalRequest {
     threadId: "main",
     provenance: {
       actionDigest: digestCanonical({ head: "fix/demo" }),
-      repository: "cmdr-chara/evidenceforge-fixture",
-      revision: "abc123",
+      repository: state.task.repository,
+      revision: state.task.revision,
       risk: "EXTERNAL_REVERSIBLE",
       originatingOperationId: "operation-runtime",
+      binding: artifactBindingFor(state, "EXTERNAL"),
       issuedAt: new Date(Date.now() - 1_000).toISOString(),
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
     },
@@ -137,7 +142,7 @@ test("durable runtime submits the exact approved TrueForge tool call and persist
     const state = buildState();
     state.trueForgeSessionId = "tf-session";
     addRuntimeOperation(state);
-    state.approvals.push(decidedApproval("APPROVED"));
+    state.approvals.push(decidedApproval(state, "APPROVED"));
 
     const updated = await runtime.submitApproval(
       state,
@@ -176,7 +181,7 @@ test("durable runtime maps a denied decision to a TrueForge deny response", asyn
     );
     const state = buildState();
     state.trueForgeSessionId = "tf-session";
-    const approval = decidedApproval("DENIED");
+    const approval = decidedApproval(state, "DENIED");
     state.approvals.push(approval);
 
     await runtime.submitApproval(state, approval, "DENIED", "human rejected the PR");
@@ -199,10 +204,10 @@ test("durable runtime rejects approval submission after the session is blocked",
     );
     const state = buildState();
     state.trueForgeSessionId = "tf-session";
+    const approval = decidedApproval(state, "APPROVED");
+    state.approvals.push(approval);
     state.status = "BLOCKED";
     state.phase = "BLOCKED";
-    const approval = decidedApproval("APPROVED");
-    state.approvals.push(approval);
 
     await assert.rejects(
       runtime.submitApproval(state, approval, "APPROVED"),
