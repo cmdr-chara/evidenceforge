@@ -1,0 +1,147 @@
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.status-pill {
+  min-height: 30px;
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  line-height: 1.25;
+}
+
+.metric,
+.permission-label {
+  color: #b7bab2;
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.activity-meta {
+  color: #a0a49b;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.certificate-grid strong {
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
+.certificate-grid span,
+.case-strip dd,
+.digest,
+.repository,
+.activity-label,
+.activity-meta {
+  overflow-wrap: anywhere;
+}
+
+.activity-item.tone-info {
+  border-left-color: var(--blue);
+}
+
+.activity-item.tone-success {
+  border-left-color: var(--signal-dark);
+}
+
+.activity-item.tone-warning {
+  border-left-color: var(--amber);
+}
+
+.activity-item.tone-error {
+  border-left-color: var(--danger);
+  background: rgb(255 110 95 / 0.035);
+}
+
+.activity-item.tone-blocked {
+  border-left-color: var(--danger);
+  color: var(--paper);
+  background: rgb(255 110 95 / 0.09);
+}
+
+@media (max-width: 760px) {
+  .case-strip dd {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .digest {
+    max-width: 62%;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 420px) {
+  main,
+  footer {
+    width: calc(100% - 16px);
+  }
+
+  .topbar {
+    padding-inline: 12px;
+  }
+
+  .topbar-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-actions .status-pill {
+    grid-column: 1;
+  }
+
+  .case-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .trace-fact {
+    grid-column: auto;
+  }
+
+  .hero-copy,
+  .ledger,
+  .compact-section,
+  .approval-panel,
+  .certificate-panel,
+  .live-panel {
+    padding-inline: 16px;
+  }
+
+  .activity-item {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .activity-meta {
+    grid-column: 1;
+  }
+
+  .approval-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .approval-actions .button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
