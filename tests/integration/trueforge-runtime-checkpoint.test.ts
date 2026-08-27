@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -74,6 +75,7 @@ test("TrueForge verifier evidence survives a process-level checkpoint restore", 
       createdAt: "2026-08-25T20:05:00.000Z",
     });
     const state = createSessionState(task, buildCiSuccessContract(task));
+    state.patchDigest = createHash("sha256").update("checkpoint-patch").digest("hex");
     const evidenceStore = new EvidenceStore();
     const checkpoints = new JsonRuntimeCheckpointStore(join(directory, "checkpoints"));
     const runtime = new DurableTrueForgeRuntime(
