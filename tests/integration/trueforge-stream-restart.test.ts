@@ -20,6 +20,7 @@ test("streamed tool-call correlation survives restart before tool response", () 
         type: "model.message",
         id: "message-restart",
         threadId: "main",
+        content: "",
       },
     },
     {
@@ -32,14 +33,18 @@ test("streamed tool-call correlation survives restart before tool response", () 
       payload: {
         type: "model.message.delta",
         id: "message-restart",
+        delta: "",
         toolCalls: [
           {
             index: 0,
             id: "call-restart",
             function: {
               name: "exec",
-              arguments:
-                '{"intent":"evidenceforge.verify:targeted-tests","command":"pnpm',
+              arguments: JSON.stringify({
+                intent: "evidenceforge.verify:targeted-tests",
+                command: "pnpm test",
+                cwd: "/workspace/repository",
+              }),
             },
             toolInfo: { type: "truefoundry-system", name: "sandbox" },
           },
@@ -56,14 +61,7 @@ test("streamed tool-call correlation survives restart before tool response", () 
       payload: {
         type: "model.message.delta",
         id: "message-restart",
-        toolCalls: [
-          {
-            index: 0,
-            function: {
-              arguments: ' test","cwd":"/workspace/repository"}',
-            },
-          },
-        ],
+        delta: "",
         finishReason: "tool_calls",
       },
     },
@@ -93,6 +91,7 @@ test("streamed tool-call correlation survives restart before tool response", () 
 
   const projection = restartedProjector.project(state, response);
 
+  assert.equal(projection.verifierRejection, undefined, projection.verifierRejection);
   assert.equal(projection.toolResult?.tool, "sandbox.exec");
   assert.equal(projection.toolResult?.status, "OK");
   assert.equal(projection.verificationResult?.status, "PASS");
