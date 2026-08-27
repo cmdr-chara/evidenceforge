@@ -128,17 +128,27 @@ export class TrueForgeSdkAdapter {
     }
 
     const events: RuntimeEvent[] = [];
+    let lastSequenceNumber = afterSequenceNumber;
     for await (const raw of await client.sessions.listTurnEvents(sessionId, turnId, { order: "asc" })) {
-      const normalized = normalizeTrueForgeEvent(raw);
+      const record = asRecord(raw);
+      const sequence = readSequence(record);
+      if (sequence !== undefined) {
+        lastSequenceNumber = Math.max(lastSequenceNumber, sequence);
+        if (sequence <= afterSequenceNumber) continue;
+      }
+      const normalized = normalizeTrueForgeEvent(raw, sequence);
       events.push(normalized.event);
       await onEvent?.(normalized.event);
     }
     return {
       sessionId,
       turnId,
-      lastSequenceNumber: afterSequenceNumber,
+      lastSequenceNumber,
       events,
-      paused: state.status === "done" && Array.isArray(state.requiredActions) && state.requiredActions.length > 0,
+      paused:
+        state.status === "done" &&
+        Array.isArray(state.requiredActions) &&
+        state.requiredActions.length > 0,
       requiredActions: Array.isArray(state.requiredActions) ? state.requiredActions : [],
     };
   }
@@ -157,7 +167,9 @@ export class TrueForgeSdkAdapter {
 
     for await (const item of stream.withMetadata()) {
       const sequence = item.id === undefined ? undefined : Number.parseInt(item.id, 10);
-      if (sequence !== undefined && Number.isFinite(sequence)) lastSequenceNumber = sequence;
+      if (sequence !== undefined && Number.isFinite(sequence)) {
+        lastSequenceNumber = Math.max(lastSequenceNumber, sequence);
+      }
       const normalized = normalizeTrueForgeEvent(item.data, sequence);
       events.push(normalized.event);
       const raw = asRecord(item.data);
@@ -211,4 +223,16 @@ function asRecord(value: unknown): UnknownRecord {
 function readString(record: UnknownRecord, key: string): string | undefined {
   const value = record[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function readSequence(record: UnknownRecord): number | undefined {
+  for (const key of ["sequenceNumber", "sequence_number", "sequence"]) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return undefined;
 }
