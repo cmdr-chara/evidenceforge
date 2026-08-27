@@ -58,13 +58,27 @@ export function pendingCriterion(
   description: string,
   verifier: SuccessCriterion["verifier"],
   required = true,
+  evidenceScope: SuccessCriterion["evidenceScope"] = inferEvidenceScope(verifier),
 ): SuccessCriterion {
   return {
     id,
     description,
     required,
     verifier,
+    evidenceScope,
     status: "PENDING",
     evidenceIds: [],
   };
+}
+
+function inferEvidenceScope(
+  verifier: SuccessCriterion["verifier"],
+): SuccessCriterion["evidenceScope"] {
+  if (
+    verifier.kind === "FAILURE_SIGNATURE" ||
+    (verifier.kind === "COMMAND" && verifier.purpose === "REPRODUCTION")
+  ) {
+    return "INCIDENT";
+  }
+  return verifier.kind === "EXTERNAL_STATE" ? "EXTERNAL" : "PATCH";
 }

@@ -7,8 +7,14 @@ import {
   WorkflowPhase,
 } from "../../domain/src/types";
 import { validateSessionState } from "../../domain/src/validation";
-import { isIssuedCompletionCertificate } from "../../verification/src/completion-gate";
-import { completionSubjectDigest } from "../../verification/src/completion-subject";
+import {
+  artifactBindingFor,
+  artifactBindingMatchesState,
+  completionStateDigest,
+  completionSubjectDigest,
+  isIssuedCompletionCertificate,
+  successContractDigest,
+} from "../../verification/src";
 
 export type TransitionActor = "APPLICATION" | "MODEL";
 
@@ -75,12 +81,18 @@ export class SessionController {
 
   public completeWithCertificate(certificate: CompletionCertificateData): SessionState {
     if (!isIssuedCompletionCertificate(certificate)) {
-      throw new InvalidTransitionError("completion certificate was not issued by CompletionGate");
+      throw new InvalidTransitionError("completion certificate is fabricated or its payload changed");
     }
-    if (certificate.taskId !== this.state.task.id) {
-      throw new InvalidTransitionError("certificate task does not match session task");
-    }
-    if (certificate.subjectDigest !== completionSubjectDigest(this.state)) {
+    if (
+      certificate.taskId !== this.state.task.id ||
+      certificate.repository !== this.state.task.repository ||
+      certificate.revision !== this.state.task.revision ||
+      certificate.patchDigest !== this.state.patchDigest ||
+      certificate.stateVersion !== this.state.version ||
+      certificate.successContractDigest !== successContractDigest(this.state) ||
+      certificate.stateDigest !== completionStateDigest(this.state) ||
+      certificate.subjectDigest !== completionSubjectDigest(this.state)
+    ) {
       throw new InvalidTransitionError("completion certificate subject no longer matches session state");
     }
     this.state.phase = "COMPLETED";
@@ -95,10 +107,12 @@ export class SessionController {
     if (criterion === undefined) {
       throw new Error(`unknown success criterion: ${result.criterionId}`);
     }
-    this.state.verifierResults.push(structuredClone(result));
-    criterion.status = result.status;
-    criterion.evidenceIds = [...new Set([...criterion.evidenceIds, ...result.evidenceIds])];
-    this.state.evidenceIds = [...new Set([...this.state.evidenceIds, ...result.evidenceIds])];
+    const boundResult = structuredClone(result);
+    boundResult.binding ??= artifactBindingFor(this.state, criterion.evidenceScope);
+    this.state.verifierResults.push(boundResult);
+    criterion.status = boundResult.status;
+    criterion.evidenceIds = [...new Set([...criterion.evidenceIds, ...boundResult.evidenceIds])];
+    this.state.evidenceIds = [...new Set([...this.state.evidenceIds, ...boundResult.evidenceIds])];
     this.state.version += 1;
     return this.snapshot();
   }
@@ -107,9 +121,18 @@ export class SessionController {
     if (this.state.status !== "ACTIVE") {
       throw new Error("patch digest can change only while the session is active");
     }
-    if (!/^[a-f0-9]{64}$/i.test(digest)) throw new Error("patch digest must be a SHA-256 hex string");
+    if (!/^[a-f0-9]{64}$/i.test(digest)) {
+      throw new Error("patch digest must be a SHA-256 hex string");
+    }
     const normalized = digest.toLowerCase();
-    if (this.state.patchDigest !== normalized) this.invalidatePatchBoundVerification();
+    if (this.state.patchDigest === normalized) return this.snapshot();
+    if (
+      this.state.externalAction?.status === "COMMITTED" ||
+      this.state.externalAction?.status === "RECONCILED"
+    ) {
+      throw new Error("cannot replace a patch after its external action was committed");
+    }
+    this.invalidatePatchBoundState();
     this.state.patchDigest = normalized;
     this.state.version += 1;
     return this.snapshot();
@@ -117,6 +140,8 @@ export class SessionController {
 
   public setReviewerVerdict(verdict: SessionState["reviewerVerdict"]): SessionState {
     this.state.reviewerVerdict = verdict;
+    this.state.reviewBinding =
+      verdict === undefined ? undefined : artifactBindingFor(this.state, "PATCH");
     this.state.version += 1;
     return this.snapshot();
   }
@@ -134,6 +159,12 @@ export class SessionController {
     const approval = this.state.approvals.find((item) => item.id === id);
     if (approval === undefined) throw new Error(`unknown approval request: ${id}`);
     if (approval.status !== "PENDING") throw new Error(`approval ${id} is already decided`);
+    if (
+      approval.provenance !== undefined &&
+      !artifactBindingMatchesState(approval.provenance.binding, this.state, "EXTERNAL")
+    ) {
+      throw new Error(`approval ${id} is stale for the current patch`);
+    }
     approval.status = decision;
     this.state.version += 1;
     return this.snapshot();
@@ -151,28 +182,43 @@ export class SessionController {
     this.state = structuredClone(validateSessionState(state));
   }
 
-  private invalidatePatchBoundVerification(): void {
-    const patchBoundCriterionIds = new Set(
+  private invalidatePatchBoundState(): void {
+    const invalidCriterionIds = new Set(
       this.state.successCriteria
-        .filter(
-          (criterion) =>
-            criterion.verifier.kind !== "FAILURE_SIGNATURE" &&
-            !(
-              criterion.verifier.kind === "COMMAND" &&
-              criterion.verifier.purpose === "REPRODUCTION"
-            ),
-        )
+        .filter((criterion) => criterion.evidenceScope !== "INCIDENT")
         .map((criterion) => criterion.id),
     );
+    const invalidEvidenceIds = new Set<string>();
     for (const criterion of this.state.successCriteria) {
-      if (!patchBoundCriterionIds.has(criterion.id)) continue;
+      if (!invalidCriterionIds.has(criterion.id)) continue;
+      for (const evidenceId of criterion.evidenceIds) invalidEvidenceIds.add(evidenceId);
       criterion.status = "PENDING";
       criterion.evidenceIds = [];
     }
     this.state.verifierResults = this.state.verifierResults.filter(
-      (result) => !patchBoundCriterionIds.has(result.criterionId),
+      (result) => !invalidCriterionIds.has(result.criterionId),
     );
+    this.state.evidenceIds = this.state.evidenceIds.filter((id) => !invalidEvidenceIds.has(id));
     this.state.roundEvaluations = [];
     this.state.reviewerVerdict = undefined;
+    this.state.reviewBinding = undefined;
+
+    const invalidOperationIds = new Set<string>();
+    for (const approval of this.state.approvals) {
+      if (approval.provenance?.binding?.scope === "EXTERNAL") {
+        invalidOperationIds.add(approval.provenance.originatingOperationId);
+      }
+    }
+    if (this.state.externalAction !== undefined) {
+      invalidOperationIds.add(this.state.externalAction.operationId);
+    }
+    this.state.approvals = this.state.approvals.filter(
+      (approval) => approval.provenance?.binding?.scope !== "EXTERNAL",
+    );
+    this.state.operations = this.state.operations.filter(
+      (operation) => !invalidOperationIds.has(operation.id),
+    );
+    this.state.externalAction = undefined;
+    this.state.completionCertificate = undefined;
   }
 }

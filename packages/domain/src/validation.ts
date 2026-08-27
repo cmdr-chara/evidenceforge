@@ -1,5 +1,6 @@
 import {
   CriterionStatus,
+  EVIDENCE_SCOPES,
   REPLAY_POLICIES,
   RISK_LEVELS,
   SessionState,
@@ -46,6 +47,9 @@ export function validateSuccessCriterion(criterion: SuccessCriterion): SuccessCr
   assertNonEmpty(criterion.id, "criterion.id", issues);
   assertNonEmpty(criterion.description, "criterion.description", issues);
   if (!CRITERION_STATUSES.includes(criterion.status)) issues.push("criterion.status is invalid");
+  if (!EVIDENCE_SCOPES.includes(criterion.evidenceScope)) {
+    issues.push("criterion.evidenceScope is invalid");
+  }
   if (criterion.verifier.kind === "COMMAND" || criterion.verifier.kind === "FAILURE_SIGNATURE") {
     if (criterion.verifier.argv.length === 0) issues.push("command verifier argv cannot be empty");
     if (criterion.verifier.timeoutSeconds <= 0) issues.push("command verifier timeout must be positive");
@@ -95,6 +99,9 @@ export function validateSessionState(state: SessionState): SessionState {
   }
   if (state.status === "COMPLETED" && state.completionCertificate === undefined) {
     issues.push("COMPLETED status requires a completion certificate");
+  }
+  if (state.status !== "COMPLETED" && state.phase === "COMPLETED") {
+    issues.push("non-COMPLETED status cannot use COMPLETED phase");
   }
   if (issues.length > 0) throw new DomainValidationError(issues);
   return state;

@@ -5,6 +5,10 @@ import {
   VerificationResult,
 } from "../../domain/src";
 import { EvidenceStore } from "../../evidence/src";
+import {
+  artifactBindingFor,
+  artifactBindingMatchesState,
+} from "./completion-subject";
 
 export class ProgressEvaluator {
   public constructor(private readonly evidenceStore: EvidenceStore) {}
@@ -16,14 +20,17 @@ export class ProgressEvaluator {
   ): RoundProgressEvaluation {
     const required = state.successCriteria.filter((criterion) => criterion.required);
     const criteria = required.map((criterion) => {
+      const expectedBinding = artifactBindingFor(state, criterion.evidenceScope);
       const admissibleEvidenceIds = criterion.evidenceIds.filter((evidenceId) =>
-        this.evidenceStore.isAdmissibleForCriterion(evidenceId, criterion),
+        this.evidenceStore.isAdmissibleForCriterion(evidenceId, criterion, expectedBinding),
       );
       const latest = latestResult(state, criterion.id);
       const missingEvidence: string[] = [];
       if (admissibleEvidenceIds.length === 0) missingEvidence.push("admissible PASS evidence");
       if (latest === undefined) missingEvidence.push("executed verifier result");
-      else if (!latest.evidenceIds.some((id) => admissibleEvidenceIds.includes(id))) {
+      else if (!artifactBindingMatchesState(latest.binding, state, criterion.evidenceScope)) {
+        missingEvidence.push("current subject binding");
+      } else if (!latest.evidenceIds.some((id) => admissibleEvidenceIds.includes(id))) {
         missingEvidence.push("verifier-correlated evidence");
       }
       return {
@@ -75,12 +82,13 @@ export function roundEvaluationMatchesState(
   state: SessionState,
   evaluation: RoundProgressEvaluation,
 ): boolean {
+  if (evaluation.sessionVersion + 1 !== state.version) return false;
   if (evaluation.patchDigest !== state.patchDigest) return false;
   const required = state.successCriteria.filter((criterion) => criterion.required);
   if (evaluation.criteria.length !== required.length) return false;
   return required.every((criterion) => {
     const evaluated = evaluation.criteria.find((item) => item.criterionId === criterion.id);
-    return evaluated?.status === criterion.status;
+    return evaluated?.status === criterion.status && evaluated.missingEvidence.length === 0;
   });
 }
 

@@ -3,11 +3,17 @@ import { pendingCriterion, SuccessCriterion, Task } from "../../domain/src";
 export function buildCiSuccessContract(task: Task): SuccessCriterion[] {
   const cwd = "/workspace/repository";
   return [
-    pendingCriterion("incident-context", "Authoritative incident context retrieved", {
-      kind: "SCHEMA_FILE",
-      artifactRef: `artifact://${task.id}/incident-context.json`,
-      schemaName: "IncidentContext",
-    }),
+    pendingCriterion(
+      "incident-context",
+      "Authoritative incident context retrieved",
+      {
+        kind: "SCHEMA_FILE",
+        artifactRef: `artifact://${task.id}/incident-context.json`,
+        schemaName: "IncidentContext",
+      },
+      true,
+      "INCIDENT",
+    ),
     pendingCriterion("failure-reproduced", "Original failure independently reproduced", {
       kind: "FAILURE_SIGNATURE",
       argv: ["pnpm", "test"],
@@ -16,11 +22,17 @@ export function buildCiSuccessContract(task: Task): SuccessCriterion[] {
       signature: "CONFIG_VALIDATION_ORDER",
       timeoutSeconds: 180,
     }),
-    pendingCriterion("root-cause-supported", "Root-cause hypothesis supported by evidence", {
-      kind: "SCHEMA_FILE",
-      artifactRef: `artifact://${task.id}/hypothesis-ledger.json`,
-      schemaName: "HypothesisLedger",
-    }),
+    pendingCriterion(
+      "root-cause-supported",
+      "Root-cause hypothesis supported by evidence",
+      {
+        kind: "SCHEMA_FILE",
+        artifactRef: `artifact://${task.id}/hypothesis-ledger.json`,
+        schemaName: "HypothesisLedger",
+      },
+      true,
+      "INCIDENT",
+    ),
     pendingCriterion("regression", "Regression verifier passes post-patch", {
       kind: "COMMAND",
       argv: ["pnpm", "test", "--", "config"],

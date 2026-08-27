@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import {
+  ArtifactBinding,
   Evidence,
+  PullRequestIdentity,
   ReviewerVerdict,
   RuntimeEvent,
   SuccessCriterion,
@@ -29,6 +31,7 @@ export class VerificationEngine {
     criterion: SuccessCriterion,
     event: RuntimeEvent,
     toolResult: ToolResult,
+    binding?: ArtifactBinding,
   ): VerificationEvaluation {
     this.assertCorrelated(event, toolResult);
     const { status, details } = evaluateDeterministic(criterion, toolResult);
@@ -44,6 +47,7 @@ export class VerificationEngine {
       claim: details,
       artifactRefs: toolResult.artifactRefs,
       outcome: status,
+      binding,
       metadata: {
         callId: toolResult.callId,
         durationMs: toolResult.durationMs,
@@ -60,6 +64,7 @@ export class VerificationEngine {
         evidenceIds: [evidence.id],
         details,
         deterministic: true,
+        binding: binding === undefined ? undefined : structuredClone(binding),
       },
     };
   }
@@ -69,6 +74,7 @@ export class VerificationEngine {
     event: RuntimeEvent,
     verdict: ReviewerVerdict,
     details: string,
+    binding?: ArtifactBinding,
   ): VerificationEvaluation {
     if (criterion.verifier.kind !== "REVIEWER") {
       throw new VerificationCorrelationError("review verdict supplied to non-review criterion");
@@ -89,6 +95,7 @@ export class VerificationEngine {
       sourceTool: "independent-reviewer",
       claim: details,
       outcome: status,
+      binding,
       metadata: { verdict },
     });
     this.evidenceStore.recordEvidence(evidence);
@@ -101,6 +108,7 @@ export class VerificationEngine {
         evidenceIds: [evidence.id],
         details,
         deterministic: false,
+        binding: binding === undefined ? undefined : structuredClone(binding),
       },
     };
   }
@@ -108,8 +116,8 @@ export class VerificationEngine {
   public evaluateExternalState(
     criterion: SuccessCriterion,
     event: RuntimeEvent,
-    identifier: string,
-    headSha: string,
+    identity: PullRequestIdentity,
+    binding?: ArtifactBinding,
   ): VerificationEvaluation {
     if (criterion.verifier.kind !== "EXTERNAL_STATE") {
       throw new VerificationCorrelationError("external state supplied to non-external criterion");
@@ -118,18 +126,28 @@ export class VerificationEngine {
       throw new VerificationCorrelationError("external result must come from reconciliation event");
     }
     const expected = criterion.verifier.expectedHeadSha;
-    const status: VerificationStatus = expected === undefined || expected === headSha ? "PASS" : "FAIL";
+    const status: VerificationStatus =
+      expected === undefined || expected === identity.headSha ? "PASS" : "FAIL";
     const details =
       status === "PASS"
-        ? `GitHub confirmed pull request ${identifier} at head ${headSha}`
-        : `GitHub returned head ${headSha}, expected ${expected}`;
+        ? `GitHub confirmed pull request ${identity.identifier} at head ${identity.headSha}`
+        : `GitHub returned head ${identity.headSha}, expected ${expected}`;
     const evidence = createEvidence({
       kind: "EXTERNAL_RESULT",
       sourceEventId: event.id,
       sourceTool: "github-mcp.reconcile-pull-request",
       claim: details,
       outcome: status,
-      metadata: { identifier, headSha },
+      binding,
+      metadata: {
+        identifier: identity.identifier,
+        repository: identity.repository,
+        base: identity.base,
+        head: identity.head,
+        headSha: identity.headSha,
+        operationId: identity.operationId,
+        idempotencyKey: identity.idempotencyKey,
+      },
     });
     this.evidenceStore.recordEvidence(evidence);
     return {
@@ -141,6 +159,7 @@ export class VerificationEngine {
         evidenceIds: [evidence.id],
         details,
         deterministic: true,
+        binding: binding === undefined ? undefined : structuredClone(binding),
       },
     };
   }

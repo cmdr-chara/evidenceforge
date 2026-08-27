@@ -1,5 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Evidence, EvidenceKind, VerificationStatus } from "../../domain/src/types";
+import {
+  ArtifactBinding,
+  Evidence,
+  EvidenceKind,
+  VerificationStatus,
+} from "../../domain/src/types";
 
 export interface EvidenceInput {
   kind: EvidenceKind;
@@ -8,6 +13,7 @@ export interface EvidenceInput {
   claim: string;
   artifactRefs?: string[];
   outcome?: VerificationStatus;
+  binding?: ArtifactBinding;
   metadata?: Record<string, string | number | boolean | null>;
   timestamp?: string;
   id?: string;
@@ -23,6 +29,7 @@ export function createEvidence(input: EvidenceInput): Evidence {
     artifactRefs: [...(input.artifactRefs ?? [])],
     outcome: input.outcome,
     timestamp: input.timestamp ?? new Date().toISOString(),
+    binding: input.binding === undefined ? undefined : structuredClone(input.binding),
     metadata: input.metadata === undefined ? undefined : { ...input.metadata },
   };
 }

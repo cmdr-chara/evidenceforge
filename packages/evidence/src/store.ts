@@ -1,4 +1,6 @@
+import { digestCanonical } from "../../domain/src/canonical";
 import {
+  ArtifactBinding,
   Evidence,
   EvidenceKind,
   RuntimeEvent,
@@ -30,21 +32,23 @@ export interface ModelFacingEvidenceView {
 }
 
 export class EvidenceStore {
-  private readonly events = new Map<string, RuntimeEvent>();
+  private readonly events: RuntimeEvent[] = [];
+  private readonly eventKeys = new Set<string>();
   private readonly evidence = new Map<string, Evidence>();
 
   public recordEvent(event: RuntimeEvent): void {
-    if (this.events.has(event.id)) {
-      throw new EvidenceIntegrityError(`runtime event already exists: ${event.id}`);
-    }
-    this.events.set(event.id, structuredClone(event));
+    const snapshot = structuredClone(event);
+    const key = eventStorageKey(snapshot);
+    if (this.eventKeys.has(key)) return;
+    this.eventKeys.add(key);
+    this.events.push(snapshot);
   }
 
   public recordEvidence(item: Evidence): void {
     if (this.evidence.has(item.id)) {
       throw new EvidenceIntegrityError(`evidence already exists: ${item.id}`);
     }
-    if (!this.events.has(item.sourceEventId)) {
+    if (this.getEvent(item.sourceEventId) === undefined) {
       throw new EvidenceIntegrityError(
         `evidence ${item.id} references unknown runtime event ${item.sourceEventId}`,
       );
@@ -53,8 +57,11 @@ export class EvidenceStore {
   }
 
   public getEvent(id: string): RuntimeEvent | undefined {
-    const event = this.events.get(id);
-    return event === undefined ? undefined : structuredClone(event);
+    for (let index = this.events.length - 1; index >= 0; index -= 1) {
+      const event = this.events[index];
+      if (event?.id === id) return structuredClone(event);
+    }
+    return undefined;
   }
 
   public getEvidence(id: string): Evidence | undefined {
@@ -67,26 +74,36 @@ export class EvidenceStore {
   }
 
   public listEvents(): RuntimeEvent[] {
-    return [...this.events.values()].map((event) => structuredClone(event));
+    return this.events.map((event) => structuredClone(event));
   }
 
   public hasEvidence(id: string): boolean {
     return this.evidence.has(id);
   }
 
-  public isAdmissibleForCriterion(evidenceId: string, criterion: SuccessCriterion): boolean {
+  public isAdmissibleForCriterion(
+    evidenceId: string,
+    criterion: SuccessCriterion,
+    expectedBinding?: ArtifactBinding,
+  ): boolean {
     const item = this.evidence.get(evidenceId);
     if (item === undefined || item.outcome !== "PASS") return false;
 
-    const event = this.events.get(item.sourceEventId);
+    const event = this.getEvent(item.sourceEventId);
     if (event === undefined || event.type === "MODEL_MESSAGE") return false;
     if (MODEL_ONLY_SOURCES.has(item.sourceTool.toLowerCase())) return false;
+    if (expectedBinding !== undefined && !bindingMatches(item.binding, expectedBinding)) return false;
 
     return admissibleKindsFor(criterion).has(item.kind);
   }
 
-  public criterionHasAdmissibleEvidence(criterion: SuccessCriterion): boolean {
-    return criterion.evidenceIds.some((id) => this.isAdmissibleForCriterion(id, criterion));
+  public criterionHasAdmissibleEvidence(
+    criterion: SuccessCriterion,
+    expectedBinding?: ArtifactBinding,
+  ): boolean {
+    return criterion.evidenceIds.some((id) =>
+      this.isAdmissibleForCriterion(id, criterion, expectedBinding),
+    );
   }
 
   public export(): { events: RuntimeEvent[]; evidence: Evidence[] } {
@@ -97,7 +114,7 @@ export class EvidenceStore {
     events: RuntimeEvent[];
     evidence: Evidence[];
   }> {
-    return Object.freeze(this.export());
+    return deepFreeze(this.export());
   }
 
   public modelFacingView(
@@ -140,6 +157,35 @@ export class EvidenceStore {
   }
 }
 
+function eventStorageKey(event: RuntimeEvent): string {
+  return digestCanonical({
+    id: event.id,
+    type: event.type,
+    source: event.source,
+    threadId: event.threadId ?? null,
+    sequenceNumber: event.sequenceNumber ?? null,
+    payload: event.payload,
+  });
+}
+
+function bindingMatches(
+  actual: ArtifactBinding | undefined,
+  expected: ArtifactBinding,
+): boolean {
+  if (actual === undefined) return false;
+  return (
+    actual.taskId === expected.taskId &&
+    actual.repository === expected.repository &&
+    actual.revision === expected.revision &&
+    actual.successContractDigest === expected.successContractDigest &&
+    actual.scope === expected.scope &&
+    actual.patchDigest === expected.patchDigest &&
+    Number.isInteger(actual.stateVersion) &&
+    actual.stateVersion >= 1 &&
+    actual.stateVersion <= expected.stateVersion
+  );
+}
+
 function admissibleKindsFor(criterion: SuccessCriterion): Set<EvidenceKind> {
   switch (criterion.verifier.kind) {
     case "FAILURE_SIGNATURE":
@@ -156,4 +202,10 @@ function admissibleKindsFor(criterion: SuccessCriterion): Set<EvidenceKind> {
     case "EXTERNAL_STATE":
       return new Set(["EXTERNAL_RESULT"]);
   }
+}
+
+function deepFreeze<T>(value: T): T {
+  if (typeof value !== "object" || value === null || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  return Object.freeze(value);
 }

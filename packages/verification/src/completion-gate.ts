@@ -7,13 +7,24 @@ import {
   VerificationResult,
 } from "../../domain/src/types";
 import { EvidenceStore } from "../../evidence/src";
-import { completionSubjectDigest } from "./completion-subject";
+import {
+  artifactBindingFor,
+  artifactBindingMatchesState,
+  completionCertificatePayloadDigest,
+  completionSubjectDigest,
+  completionSubjectSnapshot,
+} from "./completion-subject";
 import { roundEvaluationMatchesState } from "./progress-evaluator";
 
-const issuedCertificates = new WeakSet<object>();
+const issuedCertificates = new WeakMap<object, string>();
 
 export function isIssuedCompletionCertificate(value: CompletionCertificateData): boolean {
-  return issuedCertificates.has(value);
+  const issuedDigest = issuedCertificates.get(value);
+  return (
+    issuedDigest !== undefined &&
+    issuedDigest === value.payloadDigest &&
+    issuedDigest === completionCertificatePayloadDigest(value)
+  );
 }
 
 export class CompletionGate {
@@ -57,14 +68,15 @@ export class CompletionGate {
         continue;
       }
 
+      const expectedBinding = artifactBindingFor(state, criterion.evidenceScope);
       const admissibleEvidenceIds = criterion.evidenceIds.filter((evidenceId) =>
-        this.evidenceStore.isAdmissibleForCriterion(evidenceId, criterion),
+        this.evidenceStore.isAdmissibleForCriterion(evidenceId, criterion, expectedBinding),
       );
       if (admissibleEvidenceIds.length === 0) {
         failures.push({
           code: "MISSING_ADMISSIBLE_EVIDENCE",
           criterionId: criterion.id,
-          message: `${criterion.id} has no admissible PASS evidence`,
+          message: `${criterion.id} has no admissible PASS evidence for the current subject`,
         });
       }
 
@@ -77,7 +89,14 @@ export class CompletionGate {
         });
         continue;
       }
-
+      if (!artifactBindingMatchesState(latestResult.binding, state, criterion.evidenceScope)) {
+        failures.push({
+          code: "MISSING_ADMISSIBLE_EVIDENCE",
+          criterionId: criterion.id,
+          message: `${criterion.id} verifier result is bound to a stale or different subject`,
+        });
+        continue;
+      }
       if (latestResult.verifier !== criterion.verifier.kind) {
         failures.push({
           code: "MISSING_ADMISSIBLE_EVIDENCE",
@@ -86,7 +105,6 @@ export class CompletionGate {
         });
         continue;
       }
-
       if (latestResult.status !== "PASS") {
         failures.push({
           code:
@@ -98,7 +116,6 @@ export class CompletionGate {
         });
         continue;
       }
-
       if (criterion.verifier.kind !== "REVIEWER" && !latestResult.deterministic) {
         failures.push({
           code: "MISSING_ADMISSIBLE_EVIDENCE",
@@ -107,7 +124,6 @@ export class CompletionGate {
         });
         continue;
       }
-
       const linkedEvidenceIds = latestResult.evidenceIds.filter((evidenceId) =>
         admissibleEvidenceIds.includes(evidenceId),
       );
@@ -136,8 +152,14 @@ export class CompletionGate {
       });
     }
 
-    if (state.reviewerVerdict !== "PASS" && state.reviewerVerdict !== "PASS_WITH_WARNINGS") {
-      failures.push({ code: "REVIEW_BLOCKED", message: "independent reviewer did not pass the patch" });
+    if (
+      (state.reviewerVerdict !== "PASS" && state.reviewerVerdict !== "PASS_WITH_WARNINGS") ||
+      !artifactBindingMatchesState(state.reviewBinding, state, "PATCH")
+    ) {
+      failures.push({
+        code: "REVIEW_BLOCKED",
+        message: "independent reviewer did not pass the current patch subject",
+      });
     }
 
     const externalCriteria = required.filter(
@@ -154,11 +176,13 @@ export class CompletionGate {
         externalAction?.status !== "RECONCILED" ||
         externalAction.identifier === undefined ||
         externalAction.evidenceId === undefined ||
+        externalAction.reconciledIdentity === undefined ||
+        !artifactBindingMatchesState(externalAction.binding, state, "EXTERNAL") ||
         !evidenceIsLinked
       ) {
         failures.push({
           code: "EXTERNAL_ACTION_NOT_RECONCILED",
-          message: "required external action is missing reconciled, verifier-linked evidence",
+          message: "required external action is missing exact, current, verifier-linked reconciliation",
         });
       }
     } else if (state.externalAction !== undefined && state.externalAction.status !== "RECONCILED") {
@@ -170,32 +194,45 @@ export class CompletionGate {
 
     if (failures.length > 0) return { allowed: false, failures };
 
+    const subject = completionSubjectSnapshot(state);
     const externalAction = state.externalAction;
-    const certificate: CompletionCertificateData = Object.freeze({
-      taskId: state.task.id,
+    const identity = externalAction?.reconciledIdentity;
+    const payload = {
+      certificateVersion: 1 as const,
+      taskId: subject.taskId,
+      repository: subject.repository,
+      revision: subject.revision,
+      stateVersion: subject.stateVersion,
+      successContractDigest: subject.successContractDigest,
+      stateDigest: subject.stateDigest,
       requiredCriteria: required.map((criterion) => ({
         criterionId: criterion.id,
         result: "PASS" as const,
         evidenceIds: [...(acceptedEvidenceIds.get(criterion.id) ?? [])],
       })),
       originalFailureReproduced: true,
-      patchDigest: state.patchDigest as string,
+      patchDigest: subject.patchDigest,
       reviewerVerdict: state.reviewerVerdict as "PASS" | "PASS_WITH_WARNINGS",
       externalAction:
         externalAction?.status === "RECONCILED" &&
-        externalAction.identifier !== undefined &&
-        externalAction.evidenceId !== undefined
+        externalAction.evidenceId !== undefined &&
+        identity !== undefined
           ? {
               type: "pull_request" as const,
-              identifier: externalAction.identifier,
+              ...identity,
               evidenceId: externalAction.evidenceId,
             }
           : undefined,
       subjectDigest: completionSubjectDigest(state),
       traceId: state.traceId,
       generatedAt,
+    };
+    const payloadDigest = completionCertificatePayloadDigest({
+      ...payload,
+      payloadDigest: "",
     });
-    issuedCertificates.add(certificate);
+    const certificate = deepFreeze<CompletionCertificateData>({ ...payload, payloadDigest });
+    issuedCertificates.set(certificate, payloadDigest);
     return { allowed: true, certificate };
   }
 }
@@ -209,4 +246,10 @@ function latestVerificationResult(
     if (result?.criterionId === criterionId) return result;
   }
   return undefined;
+}
+
+function deepFreeze<T>(value: T): T {
+  if (typeof value !== "object" || value === null || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  return Object.freeze(value);
 }

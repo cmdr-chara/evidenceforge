@@ -33,10 +33,23 @@ export const WORKFLOW_PHASES = [
 
 export type WorkflowPhase = (typeof WORKFLOW_PHASES)[number];
 
-export type SessionStatus = "ACTIVE" | "COMPLETED" | "BLOCKED" | "ESCALATED";
+export type SessionStatus = "ACTIVE" | "COMPLETED" | "BLOCKED" | "ESCALATED" | "FAILED";
 export type CriterionStatus = "PENDING" | "PASS" | "FAIL" | "INCONCLUSIVE";
 export type VerificationStatus = "PASS" | "FAIL" | "INCONCLUSIVE";
 export type ReviewerVerdict = "PASS" | "PASS_WITH_WARNINGS" | "BLOCK";
+
+export const EVIDENCE_SCOPES = ["INCIDENT", "PATCH", "EXTERNAL"] as const;
+export type EvidenceScope = (typeof EVIDENCE_SCOPES)[number];
+
+export interface ArtifactBinding {
+  taskId: string;
+  repository: string;
+  revision: string;
+  successContractDigest: string;
+  stateVersion: number;
+  scope: EvidenceScope;
+  patchDigest?: string;
+}
 
 export interface GitHubActionsIncidentSource {
   kind: "GITHUB_ACTIONS";
@@ -112,6 +125,7 @@ export interface SuccessCriterion {
   description: string;
   required: boolean;
   verifier: VerifierSpec;
+  evidenceScope: EvidenceScope;
   status: CriterionStatus;
   evidenceIds: string[];
 }
@@ -156,6 +170,7 @@ export interface Evidence {
   artifactRefs: string[];
   outcome?: VerificationStatus;
   timestamp: string;
+  binding?: ArtifactBinding;
   metadata?: Record<string, string | number | boolean | null>;
 }
 
@@ -204,6 +219,7 @@ export interface VerificationResult {
   evidenceIds: string[];
   details: string;
   deterministic: boolean;
+  binding?: ArtifactBinding;
 }
 
 export interface ApprovalRequest {
@@ -225,6 +241,7 @@ export interface ApprovalProvenance {
   revision: string;
   risk: RiskLevel;
   originatingOperationId: string;
+  binding?: ArtifactBinding;
   issuedAt: string;
   expiresAt: string;
   consumedAt?: string;
@@ -236,6 +253,16 @@ export interface AgentResult {
   hypotheses: string[];
   evidenceIds: string[];
   unresolvedQuestions: string[];
+}
+
+export interface PullRequestIdentity {
+  identifier: string;
+  repository: string;
+  base: string;
+  head: string;
+  headSha: string;
+  operationId: string;
+  idempotencyKey: string;
 }
 
 export interface ExternalActionState {
@@ -251,9 +278,11 @@ export interface ExternalActionState {
     body: string;
     expectedHeadSha: string;
   };
+  binding: ArtifactBinding;
   status: "PREPARED" | "APPROVED" | "DENIED" | "COMMITTED" | "RECONCILED";
   identifier?: string;
   evidenceId?: string;
+  reconciledIdentity?: PullRequestIdentity;
 }
 
 export type OperationStatus =
@@ -348,18 +377,26 @@ export interface SessionState {
   transientAttempts: number;
   status: SessionStatus;
   reviewerVerdict?: ReviewerVerdict;
+  reviewBinding?: ArtifactBinding;
   patchDigest?: string;
   traceId: string;
   trueForgeSessionId?: string;
   activeTurnId?: string;
   lastSequenceNumber?: number;
+  terminalSequenceNumber?: number;
   externalAction?: ExternalActionState;
   blockedReason?: string;
   completionCertificate?: CompletionCertificateData;
 }
 
 export interface CompletionCertificateData {
+  certificateVersion: 1;
   taskId: string;
+  repository: string;
+  revision: string;
+  stateVersion: number;
+  successContractDigest: string;
+  stateDigest: string;
   requiredCriteria: Array<{
     criterionId: string;
     result: "PASS";
@@ -368,12 +405,12 @@ export interface CompletionCertificateData {
   originalFailureReproduced: boolean;
   patchDigest: string;
   reviewerVerdict: "PASS" | "PASS_WITH_WARNINGS";
-  externalAction?: {
+  externalAction?: PullRequestIdentity & {
     type: "pull_request";
-    identifier: string;
     evidenceId: string;
   };
   subjectDigest: string;
+  payloadDigest: string;
   traceId: string;
   generatedAt: string;
 }
