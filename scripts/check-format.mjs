@@ -25,7 +25,7 @@ console.log('format checks passed');
 
 function walk(directory) {
   return readdirSync(directory).flatMap((entry) => {
-    if (['.git', 'node_modules', 'dist', '.data'].includes(entry)) return [];
+    if (['.git', 'node_modules', 'dist', '.data', '.evidenceforge'].includes(entry)) return [];
     const path = join(directory, entry);
     return statSync(path).isDirectory() ? walk(path) : [path];
   });
