@@ -4,6 +4,7 @@ import {
   createSessionState,
   createTask,
   Evidence,
+  PullRequestIdentity,
   RuntimeEvent,
   SessionState,
   SuccessCriterion,
@@ -13,7 +14,11 @@ import {
 import { createEvidence, EvidenceStore } from "../../../packages/evidence/src";
 import { ExternalActionCoordinator } from "../../../packages/policies/src";
 import { DIAGNOSTIC_SPECIALISTS } from "../../../packages/specialists/src";
-import { CompletionGate, ProgressEvaluator } from "../../../packages/verification/src";
+import {
+  artifactBindingFor,
+  CompletionGate,
+  ProgressEvaluator,
+} from "../../../packages/verification/src";
 import { buildCiSuccessContract, SessionController } from "../../../packages/workflow/src";
 
 interface TimelineItem {
@@ -125,7 +130,11 @@ export class DemoWorkflow {
         break;
       case "PLANNING":
         this.specialists = this.specialists.map((item) => ({ ...item, status: "RUNNING" }));
-        this.state = controller.transition("INVESTIGATING", "APPLICATION", "three read-only diagnostics launched");
+        this.state = controller.transition(
+          "INVESTIGATING",
+          "APPLICATION",
+          "three read-only diagnostics launched",
+        );
         break;
       case "INVESTIGATING":
         this.completeInvestigation();
@@ -151,8 +160,9 @@ export class DemoWorkflow {
         break;
       case "PATCHING":
         this.diff = `diff --git a/src/config.ts b/src/config.ts\n@@\n-validateProductionEnv(env);\n const resolved = applyTestFallback(env);\n+validateProductionEnv(resolved);\n return resolved;`;
-        this.state.patchDigest = createHash("sha256").update(this.diff).digest("hex");
-        this.state.version += 1;
+        this.state = new SessionController(this.state).setPatchDigest(
+          createHash("sha256").update(this.diff).digest("hex"),
+        );
         this.state = new SessionController(this.state).transition(
           "VERIFYING",
           "APPLICATION",
@@ -173,7 +183,7 @@ export class DemoWorkflow {
         break;
       case "REVIEWING":
         this.pass("independent-review", "critical issues: 0; reviewer verdict PASS", "REVIEW");
-        this.state.reviewerVerdict = "PASS";
+        this.state = new SessionController(this.state).setReviewerVerdict("PASS");
         this.prepareApproval();
         this.state = new SessionController(this.state).transition(
           "AWAITING_APPROVAL",
@@ -272,22 +282,19 @@ export class DemoWorkflow {
   private pass(
     criterionId: string,
     claim: string,
-    kind: "REPRODUCTION" | "VERIFICATION" | "REVIEW" | "EXTERNAL_RESULT",
+    kind: "REPRODUCTION" | "VERIFICATION" | "REVIEW",
   ): void {
     const criterion = this.state.successCriteria.find((item) => item.id === criterionId);
     if (criterion === undefined) throw new Error(`unknown demo criterion ${criterionId}`);
-    const event = this.event(kind === "EXTERNAL_RESULT" ? "EXTERNAL_RECONCILIATION" : "TOOL_RESULT", `fixture.${criterionId}`);
+    const event = this.event("TOOL_RESULT", `fixture.${criterionId}`);
+    const binding = artifactBindingFor(this.state, criterion.evidenceScope);
     const evidence = createEvidence({
       kind,
       sourceEventId: event.id,
-      sourceTool:
-        kind === "REVIEW"
-          ? "independent-reviewer"
-          : kind === "EXTERNAL_RESULT"
-            ? "github-mcp.reconcile-pull-request"
-            : "daytona.run-command",
+      sourceTool: kind === "REVIEW" ? "independent-reviewer" : "daytona.run-command",
       claim,
       outcome: "PASS",
+      binding,
       timestamp: event.timestamp,
     });
     this.evidenceStore.recordEvidence(evidence);
@@ -298,6 +305,7 @@ export class DemoWorkflow {
       evidenceIds: [evidence.id],
       details: claim,
       deterministic: kind !== "REVIEW",
+      binding,
     };
     this.state = new SessionController(this.state).applyVerification(result);
   }
@@ -314,6 +322,7 @@ export class DemoWorkflow {
       body: "Verified remediation for GitHub Actions run 842.",
       expectedHeadSha: "94cc31d",
       patchDigest: this.state.patchDigest,
+      binding: artifactBindingFor(this.state, "EXTERNAL"),
     });
     prepared.approval.id = "approval-demo-pr";
     prepared.approval.toolCallId = "github-create-pr-demo";
@@ -325,19 +334,38 @@ export class DemoWorkflow {
 
   private reconcileFixturePullRequest(): void {
     if (this.state.externalAction === undefined) throw new Error("external action missing");
-    this.state.externalAction = new ExternalActionCoordinator().markCommitted(this.state.externalAction);
-    this.pass("external-pr", "GitHub fixture confirms PR #219 at head 94cc31d", "EXTERNAL_RESULT");
-    const externalEvidence = this.state.successCriteria.find((item) => item.id === "external-pr")?.evidenceIds[0];
-    this.state.externalAction = {
-      ...this.state.externalAction,
-      status: "RECONCILED",
+    const coordinator = new ExternalActionCoordinator(undefined, this.evidenceStore);
+    this.state.externalAction = coordinator.markCommitted(this.state.externalAction);
+    const event = this.event("EXTERNAL_RECONCILIATION", "github-mcp.reconcile-pull-request");
+    const action = this.state.externalAction;
+    const identity: PullRequestIdentity = {
       identifier: "#219",
-      evidenceId: externalEvidence,
+      repository: action.preparedArguments.repository,
+      base: action.preparedArguments.base,
+      head: action.preparedArguments.head,
+      headSha: action.preparedArguments.expectedHeadSha,
+      operationId: action.operationId,
+      idempotencyKey: action.idempotencyKey,
     };
+    this.state.externalAction = coordinator.reconcile(this.state, event, identity);
+    const criterion = criterionById(this.state, "external-pr");
+    const evidenceId = this.state.externalAction.evidenceId;
+    if (evidenceId === undefined) throw new Error("reconciliation evidence missing");
+    this.state = new SessionController(this.state).applyVerification({
+      criterionId: criterion.id,
+      status: "PASS",
+      verifier: criterion.verifier.kind,
+      evidenceIds: [evidenceId],
+      details: "GitHub fixture confirmed exact pull-request identity",
+      deterministic: true,
+      binding: this.state.externalAction.binding,
+    });
     new ProgressEvaluator(this.evidenceStore).evaluate(this.state, "VERIFICATION");
     const decision = new CompletionGate(this.evidenceStore).evaluate(this.state);
     if (!decision.allowed) {
-      throw new Error(`fixture completion gate blocked: ${decision.failures.map((failure) => failure.message).join("; ")}`);
+      throw new Error(
+        `fixture completion gate blocked: ${decision.failures.map((failure) => failure.message).join("; ")}`,
+      );
     }
     this.state = new SessionController(this.state).completeWithCertificate(decision.certificate);
   }
@@ -348,7 +376,9 @@ export class DemoWorkflow {
       id: `demo-event-${this.sequence}-${randomUUID()}`,
       type,
       source,
-      timestamp: new Date(Date.parse("2026-08-25T19:04:00.000Z") + this.sequence * 15_000).toISOString(),
+      timestamp: new Date(
+        Date.parse("2026-08-25T19:04:00.000Z") + this.sequence * 15_000,
+      ).toISOString(),
       payload: {},
       sequenceNumber: this.sequence,
     };
@@ -363,8 +393,13 @@ function buildTimeline(current: WorkflowPhase, status: SessionState["status"]): 
   const currentIndex = displayOrder.indexOf(effectiveCurrent);
   return displayOrder.map((phase, index) => {
     let itemStatus: TimelineItem["status"] = "PENDING";
-    if (phase === effectiveCurrent) itemStatus = status === "BLOCKED" ? "BLOCKED" : "ACTIVE";
-    else if (index < currentIndex || current === "COMPLETED") itemStatus = "COMPLETE";
+    if (phase === effectiveCurrent) {
+      itemStatus = status === "BLOCKED" || status === "FAILED" || status === "ESCALATED"
+        ? "BLOCKED"
+        : "ACTIVE";
+    } else if (index < currentIndex || current === "COMPLETED") {
+      itemStatus = "COMPLETE";
+    }
     if (currentIndex === -1 && status !== "ACTIVE") itemStatus = "BLOCKED";
     return { phase, status: itemStatus };
   });
