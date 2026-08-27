@@ -1,263 +1,145 @@
 # Build journal
 
-This journal records observed work and failures. It intentionally omits invented sponsor runs and private reasoning.
+This journal records observed work and failures. It intentionally omits private reasoning and never promotes fixture output into sponsor evidence.
 
-## 2026-08-25 — repository and requirements
+## 2026-08-25 — bootstrap and first control plane
 
-### Observed
+Observed:
 
-- `cmdr-chara/evidenceforge` was public and genuinely empty.
-- Default branch was `determination`.
-- GitHub returned no commit history.
-- Created the smallest bootstrap commit containing only `README.md`.
-- Created `feat/foundation-control-plane` and issue #1 for the P0 build.
+- public repository started on default branch `determination`;
+- substantive work moved to `feat/foundation-control-plane`;
+- PR #2 opened against `determination`;
+- deterministic domain state, evidence store, verifier engine, CompletionGate, risk/approval policy, recovery logic, TrueForge adapter, incident console, fixture, and evaluation corpus were implemented;
+- early CI setup failures around pnpm ordering/cache were diagnosed and fixed rather than hidden;
+- test counts grew through multiple verified intermediate candidates as controls were hardened.
 
-### Requirements learned
+The 15-case deterministic comparison was introduced as control-policy evidence. Its fixture metrics are deliberately not described as live model or sponsor-runtime performance.
 
-- Current rules require every substantive change to use a Qodo-reviewed PR.
-- Qodo High findings must be fixed or explicitly dismissed, followed by review evidence.
-- TrueForge currently documents Node `>=22.14`, SDK `@truefoundry/trueforge-sdk`, Daytona sandboxing, git-backed skills, dynamic subagents, write approvals, persistent sessions, compaction, and large-result offloading.
-- TrueForge subagents share a sandbox and do not nest; parallel mutation is therefore unsafe.
-- MCP annotations are not a trusted authorization source by themselves.
+## 2026-08-26 — Qodo-driven hardening
 
-### Failure
+A genuine Qodo Agentic Review appeared on PR #2:
 
-The local execution container could not resolve external GitHub or npm hosts. A direct `git clone` and dependency installation were unavailable.
+- aggregate review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
+- earlier follow-up request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
 
-### Adaptation
+The earlier P0.1 batch fixed Qodo's stale-certificate and old-patch-evidence findings and was published before the larger reconstruction.
 
-- Used the authenticated GitHub connector for repository inspection and writes.
-- Kept the deterministic core dependency-light.
-- Used the preinstalled Node 22 and TypeScript toolchain for local compilation.
-- Isolated the live TrueForge SDK behind a dynamically loaded adapter so deterministic tests do not pretend the sponsor runtime exists.
+A later coordinated P0/P1/P2 attempt was interrupted after creating several candidate Git blobs but before a verified functional push. The surviving candidate source was preserved under `recovery/2026-08-27-p0-p2-wip/` rather than discarded or falsely represented as complete.
 
-## 2026-08-25 — deterministic control plane
+## 2026-08-27 — durable reconstruction
 
-### Implemented
+The reconstruction was resumed from the recovery commit and **every work block was immediately committed to the existing feature branch**. No new branch and no merge were used.
 
-- domain schemas and runtime validation;
-- evidence store with event correlation;
-- verifier engine;
-- certificate-only CompletionGate;
-- explicit state machine;
-- success contract;
-- hypothesis ledger;
-- trusted risk overlay;
-- approval and external-action protocol;
-- bounded recovery budgets;
-- exactly three read-only diagnostic specialists;
-- isolated reviewer definition;
-- bounded log/repository/sandbox tool contracts;
-- JSON persistence and event journal.
+### Completion/evidence integrity
 
-### Verification
+Implemented and saved:
 
-Initial run: 54 tests passed.
+- explicit INCIDENT / PATCH / EXTERNAL evidence scopes;
+- task/repository/revision/patch/state/contract bindings;
+- canonical completion state/subject/payload digests;
+- deep-immutable CompletionGate certificate;
+- certificate payload revalidation at state transition;
+- repatch preservation of incident/root-cause/reproduction evidence;
+- invalidation of patch verification, review, stale external approval/action/operation on repatch.
 
-After adding the incident console and approval flow: 58 EvidenceForge tests passed plus 3 healthy demo-fixture tests.
+Regression coverage includes nested certificate mutation, stale certificate state, stale approval invalidation, and incident-evidence preservation.
 
-### Issues found during development
+### Approval and exact PR identity
 
-- The first UI server smoke command backgrounded compilation and server startup together, so the curl ran before the server existed. The command was corrected to compile synchronously before starting the process.
-- A static lint assertion counted a TypeScript union declaration as a fourth specialist. The check was corrected to count the three concrete specialist names.
-- The first evaluation implementation incorrectly counted the intentionally escalated case as reproduced. The metric was corrected; reproduction rate is 0.80, not 1.00.
+Implemented and saved:
 
-These corrections are retained because they demonstrate that the evaluation and tooling are not being optimized to produce prettier numbers.
+- per-task serialized approval decision path across load → validate → decide → persist → submit → persist;
+- concurrent-decision regression proving only one submission path enters;
+- approval provenance bound to current patch subject;
+- external-action identity bound to action digest and operation/idempotency identity;
+- reconciliation checks repository, base, head, head SHA, operation ID, and idempotency key;
+- same commit on a different PR target is rejected.
 
-## 2026-08-25 — TrueForge integration and console
+### Durable recovery and terminal correctness
 
-### Implemented
+Implemented and saved:
 
-- current snake_case inline TrueForge agent spec;
-- GitHub MCP attachment with write/destructive approvals;
-- Daytona sandbox enabled;
-- four skills attached;
-- dynamic subagents, compaction, large-result handling, and iteration limit;
-- SDK stream normalization;
-- approval resume inputs;
-- durable reconnect using session, turn, and sequence IDs;
-- incident console with phase, contract, specialists, hypotheses, evidence, patch, approval, and certificate panels;
-- deterministic fixture mode clearly labeled;
-- live start/resume API that fails closed without infrastructure.
+- full streamed model-message deltas retained in evidence history;
+- projector rehydrates tool-call correlation from persisted events after restart;
+- completed-turn replay skips sequence numbers already persisted and advances to the maximum observed sequence;
+- restart-before-tool-response regression;
+- durable terminal cutoff: late actionable events do not mutate or persist after BLOCKED/FAILED/ESCALATED/COMPLETED;
+- terminal cursor remains pinned to the cutoff;
+- initial `Incident accepted` live activity reconstructs from persisted task state;
+- malformed/nonzero/failed tool responses render ERROR, never green SUCCESS.
 
-### Verified
+### Persistence reliability
 
-- HTTP health endpoint returned `ok`.
-- Console HTML served successfully.
-- Fixture state exposed 10 criteria and 3 specialists.
-- API progression paused at `AWAITING_APPROVAL`.
-- Approval advanced to `PUBLISHING`.
-- Reconciliation produced `COMPLETED`, 10/10 criteria, and fixture PR `#219`.
-- Denial path is covered by an integration test and produces `BLOCKED` without a certificate.
+Implemented and saved:
 
-### External blockers
+- SHA-256 task-keyed filenames;
+- unique UUID tempfiles;
+- per-task serialized writes;
+- embedded task-ID validation;
+- legacy sanitized filename read fallback with no destructive migration;
+- regression for `a/b` versus `a_b` and concurrent saves.
 
-No TrueForge server, model credential, GitHub MCP credential, Daytona credential, or Qodo installation was available to this execution environment. Live integration remains unverified.
+### Evaluation correctness
 
-## Next highest-risk work
+Recovery success now has one definition for both the baseline and EvidenceForge: an uncertain effect counts as recovered only when the terminal outcome is genuinely `COMPLETED` and the replay/reconciliation policy is satisfied. `BLOCKED` and `ESCALATED` never count as successful recovery.
 
-1. Push the substantive branch and open the first PR.
-2. Trigger real Qodo Agentic Review and act on findings.
-3. Configure TrueForge, GitHub MCP, Daytona, and a model.
-4. Run the live smoke and preserve session/trace evidence.
-5. Seed the red demo branch, resolve it through EvidenceForge, approve a real PR, and reconcile it.
-6. Record the short demo and update submission links.
+### UI/live activity
 
-## 2026-08-25 — fixture reset and blocked live smoke
+Implemented and saved without new UI dependencies:
 
-### Verified
+- task-scoped SSE channels;
+- persisted snapshot reload on reconnect;
+- browser defense-in-depth task filtering;
+- explicit INFO / SUCCESS / WARNING / ERROR / BLOCKED activity semantics;
+- >=44px primary controls;
+- long SHA/revision/trace values expose full title/ARIA values;
+- focus visibility, skip link, accessible log/live regions;
+- custom scrollbar/reduced motion retained;
+- narrow viewport overrides down to 320px-class layouts.
 
-- Seeding the fixture made the test command exit 1 with the stable `CONFIG_VALIDATION_ORDER` signature.
-- Resetting restored the healthy fixture; all 3 fixture tests passed.
-- The EvidenceForge suite now passes 58 / 58 tests.
-- The latest JSON evaluation report is committed under `evals/reports/`.
+The exact 320/375/768/1024/1440px + 200% visual matrix was **not browser-observed** in this execution environment and remains a manual gate.
 
-### Honest blocked checks
+### TrueForge specialist isolation investigation
 
-`node scripts/doctor.mjs` passed the Node, package-manager, and SDK-version checks, then reported missing TrueForge URL, model configuration, and installed dependencies. `node scripts/trueforge-smoke.mjs` failed closed because no TrueForge server was reachable. No live sponsor result was inferred from the adapter tests.
+TrueForge SDK `0.1.3` declarations were inspected directly. Dynamic subagents can be enabled, but the SDK exposes no per-dynamic-subagent pre-execution tool allowlist/interceptor. Therefore Qodo's read-only specialist boundary finding remains **BLOCKED**, not falsely fixed.
 
-## 2026-08-25 — first pull request CI diagnosis
+The minimum safe architecture is a future TrueForge per-subagent tool policy or a read-only proxy/tool surface for specialists while mutation remains serialized in the parent. TrueForge remains the runtime; no competing orchestration framework was added.
 
-### Observed
+## Verified CI baseline
 
-- PR #2 was open at commit `3aaed3c09d5d7571a5aedf235a0520f1d302dcc8`.
-- GitHub Actions run `32887542016` failed before installation or tests.
-- The failure occurred in `actions/setup-node@v4` because `cache: pnpm` was evaluated before a `pnpm` executable existed on `PATH`.
-- Qodo had been invoked with `/agentic_review`, but no Qodo review or finding was present yet.
+Implementation SHA:
 
-### Correction
+`628d4db9a19e50b142051fe3ae2793b0b9b704ad`
 
-- Added `pnpm/action-setup@v4` before `actions/setup-node@v4`.
-- Pinned the action to the repository's declared pnpm version `11.16.0`.
-- Removed the now-redundant `corepack enable` CI step.
+GitHub Actions run:
 
-### Verification
+`33083635762`
 
-- Local typecheck, lint, format checks, 58 tests, 3 fixture tests, and the five-case smoke evaluation still pass.
-- The next remote run reached pnpm installation successfully, exposing a second independent setup issue.
+Observed green steps:
 
-## 2026-08-25 — second pull request CI diagnosis
+- `pnpm install --frozen-lockfile`;
+- `pnpm format:check`;
+- `pnpm lint`;
+- `pnpm typecheck`;
+- `pnpm test` — **159 / 159 passed**;
+- `pnpm eval:smoke`;
+- `pnpm demo:fixture`;
+- `pnpm build`;
+- `pnpm doctor`;
+- `git diff --check`.
 
-### Observed
+This is the first fully green reconstructed implementation baseline. Documentation changes after that SHA require their own final exact-head CI before handoff.
 
-- Corrective run `32887843828` successfully installed pnpm with `pnpm/action-setup@v4`.
-- `actions/setup-node@v4` still failed before dependency installation.
-- The workflow enabled pnpm caching before the repository had a committed `pnpm-lock.yaml`; setup-node could not derive its cache key.
+## Remaining external/human gates
 
-### Correction
+- final exact-head GitHub Actions after documentation synchronization;
+- final Qodo `/agentic_review` and response on that exact SHA;
+- P0.4 pre-execution specialist isolation capability in TrueForge (SDK-blocked today);
+- credentialed TrueForge + model + GitHub MCP + Daytona vertical slice;
+- exact viewport/200% visual observation;
+- real approval pause, real PR write, and exact reconciliation from the live path;
+- approximately three-minute demo/publication;
+- human merge;
+- official submission.
 
-- Removed `cache: pnpm` from `actions/setup-node@v4` for the bootstrap PR.
-- Retained explicit pnpm setup, Node 22.14, and real dependency installation.
-- Caching can be restored after a reviewed lockfile is committed.
-
-### Verified remotely
-
-GitHub Actions run `32887937986` completed successfully. Every verification step passed:
-
-- dependency installation;
-- format check;
-- lint;
-- TypeScript typecheck;
-- 58-test EvidenceForge suite;
-- five-case smoke evaluation;
-- healthy demo fixture.
-
-CI became green. Qodo still had no observed review response, so the pull request remained unmergeable under the required hackathon process.
-
-## 2026-08-25 — CompletionGate correlation hardening
-
-### Finding
-
-An independent control-plane review found two linked defects:
-
-1. a criterion could be manually marked `PASS` with admissible-looking evidence even when no matching `VerificationResult` existed;
-2. the gate searched all historical verifier results for any deterministic failure, so one failed patch attempt could permanently block completion even after a later verified PASS.
-
-The first weakened the “verifier never runs means completion is impossible” invariant. The second conflicted with bounded retry and replan semantics.
-
-### Correction
-
-- Completion now requires the latest result for every required criterion.
-- The result must match the criterion verifier kind.
-- Non-review criteria require a deterministic result.
-- The latest PASS must reference evidence that is both attached to the criterion and admissible for its verifier type.
-- Historical failures remain auditable but a later verified PASS can supersede an earlier failed attempt.
-- A required external-state criterion now also requires a `RECONCILED` external action whose evidence ID is linked to the passing external verifier result.
-- Completion certificates include only verifier-linked admissible evidence IDs.
-
-### Verified remotely
-
-GitHub Actions run `32888513388` passed:
-
-- dependency installation;
-- format check;
-- lint across 118 files;
-- TypeScript typecheck;
-- 62 / 62 EvidenceForge tests;
-- five-case smoke evaluation with false-success rate `0.00`;
-- 3 / 3 healthy demo-fixture tests.
-
-Four new tests cover missing verifier results, retry recovery after an earlier deterministic failure, verifier/evidence mismatch, and mandatory external reconciliation.
-
-Qodo was triggered twice on PR #2 but still produced no observable review or finding. That blocker remains documented rather than fabricated.
-
-## 2026-08-25 — exact approval binding
-
-### Finding
-
-The pull-request approval object and the prepared external action shared the same mutable argument object. `applyApproval` also accepted an approval based only on its status and risk policy. That meant a mutated approval snapshot, an unrelated approval, or a replayed approval was not structurally rejected by the external-action coordinator.
-
-### Correction
-
-- Approval arguments are now a deep-cloned snapshot of the prepared PR arguments.
-- The coordinator verifies the exact action name, `EXTERNAL_REVERSIBLE` risk, reversibility, and deep equality of normalized arguments.
-- Approval can be applied only while the external action is `PREPARED`.
-- Reusing the approval after the action becomes `APPROVED` is rejected.
-- Mutation of the approval display payload cannot mutate the prepared action.
-
-### Verified remotely
-
-GitHub Actions run `32888882163` passed:
-
-- dependency installation;
-- format check;
-- lint across 119 files;
-- TypeScript typecheck;
-- 65 / 65 EvidenceForge tests;
-- five-case smoke evaluation with false-success rate `0.00`;
-- 3 / 3 healthy demo-fixture tests.
-
-Three new tests cover argument substitution, unrelated approval reuse, and approval replay. No Qodo response was observed after two `/agentic_review` requests; Qodo remains an external blocker.
-
-## 2026-08-25 — durable harness hardening
-
-### Implemented
-
-- Added explicit per-tool replay policy: `SAFE`, `RECONCILE_FIRST`, or `NEVER`.
-- Added a persisted operation program counter covering durable intent, effect start, uncertainty, and settlement. The settlement stores authoritative result, runtime event, evidence, and next phase; no exactly-once claim is made.
-- Added round-level progress evaluation and a supervisor stop guard. `CompletionGate` now also rejects stale/missing round evaluation and unresolved uncertain effects.
-- Added semantic no-progress fingerprints and staged reconsider, replan, and escalation evidence.
-- Added exact base-verified, non-overlapping, same-file-serialized structured edits with patch metadata.
-- Bound approvals to exact action digest, arguments, repository/revision, risk, originating operation, expiry, and one-shot consumption.
-- Separated bounded model-facing evidence projections from the full authoritative evidence store.
-- Extended TrueForge projection so an approved tool effect is marked started before resume and settles only from its correlated tool response.
-
-### Deterministic evaluation
-
-The previous five-case one-sided evaluator was replaced by a 15-case same-input comparison between an unenforced completion baseline and EvidenceForge. The recorded fixture report shows:
-
-- baseline false-success rate `0.5714`; EvidenceForge `0.0000`;
-- true completion precision `0.4286` versus `1.0000`;
-- resolvable-task completion `1.0000` for both;
-- recovery success `0.3333` versus `0.6667`;
-- retries `11` versus `2` and unnecessary actions `8` versus `0`.
-
-The report explicitly labels tool calls, interventions, retries, and latency as deterministic control-policy instrumentation. No live model, TrueForge, GitHub MCP, Daytona, or network performance is inferred.
-
-### Attribution and rejected ideas
-
-ADR 0007 records the public Pi, ZCode, Claude Code, OpenCode, Codex, Kimi Code, and DeepSeek Harness ideas used as references. TrueForge remains the runtime. Importing a competing runtime, trusting prose as verification, universal blind retry, exactly-once claims, summary-only evidence, and removal of necessary shell access were rejected.
-
-### External blockers
-
-Credentialed TrueForge/model, GitHub MCP, Daytona, live approval pause/resume, EvidenceForge-created PR reconciliation, genuine Qodo review, final human merge, and public submission remain blocked without external evidence.
+PR #2 remains open and unmerged. No blocked live, Qodo, merge, or submission gate is recorded as complete without observed evidence.
