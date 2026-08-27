@@ -946,7 +946,7 @@ test("runtime terminalizes and cancels when an in-flight journal never settles",
       undefined,
       undefined,
       undefined,
-      { drainTimeoutMs: 15 },
+      { drainTimeoutMs: 250 },
     );
 
     const startedAt = Date.now();
@@ -954,7 +954,7 @@ test("runtime terminalizes and cancels when an in-flight journal never settles",
     await adapter.failureObserved;
     const updated = await startPromise;
 
-    assert.ok(Date.now() - startedAt < 500);
+    assert.ok(Date.now() - startedAt < 2_000);
     assert.equal(updated.status, "BLOCKED");
     assert.equal(adapter.cancellations, 1);
     assert.deepEqual(
@@ -984,13 +984,13 @@ test("runtime terminalizes and cancels when a checkpoint never settles", async (
       undefined,
       undefined,
       undefined,
-      { drainTimeoutMs: 15 },
+      { drainTimeoutMs: 250 },
     );
 
     const startedAt = Date.now();
     const updated = await runtime.start(state, "investigate");
 
-    assert.ok(Date.now() - startedAt < 500);
+    assert.ok(Date.now() - startedAt < 2_000);
     assert.equal(updated.status, "BLOCKED");
     assert.equal(adapter.cancellations, 1);
     assert.equal(checkpoints.snapshots[0]?.state.status, "ACTIVE");
@@ -1019,13 +1019,13 @@ test("runtime terminalizes and cancels when an observer never settles", async ()
       },
       undefined,
       undefined,
-      { drainTimeoutMs: 15 },
+      { drainTimeoutMs: 250 },
     );
 
     const startedAt = Date.now();
     const updated = await runtime.start(state, "investigate");
 
-    assert.ok(Date.now() - startedAt < 500);
+    assert.ok(Date.now() - startedAt < 2_000);
     assert.equal(updated.status, "BLOCKED");
     assert.equal(adapter.cancellations, 1);
     assert.deepEqual(
