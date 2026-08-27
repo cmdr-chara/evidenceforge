@@ -25,20 +25,58 @@ export interface TrueForgeRuntimeAdapter {
     sessionId: string,
     approvals: ApprovalResponse[],
     onEvent?: RunTurnInput["onEvent"],
+    generation?: StreamGeneration,
   ): Promise<StreamResult>;
   resumeTurn(
     sessionId: string,
     turnId: string,
     afterSequenceNumber: number,
     onEvent?: RunTurnInput["onEvent"],
+    generation?: StreamGeneration,
   ): Promise<StreamResult>;
+}
+
+/**
+ * A stream callback can outlive the Promise that consumed the stream (for
+ * example, when the consumer's deadline wins a Promise.race). The callback
+ * must therefore carry a generation owned by the runtime rather than relying
+ * on the adapter to cancel a JavaScript Promise.
+ */
+class StreamGeneration {
+  private open = true;
+  private accepting = true;
+  public readonly events: RuntimeEvent[] = [];
+  public readonly diagnosticGuard: DiagnosticContractGuard;
+
+  public constructor(events: RuntimeEvent[]) {
+    this.diagnosticGuard = new DiagnosticContractGuard(events);
+  }
+
+  public close(): void {
+    this.open = false;
+    this.accepting = false;
+  }
+
+  public isOpen(): boolean {
+    return this.open;
+  }
+
+  public stopAccepting(): void {
+    this.accepting = false;
+  }
+
+  public accept(event: RuntimeEvent): boolean {
+    if (!this.open || !this.accepting) return false;
+    this.events.push(structuredClone(event));
+    return true;
+  }
 }
 
 export class DurableTrueForgeRuntime {
   private readonly projector: TrueForgeEventProjector;
-  private readonly diagnosticGuard: DiagnosticContractGuard;
   private readonly cancelledSessions = new Set<string>();
   private readonly applicationReducer?: (state: SessionState, event: RuntimeEvent) => void;
+  private activeGeneration: StreamGeneration | undefined;
 
   public constructor(
     private readonly adapter: TrueForgeRuntimeAdapter | TrueForgeSdkAdapter,
@@ -53,7 +91,6 @@ export class DurableTrueForgeRuntime {
     applicationReducer?: (state: SessionState, event: RuntimeEvent) => void,
   ) {
     this.projector = projector ?? new TrueForgeEventProjector(undefined, evidenceStore);
-    this.diagnosticGuard = new DiagnosticContractGuard(evidenceStore.listEvents());
     this.applicationReducer = applicationReducer;
   }
 
@@ -69,17 +106,29 @@ export class DurableTrueForgeRuntime {
     state.trueForgeSessionId = sessionId;
     await this.persist(state);
 
+    const generation = this.beginGeneration(this.evidenceStore.listEvents());
     let result: StreamResult;
     try {
       result = await this.adapter.runTurn({
         sessionId,
         message,
-        onEvent: async (event) => this.handleEvent(state, event),
+        onEvent: async (event) => this.handleEvent(state, event, generation),
+        generation,
       });
     } catch (error) {
+      generation.close();
       await this.failClosedStream(state, error);
       return state;
     }
+    generation.stopAccepting();
+    try {
+      await this.commitGeneration(state, generation);
+    } catch (error) {
+      generation.close();
+      await this.failClosedStream(state, error);
+      return state;
+    }
+    generation.close();
     applyStreamCursor(state, result);
     await this.persist(state);
     return state;
@@ -141,6 +190,7 @@ export class DurableTrueForgeRuntime {
       await this.persist(state);
     }
     this.restoreCorrelatedToolCalls(state);
+    const generation = this.beginGeneration(this.evidenceStore.listEvents());
     let result: StreamResult;
     try {
       result = await this.adapter.submitApprovals(
@@ -153,9 +203,11 @@ export class DurableTrueForgeRuntime {
             reason,
           },
         ],
-        async (event) => this.handleEvent(state, event),
+        async (event) => this.handleEvent(state, event, generation),
+        generation,
       );
     } catch (error) {
+      generation.close();
       if (startedOperationId !== undefined) {
         const operation = state.operations.find((candidate) => candidate.id === startedOperationId);
         if (operation?.status === "EFFECT_STARTED") {
@@ -166,6 +218,15 @@ export class DurableTrueForgeRuntime {
       await this.failClosedStream(state, error);
       return state;
     }
+    generation.stopAccepting();
+    try {
+      await this.commitGeneration(state, generation);
+    } catch (error) {
+      generation.close();
+      await this.failClosedStream(state, error);
+      return state;
+    }
+    generation.close();
     applyStreamCursor(state, result);
     await this.persist(state);
     return state;
@@ -181,18 +242,30 @@ export class DurableTrueForgeRuntime {
       throw new Error("session cannot resume without persisted TrueForge session, turn, and sequence IDs");
     }
     this.restoreCorrelatedToolCalls(state);
+    const generation = this.beginGeneration(this.evidenceStore.listEvents());
     let result: StreamResult;
     try {
       result = await this.adapter.resumeTurn(
         state.trueForgeSessionId,
         state.activeTurnId,
         state.lastSequenceNumber,
-        async (event) => this.handleEvent(state, event),
+        async (event) => this.handleEvent(state, event, generation),
+        generation,
       );
     } catch (error) {
+      generation.close();
       await this.failClosedStream(state, error);
       return state;
     }
+    generation.stopAccepting();
+    try {
+      await this.commitGeneration(state, generation);
+    } catch (error) {
+      generation.close();
+      await this.failClosedStream(state, error);
+      return state;
+    }
+    generation.close();
     applyStreamCursor(state, result);
     await this.persist(state);
     return state;
@@ -206,35 +279,79 @@ export class DurableTrueForgeRuntime {
     }
   }
 
-  private async handleEvent(state: SessionState, event: RuntimeEvent): Promise<void> {
-    if (state.status !== "ACTIVE") return;
-    if (!this.evidenceStore.recordEvent(event)) return;
+  private beginGeneration(events: RuntimeEvent[]): StreamGeneration {
+    this.activeGeneration?.close();
+    const generation = new StreamGeneration(events);
+    this.activeGeneration = generation;
+    return generation;
+  }
 
-    const violation = this.diagnosticGuard.observe(event);
-    if (violation !== undefined) blockForDiagnosticViolation(state, violation);
-    if (violation === undefined) this.projector.project(state, event);
-    if (violation === undefined && state.status === "ACTIVE") {
-      this.applicationReducer?.(state, event);
+  private generationIsOpen(generation: StreamGeneration): boolean {
+    return this.activeGeneration === generation && generation.isOpen();
+  }
+
+  private async handleEvent(
+    state: SessionState,
+    event: RuntimeEvent,
+    generation: StreamGeneration,
+  ): Promise<void> {
+    if (state.status !== "ACTIVE" || !this.generationIsOpen(generation)) return;
+    generation.accept(event);
+  }
+
+  private async commitGeneration(
+    state: SessionState,
+    generation: StreamGeneration,
+  ): Promise<void> {
+    if (!this.generationIsOpen(generation)) {
+      throw new Error("TrueForge stream generation closed before commit");
     }
-    if (event.type === "TURN_CREATED" && state.status === "ACTIVE") {
-      state.activeTurnId = readTurnId(event.payload) ?? state.activeTurnId;
-    }
-    if (event.sequenceNumber !== undefined) {
-      state.lastSequenceNumber = Math.max(state.lastSequenceNumber ?? 0, event.sequenceNumber);
-    }
-    if (state.status !== "ACTIVE" && state.terminalSequenceNumber === undefined) {
-      state.terminalSequenceNumber = event.sequenceNumber ?? state.lastSequenceNumber;
-      if (state.terminalSequenceNumber !== undefined) {
-        state.lastSequenceNumber = state.terminalSequenceNumber;
+
+    for (const event of generation.events) {
+      if (!this.generationIsOpen(generation)) {
+        throw new Error("TrueForge stream generation closed during commit");
       }
-    }
+      if (state.status !== "ACTIVE") break;
+      if (!this.evidenceStore.recordEvent(event)) continue;
 
-    await this.journal.append(event);
-    await this.persist(state);
-    if (state.status !== "ACTIVE" && state.trueForgeSessionId !== undefined) {
-      await this.cancelOnce(state.trueForgeSessionId);
+      const violation = generation.diagnosticGuard.observe(event);
+      if (violation !== undefined) blockForDiagnosticViolation(state, violation);
+      if (violation === undefined) this.projector.project(state, event);
+      if (violation === undefined && state.status === "ACTIVE") {
+        this.applicationReducer?.(state, event);
+      }
+      if (event.type === "TURN_CREATED" && state.status === "ACTIVE") {
+        state.activeTurnId = readTurnId(event.payload) ?? state.activeTurnId;
+      }
+      if (event.sequenceNumber !== undefined) {
+        state.lastSequenceNumber = Math.max(state.lastSequenceNumber ?? 0, event.sequenceNumber);
+      }
+      if (state.status !== "ACTIVE" && state.terminalSequenceNumber === undefined) {
+        state.terminalSequenceNumber = event.sequenceNumber ?? state.lastSequenceNumber;
+        if (state.terminalSequenceNumber !== undefined) {
+          state.lastSequenceNumber = state.terminalSequenceNumber;
+        }
+      }
+
+      if (!this.generationIsOpen(generation)) {
+        throw new Error("TrueForge stream generation closed during commit");
+      }
+      await this.journal.append(event);
+      if (!this.generationIsOpen(generation)) {
+        throw new Error("TrueForge stream generation closed during commit");
+      }
+      await this.persist(state);
+      if (!this.generationIsOpen(generation)) {
+        throw new Error("TrueForge stream generation closed during commit");
+      }
+      if (state.status !== "ACTIVE" && state.trueForgeSessionId !== undefined) {
+        await this.cancelOnce(state.trueForgeSessionId);
+      }
+      if (!this.generationIsOpen(generation)) {
+        throw new Error("TrueForge stream generation closed during commit");
+      }
+      await this.onEvent?.(event, structuredClone(state));
     }
-    await this.onEvent?.(event, structuredClone(state));
   }
 
   private async cancelOnce(sessionId: string): Promise<void> {

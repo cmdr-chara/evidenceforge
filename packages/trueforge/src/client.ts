@@ -60,6 +60,17 @@ export interface RunTurnInput {
   sessionId: string;
   message: string;
   onEvent?: (event: RuntimeEvent) => void | Promise<void>;
+  generation?: StreamGeneration;
+}
+
+/**
+ * A runtime-owned lifetime for callbacks spawned by one TrueForge stream.
+ * Closing the generation does not cancel JavaScript promises, but it gives
+ * the callback owner a durable, shared cutoff to check before side effects.
+ */
+export interface StreamGeneration {
+  isOpen(): boolean;
+  close(): void;
 }
 
 export interface ApprovalResponse {
@@ -79,6 +90,7 @@ export async function replayListedTurnEvents(
   afterSequenceNumber: number,
   onEvent?: RunTurnInput["onEvent"],
   timeoutInSeconds?: number,
+  generation?: StreamGeneration,
 ): Promise<ReplayedTurnEvents> {
   const events: RuntimeEvent[] = [];
   let lastSequenceNumber = afterSequenceNumber;
@@ -86,6 +98,7 @@ export async function replayListedTurnEvents(
   const deadline = deadlineFor(timeoutInSeconds);
   try {
     while (true) {
+      if (generation !== undefined && !generation.isOpen()) break;
       const next = await runBeforeDeadline(
         () => iterator.next(),
         deadline,
@@ -101,12 +114,16 @@ export async function replayListedTurnEvents(
       }
       const normalized = normalizeTrueForgeEvent(raw, sequence);
       events.push(normalized.event);
+      if (generation !== undefined && !generation.isOpen()) break;
       await runBeforeDeadline(
         () => onEvent?.(normalized.event),
         deadline,
         timeoutInSeconds,
       );
     }
+  } catch (error) {
+    generation?.close();
+    throw error;
   } finally {
     closeIterator(iterator);
   }
@@ -136,13 +153,14 @@ export class TrueForgeSdkAdapter {
     const stream = await client.sessions.createTurnStream(input.sessionId, {
       input: [{ type: "user.message", content: input.message }],
     });
-    return this.consume(input.sessionId, stream, input.onEvent);
+    return this.consume(input.sessionId, stream, input.onEvent, 0, undefined, input.generation);
   }
 
   public async submitApprovals(
     sessionId: string,
     approvals: ApprovalResponse[],
     onEvent?: RunTurnInput["onEvent"],
+    generation?: StreamGeneration,
   ): Promise<StreamResult> {
     const client = await this.client();
     const stream = await client.sessions.createTurnStream(sessionId, {
@@ -156,7 +174,7 @@ export class TrueForgeSdkAdapter {
             : { status: "deny", reason: approval.reason ?? "denied by user" },
       })),
     });
-    return this.consume(sessionId, stream, onEvent);
+    return this.consume(sessionId, stream, onEvent, 0, undefined, generation);
   }
 
   public async resumeTurn(
@@ -164,6 +182,7 @@ export class TrueForgeSdkAdapter {
     turnId: string,
     afterSequenceNumber: number,
     onEvent?: RunTurnInput["onEvent"],
+    generation?: StreamGeneration,
   ): Promise<StreamResult> {
     const client = await this.client();
     const { data: turn } = await client.sessions.getTurn(sessionId, turnId);
@@ -175,7 +194,7 @@ export class TrueForgeSdkAdapter {
         { afterSequenceNumber },
         { timeoutInSeconds: this.config.timeoutInSeconds },
       );
-      return this.consume(sessionId, stream, onEvent, afterSequenceNumber, turnId);
+      return this.consume(sessionId, stream, onEvent, afterSequenceNumber, turnId, generation);
     }
 
     const replay = await replayListedTurnEvents(
@@ -183,6 +202,7 @@ export class TrueForgeSdkAdapter {
       afterSequenceNumber,
       onEvent,
       this.config.timeoutInSeconds,
+      generation,
     );
     return {
       sessionId,
@@ -203,6 +223,7 @@ export class TrueForgeSdkAdapter {
     onEvent?: RunTurnInput["onEvent"],
     initialSequence = 0,
     knownTurnId?: string,
+    generation?: StreamGeneration,
   ): Promise<StreamResult> {
     return consumeMetadataStream({
       sessionId,
@@ -211,6 +232,7 @@ export class TrueForgeSdkAdapter {
       onEvent,
       initialSequence,
       knownTurnId,
+      generation,
     });
   }
 
@@ -227,6 +249,7 @@ export async function consumeMetadataStream(input: {
   onEvent?: RunTurnInput["onEvent"];
   initialSequence?: number;
   knownTurnId?: string;
+  generation?: StreamGeneration;
 }): Promise<StreamResult> {
     const {
       sessionId,
@@ -235,6 +258,7 @@ export async function consumeMetadataStream(input: {
       onEvent,
       initialSequence = 0,
       knownTurnId,
+      generation,
     } = input;
     let lastSequenceNumber = initialSequence;
     let turnId = knownTurnId;
@@ -245,6 +269,7 @@ export async function consumeMetadataStream(input: {
 
     try {
       while (true) {
+        if (generation !== undefined && !generation.isOpen()) break;
         const next = await runBeforeDeadline(
           () => iterator.next(),
           deadline,
@@ -266,12 +291,16 @@ export async function consumeMetadataStream(input: {
           const state = asRecord(raw.state);
           if (Array.isArray(state.requiredActions)) requiredActions = state.requiredActions;
         }
+        if (generation !== undefined && !generation.isOpen()) break;
         await runBeforeDeadline(
           () => onEvent?.(normalized.event),
           deadline,
           timeoutInSeconds,
         );
       }
+    } catch (error) {
+      generation?.close();
+      throw error;
     } finally {
       closeIterator(iterator);
     }

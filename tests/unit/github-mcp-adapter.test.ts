@@ -283,17 +283,16 @@ test("get_file_contents requires a structured artifact at the exact commit revis
     validateIncidentRead("get_file_contents", args, validFile, prepared.repository, prepared.expectedHeadSha).toolName,
     "get_file_contents",
   );
-  const validDirectory = {
-    content: [{
-      type: "text",
-      text: JSON.stringify([{ type: "file", name: "README.md", path: "README.md", sha: "a".repeat(40) }]),
-    }],
+  const verifiedDirectoryEnvelope = {
+    repository: prepared.repository,
+    revision: prepared.expectedHeadSha,
+    artifact: [{ type: "file", name: "README.md", path: "README.md", sha: "a".repeat(40), content: "incident details" }],
   };
   assert.doesNotThrow(() =>
     validateIncidentRead(
       "get_file_contents",
       { ...args, path: "" },
-      validDirectory,
+      verifiedDirectoryEnvelope,
       prepared.repository,
       prepared.expectedHeadSha,
     ));
@@ -311,6 +310,18 @@ test("get_file_contents requires a structured artifact at the exact commit revis
           mimeType: "text/plain",
           text: "wrong revision binding",
         },
+      }],
+    },
+    {
+      type: "file",
+      path: "README.md",
+      sha: "a".repeat(40),
+      content: "stale plain file object",
+    },
+    {
+      content: [{
+        type: "text",
+        text: JSON.stringify([{ type: "file", path: "README.md", sha: "a".repeat(40), content: "misrouted directory" }]),
       }],
     },
   ]) {

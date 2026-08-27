@@ -111,7 +111,9 @@ A credentialed TrueForge/model turn was observed in session `01m11zp6dfp08dq520e
 
 The application control plane was then hardened around the official GitHub MCP schema. Application-only identity fields are never sent to GitHub. `create_pull_request` produces only a minimal receipt; a later `pull_request_read`, bound to an earlier authoritative `get_commit` of the proposed head, must reconcile repository/base/head/head SHA before external evidence can commit. TrueForge stream deadlines now cover iteration, event callbacks, completed-turn replay, iterator cleanup, and session-creation failure, with durable fail-closed regressions.
 
-The integrated unpublished candidate passes format, lint, typecheck, **192/192 tests**, evaluation smoke, fixture demo, build, CI-mode doctor, and diff integrity locally. It is not labeled an externally verified final SHA until publication and exact-head CI/Qodo observation.
+The integrated unpublished candidate passes format, lint, typecheck, **193/193 tests**, evaluation smoke, fixture demo, build, CI-mode doctor, and diff integrity locally. It is not labeled an externally verified final SHA until publication and exact-head CI/Qodo observation.
+
+Qodo's review of the first published hardening commit identified two additional Highs. GitHub file evidence had to bind repository/revision in the connector response, not merely in the request; plain file/directory payloads are now rejected unless an explicit trusted envelope carries both identities, while official `repo://…/sha/<commit>/…` resources remain supported. TrueForge callback deadlines also needed a runtime generation fence because `Promise.race` does not cancel the losing callback; a callback released after timeout is now prevented from journaling, persisting, cancelling, or notifying after terminal cutoff. Both paths have deterministic regressions and require exact-head Qodo confirmation after publication.
 
 ## Verified final branch baseline
 

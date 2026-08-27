@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ApprovalRequest, RuntimeEvent } from "../../packages/domain/src";
+import { ApprovalRequest, RuntimeEvent, SessionState } from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
 import { JsonSessionStore } from "../../packages/persistence/src";
 import { EventJournal } from "../../packages/telemetry/src";
@@ -80,6 +80,68 @@ class SingleEventAdapter implements TrueForgeRuntimeAdapter {
 class SessionCreationFailureAdapter extends SingleEventAdapter {
   public override async createSession(): Promise<string> {
     throw new Error("secret authentication detail");
+  }
+}
+
+class LateCallbackAdapter implements TrueForgeRuntimeAdapter {
+  public cancellations = 0;
+  private callback: Promise<void> | undefined;
+  private release: (() => void) | undefined;
+
+  public async createSession(): Promise<string> {
+    return "tf-late-callback";
+  }
+
+  public async cancelSession(sessionId: string): Promise<void> {
+    assert.equal(sessionId, "tf-late-callback");
+    this.cancellations += 1;
+  }
+
+  public async runTurn(input: RunTurnInput): Promise<StreamResult> {
+    const event: RuntimeEvent = {
+      id: "late-callback-event",
+      type: "TURN_CREATED",
+      source: "trueforge:turn.created",
+      timestamp: "2026-08-27T15:00:00.000Z",
+      sequenceNumber: 1,
+      payload: { type: "turn.created", turnId: "late-callback-turn" },
+    };
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    this.release = releaseGate;
+    this.callback = (async () => {
+      // The callback starts while the generation is open. Runtime event
+      // handling only stages the event; the pending adapter continuation
+      // models a stream callback that outlives the losing Promise.race.
+      const handled = input.onEvent?.(event);
+      await gate;
+      await handled;
+    })();
+    throw new TrueForgeStreamTimeoutError(30);
+  }
+
+  public async submitApprovals(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async resumeTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async releaseCallback(): Promise<void> {
+    this.release?.();
+    await this.callback;
+  }
+}
+
+class CountingSessionStore extends JsonSessionStore {
+  public readonly saves: SessionState[] = [];
+
+  public override async save(state: SessionState): Promise<void> {
+    this.saves.push(structuredClone(state));
+    await super.save(state);
   }
 }
 
@@ -232,6 +294,49 @@ test("runtime durably blocks when TrueForge session creation fails", async () =>
       "TrueForge turn stream ended before a trustworthy terminal result",
     );
     assert.equal(updated.blockedReason?.includes("secret"), false);
+    assert.equal((await sessions.load(state.task.id))?.status, "BLOCKED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("runtime fences a callback released after a timed-out stream", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-late-callback-"));
+  try {
+    const adapter = new LateCallbackAdapter();
+    const sessions = new CountingSessionStore(join(root, "sessions"));
+    const evidence = new EvidenceStore();
+    const journal = new EventJournal(join(root, "events.jsonl"));
+    const observed: RuntimeEvent[] = [];
+    const state = buildState();
+    const runtime = new DurableTrueForgeRuntime(
+      adapter,
+      sessions,
+      evidence,
+      journal,
+      (event) => {
+        observed.push(event);
+      },
+    );
+
+    const updated = await runtime.start(state, "investigate");
+    const savesBeforeRelease = sessions.saves.length;
+    const eventsBeforeRelease = evidence.listEvents();
+    const journalBeforeRelease = await journal.readAll();
+    const observedBeforeRelease = observed.length;
+
+    assert.equal(updated.status, "BLOCKED");
+    assert.equal(adapter.cancellations, 1);
+    assert.equal(eventsBeforeRelease.length, 0);
+    assert.equal(journalBeforeRelease.length, 0);
+
+    await adapter.releaseCallback();
+
+    assert.equal(evidence.listEvents().length, eventsBeforeRelease.length);
+    assert.equal((await journal.readAll()).length, journalBeforeRelease.length);
+    assert.equal(sessions.saves.length, savesBeforeRelease);
+    assert.equal(observed.length, observedBeforeRelease);
+    assert.equal(adapter.cancellations, 1);
     assert.equal((await sessions.load(state.task.id))?.status, "BLOCKED");
   } finally {
     await rm(root, { recursive: true, force: true });

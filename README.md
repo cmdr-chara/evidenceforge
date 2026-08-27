@@ -4,7 +4,7 @@
 
 EvidenceForge is an evidence-gated CI incident resolution agent built on TrueForge. It investigates failed GitHub Actions runs, reproduces failures in an isolated Daytona sandbox, generates and verifies a patch, pauses before external writes, and refuses to mark a task complete until required evidence exists.
 
-> **Verified repository baseline — 2026-08-27:** SHA `7555f0f01f1af1f198d665333098619d05408230` passed GitHub Actions runs [`33084240703`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33084240703) and [`33084235854`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33084235854). The newer control-plane candidate passes all local gates with **192/192 tests**; it is not called the final branch SHA until exact-head CI and review exist.
+> **Verified repository baseline — 2026-08-27:** SHA `7555f0f01f1af1f198d665333098619d05408230` passed GitHub Actions runs [`33084240703`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33084240703) and [`33084235854`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33084235854). The newer control-plane candidate passes all local gates with **193/193 tests**; it is not called the final branch SHA until exact-head CI and review exist.
 
 A credentialed TrueForge/model session and a real read-only GitHub MCP `get_commit` call were also observed (session `01m11zp6dfp08dq520eqsp9cdx`, turn `01m11zp6dyt1xq08qwdkzdns1h.local`) against the exact repository SHA. Daytona connectivity and command execution were observed separately. These observations do **not** prove the still-open end-to-end failing-revision reproduction, approval, PR creation, or completion flow.
 

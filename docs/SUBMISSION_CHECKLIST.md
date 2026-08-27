@@ -64,7 +64,7 @@
 
 ## Quality
 
-Last externally verified branch baseline: `7555f0f01f1af1f198d665333098619d05408230`, GitHub Actions runs `33084240703` and `33084235854`. Current unpublished candidate: all local gates green, **192/192 tests**; exact-head CI still required after publication.
+Last externally verified branch baseline: `7555f0f01f1af1f198d665333098619d05408230`, GitHub Actions runs `33084240703` and `33084235854`. Current unpublished candidate: all local gates green, **193/193 tests**; exact-head CI still required after publication.
 
 - [x] `pnpm install --frozen-lockfile`.
 - [x] `pnpm format:check`.
@@ -132,7 +132,7 @@ Last externally verified branch baseline: `7555f0f01f1af1f198d665333098619d05408
 - [x] Public repository exists.
 - [ ] Credentialed live sponsor vertical slice complete.
 - [ ] Exact viewport/200% visual check complete.
-- [x] Final Qodo re-review complete; one High remains SDK-blocked and disclosed.
+- [ ] Exact-head Qodo re-review after the latest two implementable High remediations; the SDK-blocked High remains disclosed.
 - [ ] Human merge complete.
 - [ ] Demo video URL added.
 - [ ] Blog URL added if entering blog category.

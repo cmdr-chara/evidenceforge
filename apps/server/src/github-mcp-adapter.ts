@@ -470,32 +470,49 @@ function hasStructuredFileContents(
   expectedRepository: string,
   revision: string,
 ): boolean {
+  if (hasVerifiedFileContentsEnvelope(result, expectedRepository, revision)) return true;
   const payloads = structuredPayloads(result);
   for (const payload of payloads) {
-    if (isFileArtifact(payload, expectedRepository, revision) || isDirectoryArtifact(payload)) return true;
+    if (isOfficialFileResource(payload, expectedRepository, revision)) return true;
   }
   return false;
 }
 
-function isFileArtifact(value: unknown, expectedRepository: string, revision: string): boolean {
-  const record = asRecord(value);
-  if (readString(record, "type") === "file") {
-    const path = readString(record, "path") ?? readString(record, "name");
-    const content = record.content;
-    const blob = record.blob;
-    const sha = readString(record, "sha");
-    return path !== undefined &&
-      sha !== undefined &&
-      /^[a-f0-9]{7,64}$/i.test(sha) &&
-      (typeof content === "string" || typeof blob === "string") &&
-      revision.length > 0;
-  }
+function hasVerifiedFileContentsEnvelope(
+  result: Record<string, unknown>,
+  expectedRepository: string,
+  revision: string,
+): boolean {
+  const repository = readString(result, "repository");
+  const responseRevision = readString(result, "revision") ??
+    readString(result, "commitSha") ??
+    readString(result, "sha");
+  const artifact = result.artifact;
+  return repository === expectedRepository &&
+    responseRevision === revision &&
+    (isFileArtifactData(artifact) || isDirectoryArtifact(artifact));
+}
 
+function isOfficialFileResource(value: unknown, expectedRepository: string, revision: string): boolean {
+  const record = asRecord(value);
   const resource = readResource(value);
   if (resource === undefined) return false;
   const uri = readString(resource, "uri");
   const hasContent = typeof resource.text === "string" || typeof resource.blob === "string";
   return uri !== undefined && hasContent && resourceUriIsBound(uri, expectedRepository, revision);
+}
+
+function isFileArtifactData(value: unknown): boolean {
+  const record = asRecord(value);
+  if (readString(record, "type") !== "file") return false;
+  const path = readString(record, "path") ?? readString(record, "name");
+  const content = record.content;
+  const blob = record.blob;
+  const sha = readString(record, "sha");
+  return path !== undefined &&
+    sha !== undefined &&
+    /^[a-f0-9]{7,64}$/i.test(sha) &&
+    (typeof content === "string" || typeof blob === "string");
 }
 
 function isDirectoryArtifact(value: unknown): boolean {

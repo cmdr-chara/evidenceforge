@@ -104,7 +104,7 @@ Last externally verified baseline SHA `7555f0f01f1af1f198d665333098619d05408230`
 - doctor;
 - `git diff --check`.
 
-This proves that baseline repository candidate, not the newer unpublished candidate or a full sponsor-infrastructure vertical slice. The newer candidate passes the equivalent local gates with 192/192 tests and still requires exact-head CI after publication.
+This proves that baseline repository candidate, not the newer unpublished candidate or a full sponsor-infrastructure vertical slice. The newer candidate passes the equivalent local gates with 193/193 tests and still requires exact-head CI after publication.
 
 Observed live component evidence:
 

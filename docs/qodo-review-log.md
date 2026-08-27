@@ -48,6 +48,9 @@ No second orchestration framework is introduced and no post-execution detector i
 
 ## Required follow-up
 
-1. Preserve the exact-SHA Qodo links above in the submission evidence.
-2. Keep the SDK-blocked High visible; do not relabel post-result detection as prevention.
-3. Keep PR #2 unmerged until the live/manual gates pass and a human decides to merge.
+Qodo's exact review of `d9a79c0069c6dac0c71dee38d8312d36c680ec48` added two implementable Highs: **File results lack revision binding** and **Timed-out callbacks persist late**. The subsequent candidate binds GitHub file artifacts using response-level repository/commit identity and introduces a stream-generation fence that suppresses callbacks released after timeout. Both include regressions and remain pending exact-head Qodo confirmation until published.
+
+1. Preserve the exact-SHA Qodo links in the submission evidence.
+2. Request and inspect Qodo against the subsequent exact SHA.
+3. Keep the SDK-blocked High visible; do not relabel post-result detection as prevention.
+4. Keep PR #2 unmerged until the live/manual gates pass and a human decides to merge.
