@@ -66,9 +66,10 @@ test("blocked live session produces an explicitly blocked timeline", () => {
   assert.equal(snapshot.blockedReason, "runtime event could not be correlated");
   assert.equal(snapshot.patch, undefined);
   assert.ok(snapshot.timeline.every((item) => item.status === "BLOCKED"));
+  assert.equal(snapshot.activity.at(-1)?.tone, "BLOCKED");
 });
 
-test("live activity exposes a sanitized label without raw tool payload", () => {
+test("malformed tool activity fails closed without exposing raw payload", () => {
   const activity = toLiveActivity(
     {
       id: "event-tool-response",
@@ -85,9 +86,26 @@ test("live activity exposes a sanitized label without raw tool payload", () => {
   );
 
   assert.ok(activity);
-  assert.equal(activity.label, "Tool execution completed");
+  assert.equal(activity.tone, "ERROR");
+  assert.equal(activity.label, "Tool response malformed");
   assert.equal(activity.sequenceNumber, 42);
   assert.doesNotMatch(JSON.stringify(activity), /secret-token|private-call-id/);
+});
+
+test("non-zero tool exit is rendered as ERROR", () => {
+  const activity = toLiveActivity({
+    id: "event-tool-failed",
+    type: "TOOL_RESULT",
+    source: "trueforge:tool.response",
+    timestamp: "2026-08-26T12:31:00.000Z",
+    payload: {
+      content: JSON.stringify({ success: true, response: { exitCode: 2, result: "private" } }),
+    },
+  });
+  assert.ok(activity);
+  assert.equal(activity.tone, "ERROR");
+  assert.equal(activity.label, "Tool execution failed");
+  assert.doesNotMatch(JSON.stringify(activity), /private/);
 });
 
 test("cancelled turn activity reports a timeout without forwarding turn metrics", () => {
@@ -163,7 +181,7 @@ test("turn activity uses a finite fail-closed terminal-state mapping", () => {
   }
 });
 
-test("live snapshot rebuilds sanitized activity from persisted runtime events", () => {
+test("live snapshot rebuilds initial and sanitized activity from durable state", () => {
   const state = buildState();
   const store = new EvidenceStore();
   store.recordEvent({
@@ -177,7 +195,8 @@ test("live snapshot rebuilds sanitized activity from persisted runtime events", 
 
   const snapshot = buildLiveConsoleSnapshot(state, store);
 
-  assert.equal(snapshot.activity.length, 1);
-  assert.equal(snapshot.activity[0]?.label, "Daytona sandbox ready");
+  assert.equal(snapshot.activity.length, 2);
+  assert.equal(snapshot.activity[0]?.label, "Incident accepted by the control plane");
+  assert.equal(snapshot.activity[1]?.label, "Daytona sandbox ready");
   assert.doesNotMatch(JSON.stringify(snapshot.activity), /must-not-reach-the-browser/);
 });
