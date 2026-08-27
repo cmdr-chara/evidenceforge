@@ -3,7 +3,11 @@ import { test } from "node:test";
 import { CompletionCertificateData } from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
 import { SessionController } from "../../packages/workflow/src";
-import { CompletionGate } from "../../packages/verification/src";
+import {
+  artifactBindingFor,
+  CompletionGate,
+  isIssuedCompletionCertificate,
+} from "../../packages/verification/src";
 import { buildState, passAll, passCriterion } from "../fixtures/builders";
 
 test("completion gate rejects missing required evidence", () => {
@@ -50,7 +54,8 @@ test("completion gate rejects model-only success claim", () => {
   if (!decision.allowed) {
     assert.ok(
       decision.failures.some(
-        (failure) => failure.code === "MISSING_ADMISSIBLE_EVIDENCE" && failure.criterionId === "tests",
+        (failure) =>
+          failure.code === "MISSING_ADMISSIBLE_EVIDENCE" && failure.criterionId === "tests",
       ),
     );
   }
@@ -67,6 +72,7 @@ test("deterministic failed verifier overrides reviewer PASS", () => {
     evidenceIds: [],
     details: "tests still fail",
     deterministic: true,
+    binding: artifactBindingFor(state, "PATCH"),
   });
   state.reviewerVerdict = "PASS";
   const decision = new CompletionGate(store).evaluate(state);
@@ -106,6 +112,23 @@ test("gate-issued certificate is rejected after certified state changes", () => 
   );
 });
 
+test("gate-issued certificate payload and nested evidence are deeply immutable", () => {
+  const state = buildState();
+  const store = new EvidenceStore();
+  passAll(state, store);
+  const decision = new CompletionGate(store).evaluate(state, "2026-08-25T18:05:00.000Z");
+  assert.equal(decision.allowed, true);
+  if (!decision.allowed) return;
+
+  const certificate = decision.certificate;
+  assert.equal(Object.isFrozen(certificate), true);
+  assert.equal(Object.isFrozen(certificate.requiredCriteria), true);
+  assert.equal(Object.isFrozen(certificate.requiredCriteria[0]), true);
+  assert.equal(Object.isFrozen(certificate.requiredCriteria[0]?.evidenceIds), true);
+  assert.throws(() => certificate.requiredCriteria[0]?.evidenceIds.push("tampered"));
+  assert.equal(isIssuedCompletionCertificate(certificate), true);
+});
+
 test("changing patch digest invalidates patch-bound verification and review", () => {
   const state = buildState();
   const store = new EvidenceStore();
@@ -143,12 +166,19 @@ test("fabricated certificate is rejected", () => {
   const state = buildState();
   const controller = new SessionController(state);
   const fabricated: CompletionCertificateData = {
+    certificateVersion: 1,
     taskId: state.task.id,
+    repository: state.task.repository,
+    revision: state.task.revision,
+    stateVersion: state.version,
+    successContractDigest: "0".repeat(64),
+    stateDigest: "0".repeat(64),
     requiredCriteria: [],
     originalFailureReproduced: true,
     patchDigest: state.patchDigest ?? "",
     reviewerVerdict: "PASS",
     subjectDigest: "0".repeat(64),
+    payloadDigest: "0".repeat(64),
     traceId: state.traceId,
     generatedAt: new Date().toISOString(),
   };
