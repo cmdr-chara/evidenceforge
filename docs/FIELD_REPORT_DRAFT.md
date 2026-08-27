@@ -135,17 +135,17 @@ The reconstructed batch addresses the implementable open High/Medium findings wi
 
 The read-only pre-execution specialist boundary remains **BLOCKED by TrueForge SDK 0.1.3**, with rationale recorded in `docs/qodo-review-log.md`.
 
-Qodo updated its aggregate review through implementation SHA `be60a91…`. The cursor/path and three later runtime transaction findings are resolved. The disclosed SDK-blocked read-only boundary remains open separately.
+Qodo updated its aggregate review through implementation SHA `c57c5e4…`. The cursor/path, runtime transaction, terminal-durability, and cancellation-retry findings are resolved. The disclosed SDK-blocked read-only boundary remains open separately.
 
 ## 13. Verified repository result
 
-Latest verified implementation SHA `be60a919fe7a63fe5dcbb14927e2342cab30c8f4` passed GitHub Actions runs `33100490081` and `33100494121` with:
+Latest verified implementation SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` passed GitHub Actions runs `33101668750` and `33101672505` with:
 
 - frozen-lockfile install;
 - format;
 - lint;
 - strict typecheck;
-- **201/201 tests**;
+- **202/202 tests**;
 - evaluation smoke;
 - healthy demo fixture;
 - build;

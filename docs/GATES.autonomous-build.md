@@ -6,7 +6,7 @@ Status values: `PASS`, `BLOCKED`, `PENDING_REVIEW`, `MANUAL`.
 
 ## Verified implementation baseline
 
-Latest implementation SHA `be60a919fe7a63fe5dcbb14927e2342cab30c8f4` passed GitHub Actions runs `33100490081` and `33100494121`, including 201/201 tests. Qodo reviewed that exact SHA and resolved all three latest implementable runtime findings.
+Latest implementation SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` passed GitHub Actions runs `33101668750` and `33101672505`, including 202/202 tests. Qodo's aggregate for that exact SHA leaves only the SDK-blocked boundary open.
 
 | Gate | Status | Evidence / blocker |
 |---|---|---|
@@ -17,7 +17,7 @@ Latest implementation SHA `be60a919fe7a63fe5dcbb14927e2342cab30c8f4` passed GitH
 | Format | PASS | exact-SHA CI |
 | Lint | PASS | exact-SHA CI |
 | Typecheck | PASS | exact-SHA CI |
-| Test suite | PASS | 201/201 on exact-SHA push and PR CI |
+| Test suite | PASS | 202/202 on exact-SHA push and PR CI |
 | Eval smoke | PASS | exact-SHA CI |
 | Demo fixture | PASS | exact-SHA CI; fixture is not live sponsor evidence |
 | Build | PASS | exact-SHA CI |
@@ -52,7 +52,7 @@ Latest implementation SHA `be60a919fe7a63fe5dcbb14927e2342cab30c8f4` passed GitH
 | Live skill materialization | PASS | four configured skills were observed in a credentialed TrueForge session |
 | Live human approval pause/resume | BLOCKED | requires live runtime event |
 | Real PR created by EvidenceForge | BLOCKED | requires live TrueForge/MCP and human authorization |
-| Latest Qodo re-review | PASS | exact-SHA update https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5443087230 marks all three latest implementable runtime findings resolved |
+| Latest Qodo re-review | PASS | exact-SHA update https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5443260617; aggregate leaves only the SDK-blocked boundary open |
 | Human merge | BLOCKED | PR #2 must remain unmerged until human decision |
 | Demo video/publication/submission | BLOCKED | requires live sponsor evidence and human account actions |
 
@@ -60,7 +60,7 @@ Latest implementation SHA `be60a919fe7a63fe5dcbb14927e2342cab30c8f4` passed GitH
 
 Observed aggregate review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 
-Qodo updated its aggregate through SHA `be60a91…` and marks initial-turn cursor durability, exact file-path binding, bounded generation drain, approval uncertainty, and journal-first admission resolved. The read-only pre-execution specialist boundary remains **BLOCKED** for the SDK reason documented in `docs/qodo-review-log.md`.
+Qodo updated its aggregate through SHA `c57c5e4…` and marks initial-turn cursor durability, exact file-path binding, bounded generation drain, explicit terminal-durability failure, cancellation retry, approval uncertainty, and journal-first admission resolved. The read-only pre-execution specialist boundary remains **BLOCKED** for the SDK reason documented in `docs/qodo-review-log.md`.
 
 ## Release decision
 

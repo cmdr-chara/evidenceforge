@@ -7,16 +7,17 @@ Record only genuine Qodo findings and follow-up evidence.
 - PR: https://github.com/cmdr-chara/evidenceforge/pull/2
 - Aggregate Agentic Review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 - Earlier follow-up request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
-- Latest reviewed implementation SHA: `be60a919fe7a63fe5dcbb14927e2342cab30c8f4`
+- Latest reviewed implementation SHA: `c57c5e424054af04c999bd2c144e09b8d54d0622`
 - Final exact-SHA request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
-- Latest Qodo exact-SHA update: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5443087230
-- GitHub Actions evidence: runs `33100490081` and `33100494121`, all required steps green including 201/201 tests.
+- Latest Qodo aggregate: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
+- Latest exact-SHA update: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5443260617
+- GitHub Actions evidence: runs `33101668750` and `33101672505`, all required steps green including 202/202 tests.
 
 Qodo previously marked **Old patch evidence reused** and **Stale certificate completes state** resolved after the earlier P0.1 batch. Additional earlier findings such as specialist budgets, missing explicit specialist terminal status, blocked-stream mutation, and sequential fan-out were also resolved/outdated in Qodo's thread state before this reconstruction.
 
 ## Current High / Medium finding disposition
 
-Qodo's aggregate review was observed after its exact-SHA update for `be60a91…`. All implementable runtime transaction findings are resolved. The read-only boundary remains explicitly SDK-blocked.
+Qodo's aggregate review was observed for exact implementation SHA `c57c5e4…`. All implementable runtime transaction findings are resolved. The read-only boundary remains explicitly SDK-blocked.
 
 | Severity | Finding | Disposition | Evidence in reconstructed batch |
 |---|---|---|---|
@@ -36,6 +37,8 @@ Qodo's aggregate review was observed after its exact-SHA update for `be60a91…`
 | High | Generation drain can hang | RESOLVED by Qodo | bounded generation drain plus bounded terminal persistence/cancellation; hanging journal/checkpoint/observer regressions |
 | High | Approval effect stays started | RESOLVED by Qodo | drain and final-persistence failures mark `EFFECT_UNCERTAIN` before terminal persistence; two regressions |
 | High | Checkpoint bypasses event journal | RESOLVED by Qodo | validate on isolated evidence, append journal first, then admit/project/checkpoint; journal-failure regression |
+| High | Terminal checkpoint failure hidden | RESOLVED by Qodo | stable `TrueForgeTerminalPersistenceError` prevents false durable-BLOCKED return; regression loads the still-ACTIVE checkpoint |
+| High | Cancellation timeout suppresses retries | RESOLVED by Qodo | in-flight/completed cancellation states separated; failed attempts clear for bounded retry while concurrent calls deduplicate |
 | High | Read-only boundary is unenforced | **BLOCKED — TrueForge SDK 0.1.3 limitation** | inspected SDK exposes dynamic-subagent enablement but no per-subagent pre-execution tool allowlist/interceptor |
 
 ## P0.4 blocked rationale

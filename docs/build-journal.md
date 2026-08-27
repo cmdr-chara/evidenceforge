@@ -117,17 +117,17 @@ Qodo's review of the first published hardening commit identified two additional 
 
 The next exact-SHA Qodo pass marked both of those Highs resolved and exposed two further edge cases. Event commits are now serialized and persisted while the stream remains active, so an initial `TURN_CREATED` ID/cursor/evidence survives a process interruption and can resume; failure closes admission, drains the single in-flight commit, then writes the terminal checkpoint before any queued late work. GitHub file evidence additionally requires the exact normalized requested path: files/resources must match it, and directory entries must be valid direct children without traversal or absolute-path ambiguity.
 
-The published `29290cb…` candidate passed both push and PR workflows. Qodo marked those cursor/path findings resolved and exposed three further transaction boundaries: drain itself could hang, an approved effect could remain `EFFECT_STARTED` after drain/final-persistence failure, and checkpoint projection preceded journal durability. The `be60a91…` candidate bounds generation drain and terminal cleanup, records `EFFECT_UNCERTAIN` before blocking, and performs journal-first event admission. Hanging journal/checkpoint/observer cases and both approval-failure paths are covered; both exact-SHA workflows passed **201/201**, and Qodo marks all three findings resolved.
+The published `29290cb…` candidate passed both push and PR workflows. Qodo marked those cursor/path findings resolved and exposed three further transaction boundaries: drain itself could hang, an approved effect could remain `EFFECT_STARTED` after drain/final-persistence failure, and checkpoint projection preceded journal durability. The `be60a91…` candidate addressed those three, after which Qodo exposed two final durability edges: an unconfirmed terminal save could be returned as BLOCKED, and a failed cancellation was suppressed forever. Implementation SHA `c57c5e4…` returns a stable durability error unless terminal persistence is confirmed and separates in-flight from completed cancellations so failed attempts can retry. Both exact-SHA workflows passed **202/202**; Qodo leaves only the SDK-blocked boundary open.
 
 ## Latest verified branch baseline
 
 Final branch SHA:
 
-`be60a919fe7a63fe5dcbb14927e2342cab30c8f4`
+`c57c5e424054af04c999bd2c144e09b8d54d0622`
 
 GitHub Actions run:
 
-`33100490081` and `33100494121`
+`33101668750` and `33101672505`
 
 Observed green steps:
 
@@ -135,7 +135,7 @@ Observed green steps:
 - `pnpm format:check`;
 - `pnpm lint`;
 - `pnpm typecheck`;
-- `pnpm test` — **201 / 201 passed**;
+- `pnpm test` — **202 / 202 passed**;
 - `pnpm eval:smoke`;
 - `pnpm demo:fixture`;
 - `pnpm build`;

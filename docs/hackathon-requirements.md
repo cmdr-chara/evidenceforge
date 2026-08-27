@@ -58,7 +58,7 @@ Qodo Agentic Review is genuinely observed on PR #2:
 - final exact-SHA request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
 - current finding triage: `docs/qodo-review-log.md`
 
-Qodo reviewed SHA `be60a919fe7a63fe5dcbb14927e2342cab30c8f4` and marks the three deeper runtime transaction findings resolved. The pre-execution read-only boundary remains separately blocked because TrueForge SDK `0.1.3` cannot enforce it per dynamic subagent.
+Qodo's aggregate for SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` marks the deeper runtime transaction and terminal-durability findings resolved. The pre-execution read-only boundary remains separately blocked because TrueForge SDK `0.1.3` cannot enforce it per dynamic subagent.
 
 ## TrueForge SDK 0.1.3 specialist-isolation limitation
 
@@ -91,13 +91,13 @@ Tool annotations are useful metadata, not an authorization oracle. EvidenceForge
 
 ## Verified repository evidence
 
-Latest verified implementation SHA `be60a919fe7a63fe5dcbb14927e2342cab30c8f4` passed GitHub Actions runs `33100490081` and `33100494121` with:
+Latest verified implementation SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` passed GitHub Actions runs `33101668750` and `33101672505` with:
 
 - `pnpm install --frozen-lockfile`;
 - format check;
 - lint;
 - TypeScript typecheck;
-- 201/201 tests;
+- 202/202 tests;
 - evaluation smoke;
 - demo fixture;
 - build;

@@ -64,13 +64,13 @@
 
 ## Quality
 
-Latest verified implementation SHA: `be60a919fe7a63fe5dcbb14927e2342cab30c8f4`, GitHub Actions runs `33100490081` and `33100494121`, **201/201 tests**.
+Latest verified implementation SHA: `c57c5e424054af04c999bd2c144e09b8d54d0622`, GitHub Actions runs `33101668750` and `33101672505`, **202/202 tests**.
 
 - [x] `pnpm install --frozen-lockfile`.
 - [x] `pnpm format:check`.
 - [x] `pnpm lint`.
 - [x] `pnpm typecheck`.
-- [x] `pnpm test` — **201/201 passed** on exact-SHA push and PR CI.
+- [x] `pnpm test` — **202/202 passed** on exact-SHA push and PR CI.
 - [x] `pnpm eval:smoke`.
 - [x] `pnpm demo:fixture`.
 - [x] `pnpm build`.
@@ -89,6 +89,8 @@ Latest verified implementation SHA: `be60a919fe7a63fe5dcbb14927e2342cab30c8f4`, 
 - [x] Request `/agentic_review` on the final exact SHA: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
 - [x] Inspect latest published-head Qodo response: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5442750603.
 - [x] Inspect fail-closed runtime Qodo response: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5443087230; all three latest implementable findings resolved.
+- [x] Inspect exact `c57c5e4…` aggregate after terminal-durability/cancellation fixes: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502; only the SDK-blocked High remains.
+- [x] Preserve the exact-SHA Qodo update: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5443260617.
 - [ ] Human merge after required review/live gates.
 
 ## Demo vertical slice required before submission
