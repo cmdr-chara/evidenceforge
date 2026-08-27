@@ -9,7 +9,7 @@ import {
   VerificationResult,
 } from "../../packages/domain/src";
 import { createEvidence, EvidenceStore } from "../../packages/evidence/src";
-import { ProgressEvaluator } from "../../packages/verification/src";
+import { artifactBindingFor, ProgressEvaluator } from "../../packages/verification/src";
 
 export function baseCriteria(): SuccessCriterion[] {
   return [
@@ -48,6 +48,7 @@ export function buildState(criteria = baseCriteria()): SessionState {
   const state = createSessionState(task, criteria);
   state.patchDigest = createHash("sha256").update("patch").digest("hex");
   state.reviewerVerdict = "PASS";
+  state.reviewBinding = artifactBindingFor(state, "PATCH");
   return state;
 }
 
@@ -61,7 +62,11 @@ export function passCriterion(
   if (criterion === undefined) throw new Error(`missing criterion ${criterionId}`);
   const event: RuntimeEvent = {
     id: `event-${criterionId}`,
-    type: options?.modelOnly ? "MODEL_MESSAGE" : criterion.verifier.kind === "EXTERNAL_STATE" ? "EXTERNAL_RECONCILIATION" : "TOOL_RESULT",
+    type: options?.modelOnly
+      ? "MODEL_MESSAGE"
+      : criterion.verifier.kind === "EXTERNAL_STATE"
+        ? "EXTERNAL_RECONCILIATION"
+        : "TOOL_RESULT",
     source: options?.modelOnly ? "trueforge:model.message" : "fixture",
     timestamp: "2026-08-25T18:01:00.000Z",
     payload: {},
@@ -75,13 +80,19 @@ export function passCriterion(
         : criterion.verifier.kind === "EXTERNAL_STATE"
           ? "EXTERNAL_RESULT"
           : "VERIFICATION";
+  const binding = artifactBindingFor(state, criterion.evidenceScope);
   const evidence = createEvidence({
     id: `evidence-${criterionId}`,
     kind,
     sourceEventId: event.id,
-    sourceTool: options?.modelOnly ? "model.prose" : kind === "REVIEW" ? "independent-reviewer" : "fixture-tool",
+    sourceTool: options?.modelOnly
+      ? "model.prose"
+      : kind === "REVIEW"
+        ? "independent-reviewer"
+        : "fixture-tool",
     claim: `${criterionId} passed`,
     outcome: "PASS",
+    binding,
     timestamp: "2026-08-25T18:01:01.000Z",
   });
   store.recordEvidence(evidence);
@@ -94,6 +105,7 @@ export function passCriterion(
     evidenceIds: [evidence.id],
     details: "fixture pass",
     deterministic: options?.deterministic ?? criterion.verifier.kind !== "REVIEWER",
+    binding,
   };
   state.verifierResults.push(result);
   state.evidenceIds.push(evidence.id);
