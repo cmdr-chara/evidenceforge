@@ -48,6 +48,13 @@ export interface TrueForgeRuntimeOptions {
 
 const DEFAULT_DRAIN_TIMEOUT_MS = 5_000;
 
+export class TrueForgeTerminalPersistenceError extends Error {
+  public constructor() {
+    super("TrueForge terminal checkpoint could not be confirmed durable");
+    this.name = "TrueForgeTerminalPersistenceError";
+  }
+}
+
 /**
  * A stream callback can outlive the Promise that consumed the stream (for
  * example, when the consumer's deadline wins a Promise.race). The callback
@@ -113,7 +120,8 @@ class StreamGeneration {
 export class DurableTrueForgeRuntime {
   private readonly projector: TrueForgeEventProjector;
   private readonly diagnosticGuard: DiagnosticContractGuard;
-  private readonly cancelledSessions = new Set<string>();
+  private readonly completedCancellations = new Set<string>();
+  private readonly cancellationAttempts = new Map<string, Promise<void>>();
   private readonly applicationReducer?: (state: SessionState, event: RuntimeEvent) => void;
   private activeGeneration: StreamGeneration | undefined;
   private readonly drainTimeoutMs: number;
@@ -442,16 +450,35 @@ export class DurableTrueForgeRuntime {
   }
 
   private async cancelOnce(sessionId: string): Promise<void> {
-    if (this.cancelledSessions.has(sessionId)) return;
-    this.cancelledSessions.add(sessionId);
+    if (this.completedCancellations.has(sessionId)) return;
+    const inFlight = this.cancellationAttempts.get(sessionId);
+    if (inFlight !== undefined) return inFlight;
+
+    let attempt!: Promise<void>;
+    attempt = this.performCancellation(sessionId).finally(() => {
+      if (this.cancellationAttempts.get(sessionId) === attempt) {
+        this.cancellationAttempts.delete(sessionId);
+      }
+    });
+    this.cancellationAttempts.set(sessionId, attempt);
+    return attempt;
+  }
+
+  private async performCancellation(sessionId: string): Promise<void> {
+    const transport = Promise.resolve(this.adapter.cancelSession(sessionId));
+    void transport.then(
+      () => this.completedCancellations.add(sessionId),
+      () => undefined,
+    );
     try {
       await awaitWithTimeout(
-        this.adapter.cancelSession(sessionId),
+        transport,
         this.drainTimeoutMs,
         new Error(`TrueForge session cancellation did not settle within ${this.drainTimeoutMs}ms`),
       );
     } catch {
-      // The durable terminal state is authoritative even if best-effort cancellation races.
+      // A failed/timed-out attempt is not marked complete. A later fail-closed
+      // path may retry, while concurrent callers share cancellationAttempts.
     }
   }
 
@@ -476,7 +503,14 @@ export class DurableTrueForgeRuntime {
       state.trueForgeSessionId === undefined
         ? Promise.resolve()
         : this.cancelOnce(state.trueForgeSessionId);
-    await Promise.allSettled([persistence, cancellation]);
+    const [persistenceResult] = await Promise.allSettled([persistence, cancellation]);
+    if (persistenceResult.status === "rejected") {
+      // The in-memory state is blocked, but callers must not mistake that for
+      // durable terminalization. The queued checkpoint write may still finish
+      // later; until then recovery must treat this as an explicit retryable
+      // durability failure rather than a successful BLOCKED result.
+      throw new TrueForgeTerminalPersistenceError();
+    }
   }
 
   private async persist(state: SessionState): Promise<void> {

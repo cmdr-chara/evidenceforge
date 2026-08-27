@@ -22,6 +22,7 @@ import {
   RunTurnInput,
   StreamResult,
   TrueForgeRuntimeAdapter,
+  TrueForgeTerminalPersistenceError,
   TrueForgeStreamTimeoutError,
 } from "../../packages/trueforge/src";
 import { createOperationIntent } from "../../packages/workflow/src";
@@ -49,6 +50,20 @@ class FailingStreamAdapter implements TrueForgeRuntimeAdapter {
 
   public async resumeTurn(): Promise<StreamResult> {
     throw new Error("simulated stream disconnect");
+  }
+}
+
+class RetryingCancellationAdapter extends FailingStreamAdapter {
+  public override cancellations = 0;
+
+  public override async createSession(): Promise<string> {
+    return "tf-retry-cancellation";
+  }
+
+  public override async cancelSession(sessionId: string): Promise<void> {
+    assert.equal(sessionId, "tf-retry-cancellation");
+    this.cancellations += 1;
+    if (this.cancellations === 1) throw new Error("first cancellation failed");
   }
 }
 
@@ -970,7 +985,7 @@ test("runtime terminalizes and cancels when an in-flight journal never settles",
   }
 });
 
-test("runtime terminalizes and cancels when a checkpoint never settles", async () => {
+test("runtime reports an undurable terminal checkpoint instead of returning false BLOCKED", async () => {
   const root = await mkdtemp(join(tmpdir(), "evidenceforge-never-checkpoint-"));
   try {
     const checkpoints = new NeverResolvingCheckpointStore(join(root, "checkpoints"));
@@ -988,14 +1003,47 @@ test("runtime terminalizes and cancels when a checkpoint never settles", async (
     );
 
     const startedAt = Date.now();
-    const updated = await runtime.start(state, "investigate");
+    await assert.rejects(
+      runtime.start(state, "investigate"),
+      TrueForgeTerminalPersistenceError,
+    );
 
     assert.ok(Date.now() - startedAt < 2_000);
-    assert.equal(updated.status, "BLOCKED");
+    assert.equal(state.status, "BLOCKED");
     assert.equal(adapter.cancellations, 1);
     assert.equal(checkpoints.snapshots[0]?.state.status, "ACTIVE");
     assert.equal(checkpoints.snapshots[1]?.state.status, "ACTIVE");
     assert.equal(checkpoints.snapshots.at(-1)?.state.status, "BLOCKED");
+    const durable = await checkpoints.loadCheckpoint(state.task.id);
+    assert.ok(durable);
+    assert.equal(durable.state.status, "ACTIVE");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("runtime retries provider cancellation after a failed attempt", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-cancel-retry-"));
+  try {
+    const adapter = new RetryingCancellationAdapter();
+    const sessions = new JsonSessionStore(join(root, "sessions"));
+    const runtime = new DurableTrueForgeRuntime(
+      adapter,
+      sessions,
+      new EvidenceStore(),
+      new EventJournal(join(root, "events.jsonl")),
+    );
+    const first = buildState();
+    first.trueForgeSessionId = "tf-retry-cancellation";
+    const second = buildState();
+    second.trueForgeSessionId = "tf-retry-cancellation";
+
+    await runtime.start(first, "first attempt");
+    await runtime.start(second, "retry cancellation");
+
+    assert.equal(first.status, "BLOCKED");
+    assert.equal(second.status, "BLOCKED");
+    assert.equal(adapter.cancellations, 2);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
