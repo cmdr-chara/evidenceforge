@@ -117,17 +117,17 @@ Qodo's review of the first published hardening commit identified two additional 
 
 The next exact-SHA Qodo pass marked both of those Highs resolved and exposed two further edge cases. Event commits are now serialized and persisted while the stream remains active, so an initial `TURN_CREATED` ID/cursor/evidence survives a process interruption and can resume; failure closes admission, drains the single in-flight commit, then writes the terminal checkpoint before any queued late work. GitHub file evidence additionally requires the exact normalized requested path: files/resources must match it, and directory entries must be valid direct children without traversal or absolute-path ambiguity.
 
-The published `29290cb…` candidate passed both push and PR workflows. Qodo marked those cursor/path findings resolved and exposed three further transaction boundaries: drain itself could hang, an approved effect could remain `EFFECT_STARTED` after drain/final-persistence failure, and checkpoint projection preceded journal durability. The next candidate bounds generation drain and terminal cleanup, records `EFFECT_UNCERTAIN` before blocking, and performs journal-first event admission. Hanging journal/checkpoint/observer cases and both approval-failure paths are covered; the full local suite is **201/201** pending exact-head CI/Qodo.
+The published `29290cb…` candidate passed both push and PR workflows. Qodo marked those cursor/path findings resolved and exposed three further transaction boundaries: drain itself could hang, an approved effect could remain `EFFECT_STARTED` after drain/final-persistence failure, and checkpoint projection preceded journal durability. The `be60a91…` candidate bounds generation drain and terminal cleanup, records `EFFECT_UNCERTAIN` before blocking, and performs journal-first event admission. Hanging journal/checkpoint/observer cases and both approval-failure paths are covered; both exact-SHA workflows passed **201/201**, and Qodo marks all three findings resolved.
 
 ## Latest verified branch baseline
 
 Final branch SHA:
 
-`29290cbf6b9511eaa7860d581c243fbdbfb19231`
+`be60a919fe7a63fe5dcbb14927e2342cab30c8f4`
 
 GitHub Actions run:
 
-`33097953798` and `33097959561`
+`33100490081` and `33100494121`
 
 Observed green steps:
 
@@ -135,14 +135,14 @@ Observed green steps:
 - `pnpm format:check`;
 - `pnpm lint`;
 - `pnpm typecheck`;
-- `pnpm test` — **196 / 196 passed**;
+- `pnpm test` — **201 / 201 passed**;
 - `pnpm eval:smoke`;
 - `pnpm demo:fixture`;
 - `pnpm build`;
 - `pnpm doctor`;
 - `git diff --check`.
 
-Both workflows passed on that exact documentation/code SHA. Qodo then updated its aggregate review against the same SHA, resolving the preceding cursor/path findings and surfacing the three runtime transaction findings remediated in the next candidate. The SDK-blocked read-only High remains separate and visible.
+Both workflows passed on that exact implementation SHA. Qodo then updated its aggregate review against the same SHA, resolving all three latest implementable runtime findings. The SDK-blocked read-only High remains separate and visible.
 
 ## Remaining external/human gates
 

@@ -64,13 +64,13 @@
 
 ## Quality
 
-Last externally verified branch baseline: `29290cbf6b9511eaa7860d581c243fbdbfb19231`, GitHub Actions runs `33097953798` and `33097959561`. Current unpublished candidate: all local gates green, **201/201 tests**; exact-head CI still required after publication.
+Latest verified implementation SHA: `be60a919fe7a63fe5dcbb14927e2342cab30c8f4`, GitHub Actions runs `33100490081` and `33100494121`, **201/201 tests**.
 
 - [x] `pnpm install --frozen-lockfile`.
 - [x] `pnpm format:check`.
 - [x] `pnpm lint`.
 - [x] `pnpm typecheck`.
-- [x] `pnpm test` — **201/201 passed locally**; exact-head CI pending publication.
+- [x] `pnpm test` — **201/201 passed** on exact-SHA push and PR CI.
 - [x] `pnpm eval:smoke`.
 - [x] `pnpm demo:fixture`.
 - [x] `pnpm build`.
@@ -88,6 +88,7 @@ Last externally verified branch baseline: `29290cbf6b9511eaa7860d581c243fbdbfb19
 - [x] Read-only pre-execution finding documented as SDK-blocked rather than falsely resolved.
 - [x] Request `/agentic_review` on the final exact SHA: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
 - [x] Inspect latest published-head Qodo response: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5442750603.
+- [x] Inspect fail-closed runtime Qodo response: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5443087230; all three latest implementable findings resolved.
 - [ ] Human merge after required review/live gates.
 
 ## Demo vertical slice required before submission
@@ -132,7 +133,7 @@ Last externally verified branch baseline: `29290cbf6b9511eaa7860d581c243fbdbfb19
 - [x] Public repository exists.
 - [ ] Credentialed live sponsor vertical slice complete.
 - [ ] Exact viewport/200% visual check complete.
-- [ ] Exact-head Qodo re-review after the latest three implementable runtime remediations; the SDK-blocked High remains disclosed.
+- [x] Exact-head Qodo re-review after the latest three implementable runtime remediations; the SDK-blocked High remains disclosed.
 - [ ] Human merge complete.
 - [ ] Demo video URL added.
 - [ ] Blog URL added if entering blog category.

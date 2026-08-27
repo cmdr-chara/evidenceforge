@@ -4,7 +4,7 @@
 
 EvidenceForge is an evidence-gated CI incident resolution agent built on TrueForge. It investigates failed GitHub Actions runs, reproduces failures in an isolated Daytona sandbox, generates and verifies a patch, pauses before external writes, and refuses to mark a task complete until required evidence exists.
 
-> **Verified repository baseline — 2026-08-27:** SHA `29290cbf6b9511eaa7860d581c243fbdbfb19231` passed GitHub Actions runs [`33097953798`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33097953798) and [`33097959561`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33097959561). The newer fail-closed runtime candidate passes all local gates with **201/201 tests**; it is not called the final branch SHA until exact-head CI and review exist.
+> **Verified repository baseline — 2026-08-27:** SHA `be60a919fe7a63fe5dcbb14927e2342cab30c8f4` passed GitHub Actions runs [`33100490081`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33100490081) and [`33100494121`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33100494121), including **201/201 tests**.
 
 A credentialed TrueForge/model session and a real read-only GitHub MCP `get_commit` call were also observed (session `01m11zp6dfp08dq520eqsp9cdx`, turn `01m11zp6dyt1xq08qwdkzdns1h.local`) against the exact repository SHA. Daytona connectivity and command execution were observed separately. These observations do **not** prove the still-open end-to-end failing-revision reproduction, approval, PR creation, or completion flow.
 
@@ -192,7 +192,7 @@ Qodo Agentic Review is genuinely present on PR #2.
 - Final exact-SHA request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
 - Current triage: [docs/qodo-review-log.md](docs/qodo-review-log.md)
 
-Qodo's exact review of `29290cb…` marked the preceding cursor/path findings resolved and exposed three deeper runtime transaction findings. The current candidate bounds generation drain, marks uncertain approval effects before fail-closed persistence, and journals before admitting events; all three have deterministic regressions and await exact-head Qodo confirmation. The **read-only dynamic-subagent pre-execution boundary remains BLOCKED by TrueForge SDK 0.1.3**.
+Qodo's exact review of `be60a91…` marks the generation-drain, approval-uncertainty, and journal-ordering findings resolved. The only reported bug left is the **read-only dynamic-subagent pre-execution boundary**, which remains BLOCKED by TrueForge SDK 0.1.3.
 
 ## Hackathon documentation
 
