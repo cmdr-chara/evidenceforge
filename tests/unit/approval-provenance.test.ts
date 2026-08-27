@@ -62,3 +62,31 @@ test("approval expires and can be consumed only once", () => {
     /consumed/,
   );
 });
+
+test("malformed approval expiry fails closed", () => {
+  const malformed = prepared();
+  malformed.approval.status = "APPROVED";
+  malformed.approval.provenance!.expiresAt = "not-a-timestamp";
+  assert.throws(
+    () =>
+      new ExternalActionCoordinator().applyApproval(
+        malformed.action,
+        malformed.approval,
+        "2026-08-25T18:01:00.000Z",
+      ),
+    /malformed timestamps/,
+  );
+
+  const inverted = prepared();
+  inverted.approval.status = "APPROVED";
+  inverted.approval.provenance!.expiresAt = "2026-08-25T17:59:00.000Z";
+  assert.throws(
+    () =>
+      new ExternalActionCoordinator().applyApproval(
+        inverted.action,
+        inverted.approval,
+        "2026-08-25T18:01:00.000Z",
+      ),
+    /expiry is malformed/,
+  );
+});

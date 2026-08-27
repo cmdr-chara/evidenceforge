@@ -4,7 +4,9 @@
 
 EvidenceForge is an evidence-gated CI incident resolution agent built on TrueForge. It investigates failed GitHub Actions runs, reproduces failures in an isolated Daytona sandbox, generates and verifies a patch, pauses before external writes, and refuses to mark a task complete until required evidence exists.
 
-> **Verified repository status — 2026-08-27:** implementation SHA `628d4db9a19e50b142051fe3ae2793b0b9b704ad` passed GitHub Actions run `33083635762`: frozen-lockfile install, format, lint, typecheck, **159/159 tests**, evaluation smoke, demo fixture, build, doctor, and `git diff --check`. This is repository/fixture evidence, not a claim that credentialed TrueForge, GitHub MCP, Daytona, or sponsor submission gates have run live.
+> **Verified repository baseline — 2026-08-27:** SHA `7555f0f01f1af1f198d665333098619d05408230` passed GitHub Actions runs [`33084240703`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33084240703) and [`33084235854`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33084235854). The newer control-plane candidate passes all local gates with **192/192 tests**; it is not called the final branch SHA until exact-head CI and review exist.
+
+A credentialed TrueForge/model session and a real read-only GitHub MCP `get_commit` call were also observed (session `01m11zp6dfp08dq520eqsp9cdx`, turn `01m11zp6dyt1xq08qwdkzdns1h.local`) against the exact repository SHA. Daytona connectivity and command execution were observed separately. These observations do **not** prove the still-open end-to-end failing-revision reproduction, approval, PR creation, or completion flow.
 
 PR #2 remains open against `determination` and is intentionally unmerged.
 
@@ -154,6 +156,7 @@ Tests and current CI prove that:
 - every required criterion needs current admissible evidence and a correlated verifier result;
 - changing the patch preserves incident/root-cause evidence but invalidates patch verification, review, external approvals/actions, and related operations;
 - exact PR reconciliation checks repository, base, head, head SHA, operation identity, and idempotency identity;
+- the GitHub MCP adapter sends only official tool fields; a create response is only a receipt, and a later authoritative PR read is required for reconciliation;
 - same SHA on a different PR target is rejected;
 - concurrent approval decisions are serialized to one submission path;
 - completed-turn resume advances to the maximum observed sequence and skips persisted history;
@@ -171,7 +174,7 @@ See [docs/EVALUATION.md](docs/EVALUATION.md).
 
 The console includes task-scoped SSE with snapshot reload on reconnect, defense-in-depth task filtering, explicit INFO/SUCCESS/WARNING/ERROR/BLOCKED activity states, >=44px primary controls, visible focus, skip link, accessible live/log regions, long-value titles/ARIA labels, reduced-motion handling, and responsive rules down to 320px-class layouts.
 
-The code is CI-verified. **The exact 320 / 375 / 768 / 1024 / 1440 px plus 200% zoom visual matrix has not been browser-observed in this execution environment**, so that remains a manual presentation gate rather than a claimed pass.
+The exact 320 / 375 / 768 / 1024 / 1440 px widths were browser-observed without page-level horizontal overflow. Exact browser 200% zoom remains manual; a 640px equivalent reflow is not represented as exact zoom evidence.
 
 ## Security
 
@@ -186,9 +189,10 @@ Qodo Agentic Review is genuinely present on PR #2.
 - PR: https://github.com/cmdr-chara/evidenceforge/pull/2
 - Initial/aggregate Qodo review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 - Earlier follow-up request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
+- Final exact-SHA request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
 - Current triage: [docs/qodo-review-log.md](docs/qodo-review-log.md)
 
-The reconstructed batch contains code/test evidence for every currently implementable High/Medium finding. The **read-only dynamic-subagent pre-execution boundary remains BLOCKED by TrueForge SDK 0.1.3**. A new `/agentic_review` is required on the final exact SHA before Qodo closure is claimed.
+Qodo updated the aggregate review against final SHA `7555f0f0…`: every implementable High/Medium finding is resolved and one High remains open. The **read-only dynamic-subagent pre-execution boundary remains BLOCKED by TrueForge SDK 0.1.3**; EvidenceForge does not misrepresent that platform limitation as fixed.
 
 ## Hackathon documentation
 

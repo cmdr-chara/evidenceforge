@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 const root = resolve(new URL('..', import.meta.url).pathname);
 const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+const runtimeMode = process.env.CI === 'true' ? 'CI contract (placeholders permitted)' : 'local/live readiness';
 const checks = [
   ['Node >= 22.14', satisfiesNode(process.versions.node)],
   ['package manager declared', packageJson.packageManager === 'pnpm@11.16.0'],
@@ -11,6 +12,7 @@ const checks = [
   ['model configured', Boolean(process.env.TRUEFORGE_MODEL)],
   ['installed dependencies', existsSync(resolve(root, 'node_modules/@truefoundry/trueforge-sdk'))],
 ];
+console.log(`Doctor mode: ${runtimeMode}`);
 for (const [name, pass] of checks) console.log(`${pass ? 'PASS' : 'BLOCKED'} ${name}`);
 if (checks.some(([, pass]) => !pass)) process.exitCode = 1;
 

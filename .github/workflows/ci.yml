@@ -30,5 +30,12 @@ jobs:
       - run: pnpm eval:smoke
       - run: pnpm demo:fixture
       - run: pnpm build
-      - run: pnpm doctor
+      # CI validates the repository/runtime contract with deliberately inert values.
+      # This does not claim that credentialed TrueForge is reachable; local/live runs
+      # still need real TRUEFORGE_BASE_URL and TRUEFORGE_MODEL values.
+      - name: Run doctor with CI placeholders
+        env:
+          TRUEFORGE_BASE_URL: http://127.0.0.1:8790
+          TRUEFORGE_MODEL: ci/placeholder
+        run: pnpm run doctor
       - run: git diff --check

@@ -4,6 +4,7 @@ import {
   digestCanonical,
   EvidenceScope,
   SessionState,
+  completionStateDigest as domainCompletionStateDigest,
 } from "../../domain/src";
 
 export interface CompletionSubjectSnapshot {
@@ -12,6 +13,7 @@ export interface CompletionSubjectSnapshot {
   revision: string;
   patchDigest: string;
   stateVersion: number;
+  preCompletionPhase: SessionState["phase"];
   successContractDigest: string;
   stateDigest: string;
 }
@@ -73,28 +75,7 @@ export function artifactBindingMatchesState(
 }
 
 export function completionStateDigest(state: SessionState): string {
-  const requiredIds = new Set(
-    state.successCriteria.filter((criterion) => criterion.required).map((criterion) => criterion.id),
-  );
-  return digestCanonical({
-    version: state.version,
-    task: state.task,
-    phase: state.phase,
-    status: state.status,
-    successContractDigest: successContractDigest(state),
-    requiredCriteria: state.successCriteria.filter((criterion) => criterion.required),
-    verifierResults: state.verifierResults.filter((result) => requiredIds.has(result.criterionId)),
-    evidenceIds: state.evidenceIds,
-    patchDigest: state.patchDigest ?? null,
-    reviewerVerdict: state.reviewerVerdict ?? null,
-    reviewBinding: state.reviewBinding ?? null,
-    approvals: state.approvals,
-    operations: state.operations,
-    latestRoundEvaluation: state.roundEvaluations.at(-1) ?? null,
-    externalAction: state.externalAction ?? null,
-    terminalSequenceNumber: state.terminalSequenceNumber ?? null,
-    traceId: state.traceId,
-  });
+  return domainCompletionStateDigest(state);
 }
 
 export function completionSubjectSnapshot(state: SessionState): CompletionSubjectSnapshot {
@@ -105,6 +86,7 @@ export function completionSubjectSnapshot(state: SessionState): CompletionSubjec
     revision: state.task.revision,
     patchDigest: state.patchDigest,
     stateVersion: state.version,
+    preCompletionPhase: state.phase,
     successContractDigest: successContractDigest(state),
     stateDigest: completionStateDigest(state),
   };

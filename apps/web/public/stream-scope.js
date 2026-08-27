@@ -1,11 +1,66 @@
 (() => {
   const NativeEventSource = window.EventSource;
   const bootstrapSources = [];
+  const initialTaskId = normalizeTaskId(
+    new URL(window.location.href).searchParams.get('task'),
+  );
+
+  function normalizeTaskId(value) {
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  function scopedUrl(url) {
+    if (initialTaskId === null) return url;
+    const target = new URL(url, window.location.href);
+    if (target.pathname !== '/api/events') return url;
+    target.searchParams.set('task', initialTaskId);
+    const page = new URL(window.location.href);
+    return target.origin === page.origin
+      ? `${target.pathname}${target.search}${target.hash}`
+      : target.href;
+  }
+
+  function eventMatchesTask(name, event) {
+    if (name === 'demo-state') return initialTaskId === null;
+    if (name === 'live-state') {
+      if (initialTaskId === null) return false;
+      try {
+        return JSON.parse(event.data)?.task?.id === initialTaskId;
+      } catch {
+        return false;
+      }
+    }
+    if (name === 'runtime-event') {
+      if (initialTaskId === null) return false;
+      try {
+        const payload = JSON.parse(event.data);
+        const eventTaskId = payload?.taskId ?? payload?.task?.id;
+        return eventTaskId === undefined || eventTaskId === initialTaskId;
+      } catch {
+        return false;
+      }
+    }
+    if (name === 'connected' || name === 'stream-error') {
+      try {
+        const eventTaskId = JSON.parse(event.data)?.taskId;
+        return eventTaskId === undefined || eventTaskId === initialTaskId;
+      } catch {
+        return true;
+      }
+    }
+    return true;
+  }
 
   window.EventSource = class TrackedEventSource extends NativeEventSource {
     constructor(url, options) {
-      super(url, options);
+      super(scopedUrl(url), options);
       bootstrapSources.push(this);
+    }
+
+    addEventListener(name, listener, options) {
+      super.addEventListener(name, (event) => {
+        if (eventMatchesTask(name, event)) listener.call(this, event);
+      }, options);
     }
   };
 
@@ -13,13 +68,14 @@
     for (const source of bootstrapSources) source.close();
     window.EventSource = NativeEventSource;
 
-    const baseRender = window.render;
+    const app = window.evidenceForge;
+    const baseRender = app?.render;
     if (typeof baseRender !== 'function') return;
 
     let source = null;
     let activeTaskId = null;
 
-    window.render = (input) => {
+    app.render = (input) => {
       const snapshotTaskId = input?.mode === 'LIVE_TRUEFORGE' ? input.task?.id ?? null : null;
       if (
         activeTaskId !== null
@@ -30,8 +86,7 @@
       }
 
       baseRender(input);
-      const renderedTaskId = input?.mode === 'LIVE_TRUEFORGE' ? input.task?.id ?? null : null;
-      ensureStream(renderedTaskId);
+      ensureStream(app.getStreamSnapshot?.()?.taskId ?? null);
       decorateLongValues(input);
     };
 
@@ -45,31 +100,28 @@
       const path = normalized === null
         ? '/api/events'
         : `/api/events?task=${encodeURIComponent(normalized)}`;
+      const streamTaskId = normalized;
       source = new NativeEventSource(path);
-      source.addEventListener('connected', () => window.showConnection?.('Event stream live', 'complete'));
+      source.addEventListener('connected', () => app.showConnection?.('Event stream live', 'complete'));
       source.addEventListener('demo-state', (event) => {
-        if (activeTaskId !== null) return;
-        window.render(JSON.parse(event.data));
+        if (activeTaskId !== streamTaskId || streamTaskId !== null) return;
+        app.render(JSON.parse(event.data));
       });
       source.addEventListener('live-state', (event) => {
         const snapshot = JSON.parse(event.data);
-        if (activeTaskId === null || snapshot?.task?.id !== activeTaskId) return;
-        window.render(snapshot);
+        if (streamTaskId === null || activeTaskId !== streamTaskId || snapshot?.task?.id !== streamTaskId) return;
+        app.render(snapshot);
       });
       source.addEventListener('runtime-event', (event) => {
-        if (activeTaskId === null) return;
-        const snapshot = window.state?.snapshot;
-        if (snapshot?.mode !== 'LIVE_TRUEFORGE' || snapshot.task?.id !== activeTaskId) return;
-        const activity = window.normalizeActivity?.(JSON.parse(event.data));
-        if (activity === null || activity === undefined) return;
-        window.renderActivity?.([...(snapshot.activity ?? []), activity].slice(-80));
+        if (streamTaskId === null || activeTaskId !== streamTaskId) return;
+        app.appendRuntimeActivity?.(JSON.parse(event.data), streamTaskId);
       });
       source.addEventListener('stream-error', (event) => {
         const payload = JSON.parse(event.data);
         const notice = document.getElementById('mode-notice');
         if (notice !== null) notice.textContent = payload.error ?? 'Event stream error';
       });
-      source.onerror = () => window.showConnection?.('Reconnecting', 'warning');
+      source.onerror = () => app.showConnection?.('Reconnecting', 'warning');
     }
 
     function decorateLongValues(snapshot) {

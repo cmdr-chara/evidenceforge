@@ -17,6 +17,7 @@ import {
 import { roundEvaluationMatchesState } from "./progress-evaluator";
 
 const issuedCertificates = new WeakMap<object, string>();
+const TERMINAL_PHASES = new Set(["COMPLETED", "BLOCKED", "ESCALATED", "FAILED"]);
 
 export function isIssuedCompletionCertificate(value: CompletionCertificateData): boolean {
   const issuedDigest = issuedCertificates.get(value);
@@ -32,6 +33,12 @@ export class CompletionGate {
 
   public evaluate(state: SessionState, generatedAt = new Date().toISOString()): GateDecision {
     const failures: GateFailure[] = [];
+    if (state.status !== "ACTIVE" || TERMINAL_PHASES.has(state.phase)) {
+      failures.push({
+        code: "REQUIRED_CRITERION_NOT_PASSING",
+        message: `completion requires an ACTIVE non-terminal session (received ${state.status}/${state.phase})`,
+      });
+    }
     const required = state.successCriteria.filter((criterion) => criterion.required);
     const acceptedEvidenceIds = new Map<string, string[]>();
     const latestRound = state.roundEvaluations.at(-1);
@@ -198,11 +205,12 @@ export class CompletionGate {
     const externalAction = state.externalAction;
     const identity = externalAction?.reconciledIdentity;
     const payload = {
-      certificateVersion: 1 as const,
+      certificateVersion: 2 as const,
       taskId: subject.taskId,
       repository: subject.repository,
       revision: subject.revision,
       stateVersion: subject.stateVersion,
+      preCompletionPhase: subject.preCompletionPhase,
       successContractDigest: subject.successContractDigest,
       stateDigest: subject.stateDigest,
       requiredCriteria: required.map((criterion) => ({

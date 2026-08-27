@@ -8,6 +8,7 @@ import {
   RunTurnInput,
   StreamResult,
   TrueForgeSdkAdapter,
+  TrueForgeStreamTimeoutError,
 } from "./client";
 import { TrueForgeEventProjector } from "./projector";
 import { markEffectStarted, markEffectUncertain } from "../../workflow/src";
@@ -37,6 +38,7 @@ export class DurableTrueForgeRuntime {
   private readonly projector: TrueForgeEventProjector;
   private readonly diagnosticGuard: DiagnosticContractGuard;
   private readonly cancelledSessions = new Set<string>();
+  private readonly applicationReducer?: (state: SessionState, event: RuntimeEvent) => void;
 
   public constructor(
     private readonly adapter: TrueForgeRuntimeAdapter | TrueForgeSdkAdapter,
@@ -48,22 +50,36 @@ export class DurableTrueForgeRuntime {
       state: SessionState,
     ) => void | Promise<void>,
     projector?: TrueForgeEventProjector,
+    applicationReducer?: (state: SessionState, event: RuntimeEvent) => void,
   ) {
     this.projector = projector ?? new TrueForgeEventProjector(undefined, evidenceStore);
     this.diagnosticGuard = new DiagnosticContractGuard(evidenceStore.listEvents());
+    this.applicationReducer = applicationReducer;
   }
 
   public async start(state: SessionState, message: string): Promise<SessionState> {
     if (state.status !== "ACTIVE") throw new Error("non-active session cannot start a TrueForge turn");
-    const sessionId = state.trueForgeSessionId ?? (await this.adapter.createSession());
+    let sessionId: string;
+    try {
+      sessionId = state.trueForgeSessionId ?? (await this.adapter.createSession());
+    } catch (error) {
+      await this.failClosedStream(state, error);
+      return state;
+    }
     state.trueForgeSessionId = sessionId;
     await this.persist(state);
 
-    const result = await this.adapter.runTurn({
-      sessionId,
-      message,
-      onEvent: async (event) => this.handleEvent(state, event),
-    });
+    let result: StreamResult;
+    try {
+      result = await this.adapter.runTurn({
+        sessionId,
+        message,
+        onEvent: async (event) => this.handleEvent(state, event),
+      });
+    } catch (error) {
+      await this.failClosedStream(state, error);
+      return state;
+    }
     applyStreamCursor(state, result);
     await this.persist(state);
     return state;
@@ -147,7 +163,8 @@ export class DurableTrueForgeRuntime {
           await this.persist(state);
         }
       }
-      throw error;
+      await this.failClosedStream(state, error);
+      return state;
     }
     applyStreamCursor(state, result);
     await this.persist(state);
@@ -164,12 +181,18 @@ export class DurableTrueForgeRuntime {
       throw new Error("session cannot resume without persisted TrueForge session, turn, and sequence IDs");
     }
     this.restoreCorrelatedToolCalls(state);
-    const result = await this.adapter.resumeTurn(
-      state.trueForgeSessionId,
-      state.activeTurnId,
-      state.lastSequenceNumber,
-      async (event) => this.handleEvent(state, event),
-    );
+    let result: StreamResult;
+    try {
+      result = await this.adapter.resumeTurn(
+        state.trueForgeSessionId,
+        state.activeTurnId,
+        state.lastSequenceNumber,
+        async (event) => this.handleEvent(state, event),
+      );
+    } catch (error) {
+      await this.failClosedStream(state, error);
+      return state;
+    }
     applyStreamCursor(state, result);
     await this.persist(state);
     return state;
@@ -190,6 +213,9 @@ export class DurableTrueForgeRuntime {
     const violation = this.diagnosticGuard.observe(event);
     if (violation !== undefined) blockForDiagnosticViolation(state, violation);
     if (violation === undefined) this.projector.project(state, event);
+    if (violation === undefined && state.status === "ACTIVE") {
+      this.applicationReducer?.(state, event);
+    }
     if (event.type === "TURN_CREATED" && state.status === "ACTIVE") {
       state.activeTurnId = readTurnId(event.payload) ?? state.activeTurnId;
     }
@@ -219,6 +245,21 @@ export class DurableTrueForgeRuntime {
     } catch {
       // The durable terminal state is authoritative even if best-effort cancellation races.
     }
+  }
+
+  private async failClosedStream(state: SessionState, error: unknown): Promise<void> {
+    if (state.status === "ACTIVE") {
+      state.phase = "BLOCKED";
+      state.status = "BLOCKED";
+      state.blockedReason =
+        error instanceof TrueForgeStreamTimeoutError
+          ? error.message
+          : "TrueForge turn stream ended before a trustworthy terminal result";
+      state.version += 1;
+      state.terminalSequenceNumber ??= state.lastSequenceNumber;
+    }
+    await this.persist(state);
+    if (state.trueForgeSessionId !== undefined) await this.cancelOnce(state.trueForgeSessionId);
   }
 
   private async persist(state: SessionState): Promise<void> {

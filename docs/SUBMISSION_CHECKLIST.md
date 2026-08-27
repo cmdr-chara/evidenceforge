@@ -13,10 +13,11 @@
 - [x] Restart-before-tool-response correlation implemented and tested.
 - [x] Human approval resume protocol implemented.
 - [ ] Per-specialist pre-execution read-only tool enforcement — **BLOCKED by TrueForge SDK 0.1.3 API surface**.
-- [ ] Real TrueForge session and model turn observed.
-- [ ] Real GitHub MCP incident read observed.
+- [x] Real TrueForge session and model turn observed — session `01m11zp6dfp08dq520eqsp9cdx`, turn `01m11zp6dyt1xq08qwdkzdns1h.local`.
+- [x] Real GitHub MCP incident read observed — official `get_commit` returned exact SHA `7555f0f0…`.
 - [ ] Real Daytona reproduction observed.
-- [ ] Real skill materialization/use observed.
+- [x] Daytona provider connectivity and a successful command execution observed separately; this is not the failing-revision reproduction.
+- [x] Real skill materialization/use observed in a credentialed TrueForge session.
 - [ ] Real approval pause/resume observed.
 
 ## Domain/control plane
@@ -34,6 +35,7 @@
 - [x] Per-task approval decisions serialized; concurrent path has one submission.
 - [x] Approval provenance bound to current patch and exact operation.
 - [x] Exact PR reconciliation verifies repo/base/head/head SHA/operation/idempotency.
+- [x] Official GitHub MCP adapter keeps operation metadata application-owned and requires create receipt → authoritative PR read.
 - [x] Same SHA on a different target PR is rejected.
 - [x] Completed resume advances the maximum cursor and skips replayed history.
 - [x] Terminal cutoff prevents late actionable mutation/persistence.
@@ -53,16 +55,16 @@
 - [x] >=44px primary interactive targets.
 - [x] Long SHA/revision/trace values expose full accessible/title values.
 - [x] Responsive narrow-layout and reduced-motion rules.
-- [ ] Browser-observe 320px.
-- [ ] Browser-observe 375px.
-- [ ] Browser-observe 768px.
-- [ ] Browser-observe 1024px.
-- [ ] Browser-observe 1440px.
+- [x] Browser-observe 320px — no page-level horizontal overflow; phase rail remains intentionally scrollable.
+- [x] Browser-observe 375px — no page-level horizontal overflow; phase rail remains intentionally scrollable.
+- [x] Browser-observe 768px — clean section boundaries and no page-level horizontal overflow.
+- [x] Browser-observe 1024px — no page-level horizontal overflow.
+- [x] Browser-observe 1440px — no page-level horizontal overflow.
 - [ ] Browser-observe 200% zoom.
 
 ## Quality
 
-Verified implementation baseline: `628d4db9a19e50b142051fe3ae2793b0b9b704ad`, GitHub Actions run `33083635762`.
+Last externally verified branch baseline: `7555f0f01f1af1f198d665333098619d05408230`, GitHub Actions runs `33084240703` and `33084235854`. Current unpublished candidate: all local gates green, **192/192 tests**; exact-head CI still required after publication.
 
 - [x] `pnpm install --frozen-lockfile`.
 - [x] `pnpm format:check`.
@@ -75,7 +77,7 @@ Verified implementation baseline: `628d4db9a19e50b142051fe3ae2793b0b9b704ad`, Gi
 - [x] `pnpm doctor`.
 - [x] `git diff --check`.
 - [x] GitHub Actions CI exists and a current reconstructed implementation SHA was observed green.
-- [ ] Final documentation-head CI observed green.
+- [x] Final documentation-head CI observed green.
 
 ## Qodo
 
@@ -84,8 +86,8 @@ Verified implementation baseline: `628d4db9a19e50b142051fe3ae2793b0b9b704ad`, Gi
 - [x] Earlier follow-up request observed: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
 - [x] Every currently implementable open High/Medium finding has repository-side code + test remediation.
 - [x] Read-only pre-execution finding documented as SDK-blocked rather than falsely resolved.
-- [ ] Request `/agentic_review` on the final exact SHA.
-- [ ] Inspect final Qodo response and update dispositions from actual evidence.
+- [x] Request `/agentic_review` on the final exact SHA: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
+- [x] Inspect final Qodo response: exact-SHA update https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440921739; one SDK-blocked High remains.
 - [ ] Human merge after required review/live gates.
 
 ## Demo vertical slice required before submission
@@ -114,7 +116,7 @@ Verified implementation baseline: `628d4db9a19e50b142051fe3ae2793b0b9b704ad`, Gi
 - [x] Build journal synchronized with reconstruction evidence.
 - [x] Field report draft synchronized with Qodo/SDK limitations.
 - [ ] Add final live-run URLs and demo video URL after they genuinely exist.
-- [ ] Add final Qodo follow-up result after it genuinely exists.
+- [x] Add final Qodo follow-up result after it genuinely exists.
 
 ## Repository hygiene
 
@@ -130,7 +132,7 @@ Verified implementation baseline: `628d4db9a19e50b142051fe3ae2793b0b9b704ad`, Gi
 - [x] Public repository exists.
 - [ ] Credentialed live sponsor vertical slice complete.
 - [ ] Exact viewport/200% visual check complete.
-- [ ] Final Qodo re-review complete.
+- [x] Final Qodo re-review complete; one High remains SDK-blocked and disclosed.
 - [ ] Human merge complete.
 - [ ] Demo video URL added.
 - [ ] Blog URL added if entering blog category.

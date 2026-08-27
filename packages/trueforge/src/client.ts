@@ -14,6 +14,13 @@ interface MetadataStream {
   withMetadata(): AsyncIterable<MetadataItem>;
 }
 
+export class TrueForgeStreamTimeoutError extends Error {
+  public constructor(timeoutInSeconds: number) {
+    super(`TrueForge turn stream exceeded the ${timeoutInSeconds}-second deadline`);
+    this.name = "TrueForgeStreamTimeoutError";
+  }
+}
+
 interface SessionApi {
   create(input: unknown): Promise<{ data: { id: string } }>;
   cancel(sessionId: string): Promise<unknown>;
@@ -71,19 +78,37 @@ export async function replayListedTurnEvents(
   rawEvents: AsyncIterable<unknown>,
   afterSequenceNumber: number,
   onEvent?: RunTurnInput["onEvent"],
+  timeoutInSeconds?: number,
 ): Promise<ReplayedTurnEvents> {
   const events: RuntimeEvent[] = [];
   let lastSequenceNumber = afterSequenceNumber;
-  for await (const raw of rawEvents) {
-    const record = asRecord(raw);
-    const sequence = readSequence(record);
-    if (sequence !== undefined) {
-      lastSequenceNumber = Math.max(lastSequenceNumber, sequence);
-      if (sequence <= afterSequenceNumber) continue;
+  const iterator = rawEvents[Symbol.asyncIterator]();
+  const deadline = deadlineFor(timeoutInSeconds);
+  try {
+    while (true) {
+      const next = await runBeforeDeadline(
+        () => iterator.next(),
+        deadline,
+        timeoutInSeconds,
+      );
+      if (next.done) break;
+      const raw = next.value;
+      const record = asRecord(raw);
+      const sequence = readSequence(record);
+      if (sequence !== undefined) {
+        lastSequenceNumber = Math.max(lastSequenceNumber, sequence);
+        if (sequence <= afterSequenceNumber) continue;
+      }
+      const normalized = normalizeTrueForgeEvent(raw, sequence);
+      events.push(normalized.event);
+      await runBeforeDeadline(
+        () => onEvent?.(normalized.event),
+        deadline,
+        timeoutInSeconds,
+      );
     }
-    const normalized = normalizeTrueForgeEvent(raw, sequence);
-    events.push(normalized.event);
-    await onEvent?.(normalized.event);
+  } finally {
+    closeIterator(iterator);
   }
   return { events, lastSequenceNumber };
 }
@@ -157,6 +182,7 @@ export class TrueForgeSdkAdapter {
       await client.sessions.listTurnEvents(sessionId, turnId, { order: "asc" }),
       afterSequenceNumber,
       onEvent,
+      this.config.timeoutInSeconds,
     );
     return {
       sessionId,
@@ -178,27 +204,76 @@ export class TrueForgeSdkAdapter {
     initialSequence = 0,
     knownTurnId?: string,
   ): Promise<StreamResult> {
+    return consumeMetadataStream({
+      sessionId,
+      stream,
+      timeoutInSeconds: this.config.timeoutInSeconds,
+      onEvent,
+      initialSequence,
+      knownTurnId,
+    });
+  }
+
+  private async client(): Promise<TrueForgeClientShape> {
+    this.clientPromise ??= loadClient(this.config);
+    return this.clientPromise;
+  }
+}
+
+export async function consumeMetadataStream(input: {
+  sessionId: string;
+  stream: MetadataStream;
+  timeoutInSeconds: number;
+  onEvent?: RunTurnInput["onEvent"];
+  initialSequence?: number;
+  knownTurnId?: string;
+}): Promise<StreamResult> {
+    const {
+      sessionId,
+      stream,
+      timeoutInSeconds,
+      onEvent,
+      initialSequence = 0,
+      knownTurnId,
+    } = input;
     let lastSequenceNumber = initialSequence;
     let turnId = knownTurnId;
     const events: RuntimeEvent[] = [];
     let requiredActions: unknown[] = [];
+    const iterator = stream.withMetadata()[Symbol.asyncIterator]();
+    const deadline = deadlineFor(timeoutInSeconds);
 
-    for await (const item of stream.withMetadata()) {
-      const sequence = item.id === undefined ? undefined : Number.parseInt(item.id, 10);
-      if (sequence !== undefined && Number.isFinite(sequence)) {
-        lastSequenceNumber = Math.max(lastSequenceNumber, sequence);
+    try {
+      while (true) {
+        const next = await runBeforeDeadline(
+          () => iterator.next(),
+          deadline,
+          timeoutInSeconds,
+        );
+        if (next.done) break;
+        const item = next.value;
+        const sequence = item.id === undefined ? undefined : Number.parseInt(item.id, 10);
+        if (sequence !== undefined && Number.isFinite(sequence)) {
+          lastSequenceNumber = Math.max(lastSequenceNumber, sequence);
+        }
+        const normalized = normalizeTrueForgeEvent(item.data, sequence);
+        events.push(normalized.event);
+        const raw = asRecord(item.data);
+        if (raw.type === "turn.created") {
+          turnId = readString(raw, "turnId") ?? readString(raw, "turn_id") ?? turnId;
+        }
+        if (raw.type === "turn.done") {
+          const state = asRecord(raw.state);
+          if (Array.isArray(state.requiredActions)) requiredActions = state.requiredActions;
+        }
+        await runBeforeDeadline(
+          () => onEvent?.(normalized.event),
+          deadline,
+          timeoutInSeconds,
+        );
       }
-      const normalized = normalizeTrueForgeEvent(item.data, sequence);
-      events.push(normalized.event);
-      const raw = asRecord(item.data);
-      if (raw.type === "turn.created") {
-        turnId = readString(raw, "turnId") ?? readString(raw, "turn_id") ?? turnId;
-      }
-      if (raw.type === "turn.done") {
-        const state = asRecord(raw.state);
-        if (Array.isArray(state.requiredActions)) requiredActions = state.requiredActions;
-      }
-      await onEvent?.(normalized.event);
+    } finally {
+      closeIterator(iterator);
     }
 
     return {
@@ -209,11 +284,44 @@ export class TrueForgeSdkAdapter {
       paused: requiredActions.length > 0,
       requiredActions,
     };
-  }
+}
 
-  private async client(): Promise<TrueForgeClientShape> {
-    this.clientPromise ??= loadClient(this.config);
-    return this.clientPromise;
+function closeIterator<T>(iterator: AsyncIterator<T>): void {
+  try {
+    const result = iterator.return?.();
+    if (result !== undefined) void Promise.resolve(result).catch(() => undefined);
+  } catch {
+    // The stream deadline remains authoritative when best-effort iterator cleanup fails.
+  }
+}
+
+function deadlineFor(timeoutInSeconds: number | undefined): number {
+  return timeoutInSeconds === undefined
+    ? Number.POSITIVE_INFINITY
+    : Date.now() + timeoutInSeconds * 1_000;
+}
+
+async function runBeforeDeadline<T>(
+  operation: () => T | PromiseLike<T>,
+  deadline: number,
+  timeoutInSeconds: number | undefined,
+): Promise<T> {
+  if (timeoutInSeconds === undefined) return operation();
+  const remainingMs = deadline - Date.now();
+  if (remainingMs <= 0) throw new TrueForgeStreamTimeoutError(timeoutInSeconds);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(operation),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new TrueForgeStreamTimeoutError(timeoutInSeconds)),
+          remainingMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 

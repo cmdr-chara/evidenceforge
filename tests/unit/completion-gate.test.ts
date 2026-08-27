@@ -43,6 +43,24 @@ test("completion gate rejects required INCONCLUSIVE", () => {
   assert.equal(decision.allowed, false);
 });
 
+test("completion gate cannot issue from a non-active or terminal session", () => {
+  for (const [status, phase] of [
+    ["COMPLETED", "COMPLETED"],
+    ["BLOCKED", "BLOCKED"],
+    ["ESCALATED", "ESCALATED"],
+    ["FAILED", "FAILED"],
+  ] as const) {
+    const state = buildState();
+    const store = new EvidenceStore();
+    passAll(state, store);
+    state.status = status;
+    state.phase = phase;
+
+    const decision = new CompletionGate(store).evaluate(state);
+    assert.equal(decision.allowed, false, `${status}/${phase} must remain terminal`);
+  }
+});
+
 test("completion gate rejects model-only success claim", () => {
   const state = buildState();
   const store = new EvidenceStore();
@@ -166,11 +184,12 @@ test("fabricated certificate is rejected", () => {
   const state = buildState();
   const controller = new SessionController(state);
   const fabricated: CompletionCertificateData = {
-    certificateVersion: 1,
+    certificateVersion: 2,
     taskId: state.task.id,
     repository: state.task.repository,
     revision: state.task.revision,
     stateVersion: state.version,
+    preCompletionPhase: state.phase,
     successContractDigest: "0".repeat(64),
     stateDigest: "0".repeat(64),
     requiredCriteria: [],

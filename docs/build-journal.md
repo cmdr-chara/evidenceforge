@@ -105,15 +105,23 @@ TrueForge SDK `0.1.3` declarations were inspected directly. Dynamic subagents ca
 
 The minimum safe architecture is a future TrueForge per-subagent tool policy or a read-only proxy/tool surface for specialists while mutation remains serialized in the parent. TrueForge remains the runtime; no competing orchestration framework was added.
 
-## Verified CI baseline
+### Credentialed runtime observations and live-contract hardening
 
-Implementation SHA:
+A credentialed TrueForge/model turn was observed in session `01m11zp6dfp08dq520eqsp9cdx`, turn `01m11zp6dyt1xq08qwdkzdns1h.local`. Through TrueForge's meta-tool path, the model invoked the official GitHub MCP `get_commit` tool and received the exact repository SHA `7555f0f01f1af1f198d665333098619d05408230`. A separate credentialed session exposed the configured GitHub MCP tools, Daytona execution, four skills, dynamic subagents, and the approval gate. These are real component observations, not a completed incident-resolution run.
 
-`628d4db9a19e50b142051fe3ae2793b0b9b704ad`
+The application control plane was then hardened around the official GitHub MCP schema. Application-only identity fields are never sent to GitHub. `create_pull_request` produces only a minimal receipt; a later `pull_request_read`, bound to an earlier authoritative `get_commit` of the proposed head, must reconcile repository/base/head/head SHA before external evidence can commit. TrueForge stream deadlines now cover iteration, event callbacks, completed-turn replay, iterator cleanup, and session-creation failure, with durable fail-closed regressions.
+
+The integrated unpublished candidate passes format, lint, typecheck, **192/192 tests**, evaluation smoke, fixture demo, build, CI-mode doctor, and diff integrity locally. It is not labeled an externally verified final SHA until publication and exact-head CI/Qodo observation.
+
+## Verified final branch baseline
+
+Final branch SHA:
+
+`7555f0f01f1af1f198d665333098619d05408230`
 
 GitHub Actions run:
 
-`33083635762`
+`33084240703` and `33084235854`
 
 Observed green steps:
 
@@ -128,15 +136,13 @@ Observed green steps:
 - `pnpm doctor`;
 - `git diff --check`.
 
-This is the first fully green reconstructed implementation baseline. Documentation changes after that SHA require their own final exact-head CI before handoff.
+Both workflows passed on the final documentation/code SHA. Qodo then updated its aggregate review against the same SHA, resolving every implementable finding and retaining the SDK-blocked read-only High.
 
 ## Remaining external/human gates
 
-- final exact-head GitHub Actions after documentation synchronization;
-- final Qodo `/agentic_review` and response on that exact SHA;
 - P0.4 pre-execution specialist isolation capability in TrueForge (SDK-blocked today);
-- credentialed TrueForge + model + GitHub MCP + Daytona vertical slice;
-- exact viewport/200% visual observation;
+- one credentialed TrueForge + model + GitHub MCP + Daytona vertical slice (individual component observations now exist);
+- exact 200% browser zoom observation; the 320/375/768/1024/1440 viewport matrix is observed clean;
 - real approval pause, real PR write, and exact reconciliation from the live path;
 - approximately three-minute demo/publication;
 - human merge;

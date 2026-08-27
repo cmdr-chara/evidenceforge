@@ -390,11 +390,12 @@ export interface SessionState {
 }
 
 export interface CompletionCertificateData {
-  certificateVersion: 1;
+  certificateVersion: 2;
   taskId: string;
   repository: string;
   revision: string;
   stateVersion: number;
+  preCompletionPhase: WorkflowPhase;
   successContractDigest: string;
   stateDigest: string;
   requiredCriteria: Array<{

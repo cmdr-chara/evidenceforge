@@ -33,16 +33,37 @@ export interface ModelFacingEvidenceView {
 
 export class EvidenceStore {
   private readonly events: RuntimeEvent[] = [];
-  private readonly eventKeys = new Set<string>();
+  private readonly eventDigests = new Map<string, Map<string, RuntimeEvent>>();
   private readonly evidence = new Map<string, Evidence>();
 
   public recordEvent(event: RuntimeEvent): boolean {
     const snapshot = structuredClone(event);
-    const key = eventStorageKey(snapshot);
-    if (this.eventKeys.has(key)) return false;
-    this.eventKeys.add(key);
+    const digest = eventStorageKey(snapshot);
+    const knownEvents = this.eventDigests.get(snapshot.id);
+    if (knownEvents?.has(digest)) return false;
+    if (knownEvents !== undefined) {
+      const previous = this.latestEvent(snapshot.id);
+      if (previous === undefined || !isMonotonicTrueForgeDelta(previous, snapshot)) {
+        throw new EvidenceIntegrityError(
+          `runtime event ${snapshot.id} already exists with a conflicting payload`,
+        );
+      }
+    }
+    if (knownEvents === undefined) {
+      this.eventDigests.set(snapshot.id, new Map([[digest, snapshot]]));
+    } else {
+      knownEvents.set(digest, snapshot);
+    }
     this.events.push(snapshot);
     return true;
+  }
+
+  private latestEvent(id: string): RuntimeEvent | undefined {
+    for (let index = this.events.length - 1; index >= 0; index -= 1) {
+      const event = this.events[index];
+      if (event?.id === id) return event;
+    }
+    return undefined;
   }
 
   public recordEvidence(item: Evidence): void {
@@ -167,6 +188,41 @@ function eventStorageKey(event: RuntimeEvent): string {
     sequenceNumber: event.sequenceNumber ?? null,
     payload: event.payload,
   });
+}
+
+function isMonotonicTrueForgeDelta(
+  previous: RuntimeEvent,
+  incoming: RuntimeEvent,
+): boolean {
+  const previousSequence = previous.sequenceNumber;
+  const incomingSequence = incoming.sequenceNumber;
+  if (
+    previous.type !== "MODEL_MESSAGE" ||
+    incoming.type !== "MODEL_MESSAGE" ||
+    previous.threadId !== incoming.threadId ||
+    typeof previousSequence !== "number" ||
+    typeof incomingSequence !== "number" ||
+    !Number.isInteger(previousSequence) ||
+    !Number.isInteger(incomingSequence) ||
+    incomingSequence <= previousSequence ||
+    !incoming.source.endsWith(":model.message.delta")
+  ) {
+    return false;
+  }
+  const previousPayloadType = payloadType(previous.payload);
+  const incomingPayloadType = payloadType(incoming.payload);
+  return (
+    (previousPayloadType === "model.message" ||
+      previousPayloadType === "model.message.delta") &&
+    incomingPayloadType === "model.message.delta"
+  );
+}
+
+function payloadType(payload: unknown): unknown {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    return undefined;
+  }
+  return (payload as { type?: unknown }).type;
 }
 
 function bindingMatches(

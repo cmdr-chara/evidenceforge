@@ -1,6 +1,6 @@
 # The Agent Said It Was Fixed. The Tests Disagreed: Building an Evidence-Gated Agent with TrueForge
 
-> Draft status — 2026-08-27: implementation-backed sections are synchronized with GitHub Actions and Qodo evidence. Credentialed TrueForge, GitHub MCP, Daytona, live approval/PR, final Qodo follow-up, and demo observations remain explicitly open until genuine runs exist.
+> Draft status — 2026-08-27: implementation-backed sections retain the last exact-SHA GitHub Actions/Qodo baseline. Genuine TrueForge/model and GitHub MCP read observations now exist, plus separate Daytona connectivity/exec evidence. The newer candidate's exact-head CI, end-to-end Daytona reproduction, live approval/PR, and demo remain explicitly open.
 
 ## 1. Why “agent says done” is not a completion criterion
 
@@ -128,16 +128,18 @@ Qodo Agentic Review is genuine and public:
 - PR #2: https://github.com/cmdr-chara/evidenceforge/pull/2
 - aggregate review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 - earlier follow-up request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
+- final exact-SHA request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
+- Qodo exact-SHA update: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440921739
 
 The reconstructed batch addresses the implementable open High/Medium findings with code and regression tests, including certificate mutability, stale approvals after repatch, incident-evidence preservation, approval race, completed cursor, exact PR reconciliation, persistence collisions/tempfiles, SSE cross-talk, recovery metrics, streamed restart correlation, failed-tool activity, and initial activity recovery.
 
 The read-only pre-execution specialist boundary remains **BLOCKED by TrueForge SDK 0.1.3**, with rationale recorded in `docs/qodo-review-log.md`.
 
-A final `/agentic_review` must run against the final documentation/code SHA before the submission can claim Qodo closure.
+Qodo updated its aggregate review against final SHA `7555f0f0…`. Every implementable finding is resolved; the only remaining High is the disclosed SDK-blocked read-only boundary.
 
 ## 13. Verified repository result
 
-Implementation SHA `628d4db9a19e50b142051fe3ae2793b0b9b704ad` passed GitHub Actions run `33083635762` with:
+Final branch SHA `7555f0f01f1af1f198d665333098619d05408230` passed GitHub Actions runs `33084240703` and `33084235854` with:
 
 - frozen-lockfile install;
 - format;
@@ -150,7 +152,7 @@ Implementation SHA `628d4db9a19e50b142051fe3ae2793b0b9b704ad` passed GitHub Acti
 - doctor;
 - `git diff --check`.
 
-These results prove the repository candidate only. They do not prove credentialed TrueForge, GitHub MCP, Daytona, or hackathon sponsor acceptance.
+These results prove the last externally verified repository baseline only. A later credentialed TrueForge/model turn (`01m11zp6dfp08dq520eqsp9cdx` / `01m11zp6dyt1xq08qwdkzdns1h.local`) used the official GitHub MCP `get_commit` tool and returned the exact repository SHA; Daytona connectivity and command execution were observed separately. Those component observations do not prove the end-to-end incident-resolution path or hackathon sponsor acceptance.
 
 ## 14. Demo vertical slice still required
 
@@ -177,7 +179,7 @@ The specialist read-only pre-execution limitation should be described accurately
 - TrueForge SDK `0.1.3` cannot enforce the desired per-dynamic-subagent read-only tool policy before execution.
 - Persistence is single-node JSON with application serialization, not a distributed transactional database.
 - The evaluation corpus is deterministic and too small for generalization claims.
-- Exact viewport/200% browser validation remains manual.
+- Exact 320/375/768/1024/1440 viewport validation is observed clean; exact 200% browser zoom remains manual because the browser-control surface does not expose zoom.
 - The P0 policy deliberately does not merge, deploy, delete, or perform privileged actions.
 
 ## 16. Production roadmap

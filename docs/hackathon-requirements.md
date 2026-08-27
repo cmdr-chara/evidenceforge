@@ -35,7 +35,7 @@ This document records requirements that affect EvidenceForge. Official live sour
 - GitHub MCP, Daytona sandboxing, skills, approvals, compaction, dynamic subagents, and bounded iterations are configured in the TrueForge agent specification.
 - The UI clearly separates deterministic fixture mode from live sponsor-infrastructure mode.
 - Deterministic/live-missing checks fail closed; fixture evidence is never substituted for sponsor evidence.
-- Credentialed live TrueForge + model + GitHub MCP + Daytona execution remains an external gate.
+- Credentialed TrueForge/model and GitHub MCP read observations now exist, as do separate Daytona connectivity/exec observations. A single end-to-end failing-revision → approval → PR → reconciliation run remains an external gate.
 
 ## Qodo code-quality requirements
 
@@ -55,9 +55,10 @@ Qodo Agentic Review is genuinely observed on PR #2:
 
 - aggregate review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 - earlier follow-up request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
+- final exact-SHA request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
 - current finding triage: `docs/qodo-review-log.md`
 
-The reconstructed batch contains implementation/tests for every currently implementable open High/Medium finding. Qodo has **not yet re-reviewed the final reconstructed SHA**, so repository-side `FIXED` does not imply Qodo-side resolved status.
+Qodo updated its aggregate review against final SHA `7555f0f01f1af1f198d665333098619d05408230`. It marks the implementable findings resolved and retains one open High: the pre-execution read-only boundary that TrueForge SDK `0.1.3` cannot currently enforce per dynamic subagent.
 
 ## TrueForge SDK 0.1.3 specialist-isolation limitation
 
@@ -90,7 +91,7 @@ Tool annotations are useful metadata, not an authorization oracle. EvidenceForge
 
 ## Verified repository evidence
 
-Implementation SHA `628d4db9a19e50b142051fe3ae2793b0b9b704ad` passed GitHub Actions run `33083635762` with:
+Last externally verified baseline SHA `7555f0f01f1af1f198d665333098619d05408230` passed GitHub Actions runs `33084240703` and `33084235854` with:
 
 - `pnpm install --frozen-lockfile`;
 - format check;
@@ -103,22 +104,28 @@ Implementation SHA `628d4db9a19e50b142051fe3ae2793b0b9b704ad` passed GitHub Acti
 - doctor;
 - `git diff --check`.
 
-This proves the deterministic repository candidate, not live sponsor infrastructure.
+This proves that baseline repository candidate, not the newer unpublished candidate or a full sponsor-infrastructure vertical slice. The newer candidate passes the equivalent local gates with 192/192 tests and still requires exact-head CI after publication.
+
+Observed live component evidence:
+
+- TrueForge session `01m11zp6dfp08dq520eqsp9cdx` and model turn `01m11zp6dyt1xq08qwdkzdns1h.local`;
+- official GitHub MCP `get_commit` returned exact SHA `7555f0f0…` inside that turn;
+- Daytona connectivity and a successful command execution were observed separately;
+- the configured skills and dynamic-subagent/approval surfaces were observed in a credentialed session.
+
+These observations do not satisfy the still-open exact failing-revision reproduction, live approval/PR write, reconciliation, or CompletionGate path.
 
 ## UI evidence boundary
 
-Responsive/a11y code supports small viewports, reduced motion, task-scoped SSE, accessible logs/live regions, focus visibility, long-value labels, and >=44px primary controls. The requested exact **320 / 375 / 768 / 1024 / 1440 px and 200% zoom browser matrix has not been visually observed** in the available execution environment. It remains a manual demo/readiness check.
+Responsive/a11y code supports small viewports, reduced motion, task-scoped SSE, accessible logs/live regions, focus visibility, long-value labels, and >=44px primary controls. The exact **320 / 375 / 768 / 1024 / 1440 px** widths were observed without page-level horizontal overflow; the narrow phase rail remains intentionally scrollable. Exact browser **200% zoom** remains manual because the available browser-control surface does not expose zoom. A 640px equivalent reflow was clean but is not represented as exact zoom evidence.
 
 ## External/human prerequisites still open
 
-- reachable TrueForge server and model credentials;
-- GitHub MCP credentials inside TrueForge;
-- Daytona credentials inside TrueForge;
-- live skill materialization;
+- exact failing-run/revision selection and a reproducible signature;
+- a single durable run through GitHub context, Daytona reproduction, verification, and approval;
 - real `tool.approval_required` pause/resume;
 - EvidenceForge-created real PR + exact reconciliation;
-- final Qodo Agentic Review on the exact candidate SHA;
-- exact viewport/200% visual check;
+- exact 200% browser zoom check;
 - demo video/publication;
 - human merge and official submission.
 

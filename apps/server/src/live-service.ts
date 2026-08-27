@@ -29,6 +29,8 @@ import {
 } from "../../../packages/verification/src";
 import { buildCiSuccessContract, SessionController } from "../../../packages/workflow/src";
 import { SseBroker } from "./sse-broker";
+import { LiveWorkflowReducer, markLiveExternalApproval } from "./live-workflow";
+import { officialArgumentsForPreparedPullRequest } from "./github-mcp-adapter";
 
 export interface StartLiveIncidentInput {
   objective?: string;
@@ -135,6 +137,7 @@ export class LiveIncidentService {
       "The following verifier manifest is application-owned and immutable. To run a deterministic verifier, call sandbox.exec using the exact intent, command, and cwd shown, with no environment overrides:",
       JSON.stringify(verifierManifest, null, 2),
       "A command with different arguments is diagnostic only and cannot update the success contract.",
+      "Application-owned live milestones are accepted only from correlated structured tool results. Call GitHub MCP with its official schemas only: never add EvidenceForge intent, artifactRef, expectedHeadSha, operationId, or idempotencyKey fields. EvidenceForge binds incident artifacts internally to the task repository and revision, and requires a subsequent official pull_request_read after create_pull_request. Use evidenceforge.verify:<criterion-id> only with sandbox.exec using the exact verifier manifest; root-cause and reviewer evidence must come from a mapped application-owned connector, otherwise the workflow remains fail-closed. Prose never changes application state.",
       "Do not claim completion; the application CompletionGate owns that decision.",
     ].join("\n");
     const updated = await runtime.start(state, message);
@@ -167,6 +170,12 @@ export class LiveIncidentService {
       if (existing === undefined) throw new Error(`unknown approval request: ${approvalId}`);
       if (existing.status !== "PENDING") throw new Error(`approval ${approvalId} is already decided`);
       if (decision === "APPROVED") {
+        if (
+          existing.risk === "EXTERNAL_REVERSIBLE" &&
+          checkpoint.state.externalAction?.status !== "PREPARED"
+        ) {
+          throw new Error("external approval requires an application-prepared pull-request action");
+        }
         assertLiveApprovalReady(
           checkpoint.state,
           existing,
@@ -177,6 +186,13 @@ export class LiveIncidentService {
 
       const controller = new SessionController(checkpoint.state);
       let updated = controller.decideApproval(approvalId, decision);
+      if (
+        existing.risk === "EXTERNAL_REVERSIBLE" &&
+        existing.action === "github.create_pull_request" &&
+        updated.externalAction !== undefined
+      ) {
+        markLiveExternalApproval(updated, decision);
+      }
       await this.checkpoints.saveCheckpoint(updated, evidenceStore);
 
       const decided = updated.approvals.find((approval) => approval.id === approvalId);
@@ -228,8 +244,12 @@ export class LiveIncidentService {
     return checkpoint;
   }
 
-  private createRuntime(evidenceStore: EvidenceStore, taskId: string): DurableTrueForgeRuntime {
+  private createRuntime(
+    evidenceStore: EvidenceStore,
+    taskId: string,
+  ): DurableTrueForgeRuntime {
     const config = loadTrueForgeConfig();
+    const workflow = new LiveWorkflowReducer(evidenceStore);
     return new DurableTrueForgeRuntime(
       new TrueForgeSdkAdapter(config),
       this.checkpoints,
@@ -248,6 +268,8 @@ export class LiveIncidentService {
           taskId,
         );
       },
+      undefined,
+      (state, event) => workflow.apply(state, event),
     );
   }
 
@@ -507,6 +529,7 @@ export function assertLiveApprovalReady(
     throw new Error(`P0 live publishing supports only pull-request creation, not ${approval.action}`);
   }
   const provenance = approval.provenance;
+  const externalAction = state.externalAction;
   if (provenance === undefined) throw new Error("external approval lacks provenance");
   const persistedApproval = state.approvals.find((candidate) => candidate.id === approval.id);
   const operation = state.operations.find(
@@ -518,7 +541,6 @@ export function assertLiveApprovalReady(
     persistedApproval.provenance?.originatingOperationId !== provenance.originatingOperationId ||
     digestCanonical(persistedApproval.normalizedArguments) !== provenance.actionDigest ||
     provenance.repository !== state.task.repository ||
-    provenance.revision !== state.task.revision ||
     provenance.risk !== approval.risk ||
     provenance.consumedAt !== undefined ||
     Date.parse(provenance.expiresAt) <= Date.now() ||
@@ -527,6 +549,24 @@ export function assertLiveApprovalReady(
     operation.repository !== provenance.repository ||
     operation.revision !== provenance.revision ||
     !artifactBindingMatchesState(provenance.binding, state, "EXTERNAL")
+  ) {
+    throw new Error("external approval provenance is stale, substituted, expired, or consumed");
+  }
+  // The live reducer always creates a PREPARED external action before an
+  // approval can reach this boundary. Keep the standalone assertion usable
+  // for older callers that validate a fully formed approval directly; when an
+  // action exists, the exact prepared arguments and expected head are part of
+  // the live provenance contract.
+  if (
+    externalAction !== undefined &&
+    (externalAction.status !== "PREPARED" ||
+      externalAction.operationId !== provenance.originatingOperationId ||
+      digestCanonical(officialArgumentsForPreparedPullRequest({
+        ...externalAction.preparedArguments,
+        operationId: externalAction.operationId,
+        idempotencyKey: externalAction.idempotencyKey,
+      })) !==
+        digestCanonical(approval.normalizedArguments))
   ) {
     throw new Error("external approval provenance is stale, substituted, expired, or consumed");
   }

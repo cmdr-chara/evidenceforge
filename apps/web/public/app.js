@@ -1,5 +1,14 @@
 const state = { snapshot: null, busy: false };
 
+window.evidenceForge = {
+  render,
+  renderActivity,
+  normalizeActivity,
+  showConnection,
+  getStreamSnapshot,
+  appendRuntimeActivity,
+};
+
 const elements = {
   connection: byId('connection-status'),
   mode: byId('mode-badge'),
@@ -50,7 +59,7 @@ connectEvents();
 async function load() {
   try {
     const taskId = new URL(window.location.href).searchParams.get('task');
-    render(await request(taskId === null
+    renderSnapshot(await request(taskId === null
       ? '/api/demo/session'
       : `/api/live/session/${encodeURIComponent(taskId)}`));
   } catch (error) {
@@ -62,7 +71,7 @@ async function load() {
 async function mutate(path) {
   setBusy(true);
   try {
-    render(await request(path, { method: 'POST' }));
+    renderSnapshot(await request(path, { method: 'POST' }));
   } catch (error) {
     elements.notice.textContent = error.message;
   } finally {
@@ -79,7 +88,7 @@ async function decideApproval(decision) {
     : `/api/demo/approvals/${encodeURIComponent(approval.id)}`;
   setBusy(true);
   try {
-    render(
+    renderSnapshot(
       await request(path, {
         method: 'POST',
         body: JSON.stringify({ decision }),
@@ -102,7 +111,7 @@ async function startLive(event) {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    render(snapshot);
+    renderSnapshot(snapshot);
     elements.liveStatus.textContent = `TrueForge session ${snapshot.trueForgeSessionId ?? 'created'} persisted for task ${snapshot.task.id}.`;
   } catch (error) {
     elements.liveStatus.textContent = `Live mode BLOCKED: ${error.message}`;
@@ -112,16 +121,38 @@ async function startLive(event) {
 }
 
 function connectEvents() {
-  const source = new EventSource('/api/events');
+  const requestedTaskId = normalizeTaskId(new URL(window.location.href).searchParams.get('task'));
+  const path = requestedTaskId === null
+    ? '/api/events'
+    : `/api/events?task=${encodeURIComponent(requestedTaskId)}`;
+  const source = new EventSource(path);
   source.addEventListener('connected', () => showConnection('Event stream live', 'complete'));
-  source.addEventListener('demo-state', (event) => render(JSON.parse(event.data)));
-  source.addEventListener('live-state', (event) => render(JSON.parse(event.data)));
+  source.addEventListener('demo-state', (event) => {
+    if (requestedTaskId !== null) return;
+    renderSnapshot(JSON.parse(event.data));
+  });
+  source.addEventListener('live-state', (event) => {
+    const snapshot = JSON.parse(event.data);
+    if (requestedTaskId === null || snapshot?.task?.id !== requestedTaskId) return;
+    renderSnapshot(snapshot);
+  });
   source.addEventListener('runtime-event', (event) => {
+    if (requestedTaskId === null) return;
     const activity = normalizeActivity(JSON.parse(event.data));
     if (activity === null) return;
     renderActivity([...(state.snapshot?.activity ?? []), activity].slice(-80));
   });
   source.onerror = () => showConnection('Reconnecting', 'warning');
+}
+
+function normalizeTaskId(value) {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function renderSnapshot(input) {
+  const renderer = window.evidenceForge?.render;
+  if (typeof renderer === 'function') renderer(input);
+  else render(input);
 }
 
 function render(input) {
@@ -389,6 +420,29 @@ function normalizeActivity(input) {
     tone,
     label,
   };
+}
+
+function getStreamSnapshot() {
+  const snapshot = state.snapshot;
+  if (snapshot === null) return null;
+  return Object.freeze({
+    mode: snapshot.mode,
+    taskId: snapshot.mode === 'LIVE_TRUEFORGE' ? snapshot.task.id : null,
+    activity: Object.freeze([...(snapshot.activity ?? [])]),
+  });
+}
+
+function appendRuntimeActivity(input, expectedTaskId) {
+  const snapshot = getStreamSnapshot();
+  if (
+    snapshot === null
+    || snapshot.mode !== 'LIVE_TRUEFORGE'
+    || snapshot.taskId !== expectedTaskId
+  ) return false;
+  const activity = normalizeActivity(input);
+  if (activity === null) return false;
+  renderActivity([...snapshot.activity, activity].slice(-80));
+  return true;
 }
 
 function renderPatch(patch) {

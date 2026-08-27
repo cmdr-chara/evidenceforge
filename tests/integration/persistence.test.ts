@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -8,6 +8,8 @@ import {
   JsonRuntimeCheckpointStore,
   JsonSessionStore,
 } from "../../packages/persistence/src";
+import { SessionController } from "../../packages/workflow/src";
+import { CompletionGate } from "../../packages/verification/src";
 import { buildState, passCriterion } from "../fixtures/builders";
 
 test("session state persists and resumes with TrueForge cursor", async () => {
@@ -164,6 +166,111 @@ test("runtime checkpoints isolate evidence by task including colliding legacy ID
       ["evidence-review"],
     );
     assert.notEqual(restoredFirst?.state.task.id, restoredSecond?.state.task.id);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("a gate-issued completed checkpoint validates after restart", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "evidenceforge-completed-checkpoint-"));
+  try {
+    const state = buildState();
+    const evidenceStore = new EvidenceStore();
+    passCriterion(state, evidenceStore, "failure-reproduced");
+    passCriterion(state, evidenceStore, "tests");
+    passCriterion(state, evidenceStore, "review");
+    state.roundEvaluations.push({
+      id: "round-complete",
+      kind: "VERIFICATION",
+      sessionVersion: state.version,
+      patchDigest: state.patchDigest,
+      criteria: state.successCriteria.map((criterion) => ({
+        criterionId: criterion.id,
+        status: criterion.status,
+        admissibleEvidenceIds: [...criterion.evidenceIds],
+        missingEvidence: [],
+      })),
+      deterministicFailures: [],
+      missingEvidence: [],
+      nextAction: "COMPLETE_CANDIDATE",
+      evaluatedAt: "2026-08-25T18:02:00.000Z",
+    });
+    state.version += 1;
+
+    const decision = new CompletionGate(evidenceStore).evaluate(
+      state,
+      "2026-08-25T18:05:00.000Z",
+    );
+    assert.equal(decision.allowed, true);
+    if (!decision.allowed) return;
+    const completed = new SessionController(state).completeWithCertificate(decision.certificate);
+    const writer = new JsonRuntimeCheckpointStore(directory);
+    await writer.saveCheckpoint(completed, evidenceStore);
+
+    const restored = await new JsonRuntimeCheckpointStore(directory).loadCheckpoint(state.task.id);
+    assert.equal(restored?.state.status, "COMPLETED");
+    assert.equal(restored?.state.phase, "COMPLETED");
+    assert.equal(restored?.state.completionCertificate?.payloadDigest, decision.certificate.payloadDigest);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("tampered completed checkpoint certificates are rejected on load", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "evidenceforge-tampered-checkpoint-"));
+  try {
+    const state = buildState();
+    const evidenceStore = new EvidenceStore();
+    passCriterion(state, evidenceStore, "failure-reproduced");
+    passCriterion(state, evidenceStore, "tests");
+    passCriterion(state, evidenceStore, "review");
+    state.roundEvaluations.push({
+      id: "round-complete",
+      kind: "VERIFICATION",
+      sessionVersion: state.version,
+      patchDigest: state.patchDigest,
+      criteria: state.successCriteria.map((criterion) => ({
+        criterionId: criterion.id,
+        status: criterion.status,
+        admissibleEvidenceIds: [...criterion.evidenceIds],
+        missingEvidence: [],
+      })),
+      deterministicFailures: [],
+      missingEvidence: [],
+      nextAction: "COMPLETE_CANDIDATE",
+      evaluatedAt: "2026-08-25T18:02:00.000Z",
+    });
+    state.version += 1;
+    const decision = new CompletionGate(evidenceStore).evaluate(
+      state,
+      "2026-08-25T18:05:00.000Z",
+    );
+    assert.equal(decision.allowed, true);
+    if (!decision.allowed) return;
+    const completed = new SessionController(state).completeWithCertificate(decision.certificate);
+    const writer = new JsonRuntimeCheckpointStore(directory);
+    await writer.saveCheckpoint(completed, evidenceStore);
+
+    const checkpointName = (await readdir(directory)).find((name) => name.endsWith(".checkpoint.json"));
+    assert.ok(checkpointName);
+    const path = join(directory, checkpointName);
+    const checkpoint = JSON.parse(await readFile(path, "utf8")) as {
+      state: { completionCertificate: { certificateVersion: number; payloadDigest: string } };
+    };
+    checkpoint.state.completionCertificate.payloadDigest = "0".repeat(64);
+    await writeFile(path, `${JSON.stringify(checkpoint, null, 2)}\n`, "utf8");
+
+    await assert.rejects(
+      () => new JsonRuntimeCheckpointStore(directory).loadCheckpoint(state.task.id),
+      /completion certificate\.payloadDigest is invalid/,
+    );
+
+    checkpoint.state.completionCertificate.certificateVersion = 1;
+    await writeFile(path, `${JSON.stringify(checkpoint, null, 2)}\n`, "utf8");
+    await assert.rejects(
+      () => new JsonRuntimeCheckpointStore(directory).loadCheckpoint(state.task.id),
+      /completion certificate\.certificateVersion is unsupported/,
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

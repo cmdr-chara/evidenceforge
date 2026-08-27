@@ -115,7 +115,16 @@ export class ExternalActionCoordinator {
       throw new Error("approval provenance does not match the prepared action");
     }
     if (provenance.consumedAt !== undefined) throw new Error("approval provenance was already consumed");
-    if (Date.parse(provenance.expiresAt) <= Date.parse(now)) throw new Error("approval provenance expired");
+    const issuedAt = timestampMillis(provenance.issuedAt);
+    const expiresAt = timestampMillis(provenance.expiresAt);
+    const currentTime = timestampMillis(now);
+    if (!Number.isFinite(issuedAt) || !Number.isFinite(expiresAt) || !Number.isFinite(currentTime)) {
+      throw new Error("approval provenance contains malformed timestamps");
+    }
+    if (expiresAt <= issuedAt) {
+      throw new Error("approval provenance expiry is malformed");
+    }
+    if (expiresAt <= currentTime) throw new Error("approval provenance expired");
     const authorization = this.approvalPolicy.authorize(approval);
     if (!authorization.allowed) {
       return { ...structuredClone(action), status: "DENIED" };
@@ -142,14 +151,29 @@ export class ExternalActionCoordinator {
   ): ExternalActionState {
     const action = state.externalAction;
     if (action === undefined) throw new Error("no external action is present");
+    if (action.status !== "COMMITTED" && action.status !== "RECONCILED") {
+      throw new Error("external reconciliation requires a committed approved action");
+    }
     if (event.type !== "EXTERNAL_RECONCILIATION") {
       throw new Error("external reconciliation requires a reconciliation runtime event");
     }
-    if (this.evidenceStore === undefined) {
-      throw new Error("evidence store is required for reconciliation");
-    }
     if (!artifactBindingMatchesState(action.binding, state, "EXTERNAL")) {
       throw new Error("external action binding is stale for the current task or patch");
+    }
+    if (action.status === "RECONCILED") {
+      if (
+        action.identifier === undefined ||
+        action.evidenceId === undefined ||
+        action.reconciledIdentity === undefined ||
+        action.identifier !== observed.identifier ||
+        !pullRequestIdentityMatches(action.reconciledIdentity, observed)
+      ) {
+        throw new Error("reconciled pull request identity conflicts with the existing result");
+      }
+      return structuredClone(action);
+    }
+    if (this.evidenceStore === undefined) {
+      throw new Error("evidence store is required for reconciliation");
     }
     const expected = action.preparedArguments;
     if (
@@ -188,4 +212,23 @@ export class ExternalActionCoordinator {
       reconciledIdentity: structuredClone(observed),
     };
   }
+}
+
+function pullRequestIdentityMatches(
+  actual: PullRequestIdentity,
+  expected: PullRequestIdentity,
+): boolean {
+  return (
+    actual.identifier === expected.identifier &&
+    actual.repository === expected.repository &&
+    actual.base === expected.base &&
+    actual.head === expected.head &&
+    actual.headSha === expected.headSha &&
+    actual.operationId === expected.operationId &&
+    actual.idempotencyKey === expected.idempotencyKey
+  );
+}
+
+function timestampMillis(value: unknown): number {
+  return typeof value === "string" ? Date.parse(value) : Number.NaN;
 }
