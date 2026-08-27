@@ -56,6 +56,7 @@ export class SessionController {
   }
 
   public transition(next: WorkflowPhase, actor: TransitionActor, reason: string): SessionState {
+    this.assertActive("transition workflow state");
     if (next === "COMPLETED") {
       throw new InvalidTransitionError(
         "COMPLETED can only be reached through completeWithCertificate",
@@ -74,12 +75,16 @@ export class SessionController {
     } else if (next === "ESCALATED") {
       this.state.status = "ESCALATED";
       this.state.blockedReason = reason;
+    } else if (next === "FAILED") {
+      this.state.status = "FAILED";
+      this.state.blockedReason = reason;
     }
     this.state.version += 1;
     return this.snapshot();
   }
 
   public completeWithCertificate(certificate: CompletionCertificateData): SessionState {
+    this.assertActive("complete workflow");
     if (!isIssuedCompletionCertificate(certificate)) {
       throw new InvalidTransitionError("completion certificate is fabricated or its payload changed");
     }
@@ -103,6 +108,7 @@ export class SessionController {
   }
 
   public applyVerification(result: VerificationResult): SessionState {
+    this.assertActive("apply verification");
     const criterion = this.state.successCriteria.find((item) => item.id === result.criterionId);
     if (criterion === undefined) {
       throw new Error(`unknown success criterion: ${result.criterionId}`);
@@ -118,9 +124,7 @@ export class SessionController {
   }
 
   public setPatchDigest(digest: string): SessionState {
-    if (this.state.status !== "ACTIVE") {
-      throw new Error("patch digest can change only while the session is active");
-    }
+    this.assertActive("change patch digest");
     if (!/^[a-f0-9]{64}$/i.test(digest)) {
       throw new Error("patch digest must be a SHA-256 hex string");
     }
@@ -139,6 +143,7 @@ export class SessionController {
   }
 
   public setReviewerVerdict(verdict: SessionState["reviewerVerdict"]): SessionState {
+    this.assertActive("set reviewer verdict");
     this.state.reviewerVerdict = verdict;
     this.state.reviewBinding =
       verdict === undefined ? undefined : artifactBindingFor(this.state, "PATCH");
@@ -147,6 +152,7 @@ export class SessionController {
   }
 
   public addApproval(approval: ApprovalRequest): SessionState {
+    this.assertActive("add approval");
     if (this.state.approvals.some((item) => item.id === approval.id)) {
       throw new Error(`duplicate approval request: ${approval.id}`);
     }
@@ -156,12 +162,13 @@ export class SessionController {
   }
 
   public decideApproval(id: string, decision: "APPROVED" | "DENIED"): SessionState {
+    this.assertActive("decide approval");
     const approval = this.state.approvals.find((item) => item.id === id);
     if (approval === undefined) throw new Error(`unknown approval request: ${id}`);
     if (approval.status !== "PENDING") throw new Error(`approval ${id} is already decided`);
     if (
-      approval.provenance !== undefined &&
-      !artifactBindingMatchesState(approval.provenance.binding, this.state, "EXTERNAL")
+      approval.risk === "EXTERNAL_REVERSIBLE" &&
+      !artifactBindingMatchesState(approval.provenance?.binding, this.state, "EXTERNAL")
     ) {
       throw new Error(`approval ${id} is stale for the current patch`);
     }
@@ -171,6 +178,7 @@ export class SessionController {
   }
 
   public upsertHypothesis(hypothesis: Hypothesis): SessionState {
+    this.assertActive("update hypothesis");
     const index = this.state.hypotheses.findIndex((item) => item.id === hypothesis.id);
     if (index === -1) this.state.hypotheses.push(structuredClone(hypothesis));
     else this.state.hypotheses[index] = structuredClone(hypothesis);
@@ -180,6 +188,12 @@ export class SessionController {
 
   public replaceState(state: SessionState): void {
     this.state = structuredClone(validateSessionState(state));
+  }
+
+  private assertActive(action: string): void {
+    if (this.state.status !== "ACTIVE") {
+      throw new InvalidTransitionError(`${action} is forbidden after terminal status ${this.state.status}`);
+    }
   }
 
   private invalidatePatchBoundState(): void {
@@ -205,15 +219,16 @@ export class SessionController {
 
     const invalidOperationIds = new Set<string>();
     for (const approval of this.state.approvals) {
-      if (approval.provenance?.binding?.scope === "EXTERNAL") {
-        invalidOperationIds.add(approval.provenance.originatingOperationId);
+      if (approval.risk === "EXTERNAL_REVERSIBLE") {
+        invalidOperationIds.add(approval.provenance?.originatingOperationId ?? "");
       }
     }
+    invalidOperationIds.delete("");
     if (this.state.externalAction !== undefined) {
       invalidOperationIds.add(this.state.externalAction.operationId);
     }
     this.state.approvals = this.state.approvals.filter(
-      (approval) => approval.provenance?.binding?.scope !== "EXTERNAL",
+      (approval) => approval.risk !== "EXTERNAL_REVERSIBLE",
     );
     this.state.operations = this.state.operations.filter(
       (operation) => !invalidOperationIds.has(operation.id),
