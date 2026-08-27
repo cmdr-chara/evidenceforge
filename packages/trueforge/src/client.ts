@@ -62,6 +62,32 @@ export interface ApprovalResponse {
   reason?: string;
 }
 
+export interface ReplayedTurnEvents {
+  events: RuntimeEvent[];
+  lastSequenceNumber: number;
+}
+
+export async function replayListedTurnEvents(
+  rawEvents: AsyncIterable<unknown>,
+  afterSequenceNumber: number,
+  onEvent?: RunTurnInput["onEvent"],
+): Promise<ReplayedTurnEvents> {
+  const events: RuntimeEvent[] = [];
+  let lastSequenceNumber = afterSequenceNumber;
+  for await (const raw of rawEvents) {
+    const record = asRecord(raw);
+    const sequence = readSequence(record);
+    if (sequence !== undefined) {
+      lastSequenceNumber = Math.max(lastSequenceNumber, sequence);
+      if (sequence <= afterSequenceNumber) continue;
+    }
+    const normalized = normalizeTrueForgeEvent(raw, sequence);
+    events.push(normalized.event);
+    await onEvent?.(normalized.event);
+  }
+  return { events, lastSequenceNumber };
+}
+
 export class TrueForgeSdkAdapter {
   private clientPromise: Promise<TrueForgeClientShape> | undefined;
 
@@ -127,24 +153,16 @@ export class TrueForgeSdkAdapter {
       return this.consume(sessionId, stream, onEvent, afterSequenceNumber, turnId);
     }
 
-    const events: RuntimeEvent[] = [];
-    let lastSequenceNumber = afterSequenceNumber;
-    for await (const raw of await client.sessions.listTurnEvents(sessionId, turnId, { order: "asc" })) {
-      const record = asRecord(raw);
-      const sequence = readSequence(record);
-      if (sequence !== undefined) {
-        lastSequenceNumber = Math.max(lastSequenceNumber, sequence);
-        if (sequence <= afterSequenceNumber) continue;
-      }
-      const normalized = normalizeTrueForgeEvent(raw, sequence);
-      events.push(normalized.event);
-      await onEvent?.(normalized.event);
-    }
+    const replay = await replayListedTurnEvents(
+      await client.sessions.listTurnEvents(sessionId, turnId, { order: "asc" }),
+      afterSequenceNumber,
+      onEvent,
+    );
     return {
       sessionId,
       turnId,
-      lastSequenceNumber,
-      events,
+      lastSequenceNumber: replay.lastSequenceNumber,
+      events: replay.events,
       paused:
         state.status === "done" &&
         Array.isArray(state.requiredActions) &&
