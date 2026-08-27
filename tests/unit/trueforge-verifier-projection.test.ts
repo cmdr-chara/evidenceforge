@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 import {
   createSessionState,
@@ -28,9 +29,11 @@ function createHarness(): Harness {
     runId: "842",
     createdAt: "2026-08-25T19:50:00.000Z",
   });
+  const state = createSessionState(task, buildCiSuccessContract(task));
+  state.patchDigest = createHash("sha256").update("verifier-patch").digest("hex");
   const store = new EvidenceStore();
   return {
-    state: createSessionState(task, buildCiSuccessContract(task)),
+    state,
     store,
     projector: new TrueForgeEventProjector(undefined, store),
   };
