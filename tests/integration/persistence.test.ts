@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -23,6 +23,63 @@ test("session state persists and resumes with TrueForge cursor", async () => {
     assert.equal(restored?.trueForgeSessionId, "sess-abc");
     assert.equal(restored?.activeTurnId, "turn-123");
     assert.equal(restored?.lastSequenceNumber, 47);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("session filenames do not collide for a/b and a_b", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "evidenceforge-collision-"));
+  try {
+    const store = new JsonSessionStore(directory);
+    const slash = buildState();
+    slash.task.id = "a/b";
+    slash.activeTurnId = "turn-slash";
+    const underscore = buildState();
+    underscore.task.id = "a_b";
+    underscore.activeTurnId = "turn-underscore";
+
+    await Promise.all([store.save(slash), store.save(underscore)]);
+
+    assert.equal((await store.load("a/b"))?.activeTurnId, "turn-slash");
+    assert.equal((await store.load("a_b"))?.activeTurnId, "turn-underscore");
+    assert.equal((await readdir(directory)).filter((name) => name.endsWith(".json")).length, 2);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("concurrent session saves are serialized in invocation order", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "evidenceforge-save-order-"));
+  try {
+    const store = new JsonSessionStore(directory);
+    const first = buildState();
+    first.activeTurnId = "turn-first";
+    const second = structuredClone(first);
+    second.activeTurnId = "turn-second";
+    second.version += 1;
+
+    await Promise.all([store.save(first), store.save(second)]);
+
+    assert.equal((await store.load(first.task.id))?.activeTurnId, "turn-second");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("session store reads legacy sanitized filenames without destructive migration", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "evidenceforge-legacy-session-"));
+  try {
+    const state = buildState();
+    state.task.id = "a/b";
+    state.activeTurnId = "legacy-turn";
+    const legacyPath = join(directory, "a_b.json");
+    await writeFile(legacyPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+
+    const restored = await new JsonSessionStore(directory).load("a/b");
+
+    assert.equal(restored?.activeTurnId, "legacy-turn");
+    assert.ok((await readdir(directory)).includes("a_b.json"));
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -77,22 +134,24 @@ test("checkpoint refuses a state that references evidence not persisted with it"
   }
 });
 
-test("runtime checkpoints isolate evidence by task", async () => {
+test("runtime checkpoints isolate evidence by task including colliding legacy IDs", async () => {
   const directory = await mkdtemp(join(tmpdir(), "evidenceforge-checkpoint-isolation-"));
   try {
     const store = new JsonRuntimeCheckpointStore(directory);
     const first = buildState();
-    first.task.id = "task-first";
+    first.task.id = "a/b";
     const firstEvidence = new EvidenceStore();
     passCriterion(first, firstEvidence, "tests");
 
     const second = buildState();
-    second.task.id = "task-second";
+    second.task.id = "a_b";
     const secondEvidence = new EvidenceStore();
     passCriterion(second, secondEvidence, "review");
 
-    await store.saveCheckpoint(first, firstEvidence);
-    await store.saveCheckpoint(second, secondEvidence);
+    await Promise.all([
+      store.saveCheckpoint(first, firstEvidence),
+      store.saveCheckpoint(second, secondEvidence),
+    ]);
 
     const restoredFirst = await store.loadCheckpoint(first.task.id);
     const restoredSecond = await store.loadCheckpoint(second.task.id);
@@ -104,6 +163,7 @@ test("runtime checkpoints isolate evidence by task", async () => {
       restoredSecond?.evidenceStore.listEvidence().map((item) => item.id),
       ["evidence-review"],
     );
+    assert.notEqual(restoredFirst?.state.task.id, restoredSecond?.state.task.id);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
