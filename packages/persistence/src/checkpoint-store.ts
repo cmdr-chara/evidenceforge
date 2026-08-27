@@ -160,7 +160,9 @@ function parseCheckpoint(value: unknown): PersistedRuntimeCheckpoint {
   if (Array.isArray(value.state.successCriteria)) {
     for (const candidate of value.state.successCriteria) {
       if (!isRecord(candidate) || !isRecord(candidate.verifier)) continue;
-      candidate.evidenceScope ??= inferEvidenceScope(candidate.verifier as SuccessCriterion["verifier"]);
+      candidate.evidenceScope ??= inferEvidenceScope(
+        candidate.verifier as unknown as SuccessCriterion["verifier"],
+      );
     }
   }
   return value as unknown as PersistedRuntimeCheckpoint;
