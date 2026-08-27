@@ -1,17 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ExternalActionCoordinator } from "../../packages/policies/src";
+import { artifactBindingFor } from "../../packages/verification/src";
+import { buildState } from "../fixtures/builders";
 
 function prepared() {
+  const state = buildState();
+  state.task.repository = "owner/repository";
+  state.patchDigest = "a".repeat(64);
   return new ExternalActionCoordinator().preparePullRequest({
     sessionId: "session-approval",
-    repository: "owner/repository",
+    repository: state.task.repository,
     base: "main",
     head: "fix/demo",
     title: "Fix demo",
     body: "Verified fix",
-    expectedHeadSha: "abc123",
-    patchDigest: "a".repeat(64),
+    expectedHeadSha: state.task.revision,
+    patchDigest: state.patchDigest,
+    binding: artifactBindingFor(state, "EXTERNAL"),
     now: "2026-08-25T18:00:00.000Z",
   });
 }
