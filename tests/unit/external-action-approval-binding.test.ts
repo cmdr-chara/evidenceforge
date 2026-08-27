@@ -1,20 +1,26 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ExternalActionCoordinator } from "../../packages/policies/src";
+import { artifactBindingFor } from "../../packages/verification/src";
+import { buildState } from "../fixtures/builders";
 
 function prepare() {
   const coordinator = new ExternalActionCoordinator();
+  const state = buildState();
+  state.task.repository = "cmdr-chara/evidenceforge";
+  state.patchDigest = "f".repeat(64);
   return {
     coordinator,
     ...coordinator.preparePullRequest({
       sessionId: "session-binding",
-      repository: "cmdr-chara/evidenceforge",
+      repository: state.task.repository,
       base: "determination",
       head: "fix/demo",
       title: "fix: config order",
       body: "Evidence-backed remediation",
-      expectedHeadSha: "abc123",
-      patchDigest: "f".repeat(64),
+      expectedHeadSha: state.task.revision,
+      patchDigest: state.patchDigest,
+      binding: artifactBindingFor(state, "EXTERNAL"),
     }),
   };
 }
