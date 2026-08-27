@@ -36,12 +36,13 @@ export class EvidenceStore {
   private readonly eventKeys = new Set<string>();
   private readonly evidence = new Map<string, Evidence>();
 
-  public recordEvent(event: RuntimeEvent): void {
+  public recordEvent(event: RuntimeEvent): boolean {
     const snapshot = structuredClone(event);
     const key = eventStorageKey(snapshot);
-    if (this.eventKeys.has(key)) return;
+    if (this.eventKeys.has(key)) return false;
     this.eventKeys.add(key);
     this.events.push(snapshot);
+    return true;
   }
 
   public recordEvidence(item: Evidence): void {
