@@ -3,19 +3,27 @@ import { test } from "node:test";
 import { RuntimeEvent } from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
 import { ExternalActionCoordinator } from "../../packages/policies/src";
+import { artifactBindingFor } from "../../packages/verification/src";
 import { buildState } from "../fixtures/builders";
 
 function prepare(coordinator: ExternalActionCoordinator) {
-  return coordinator.preparePullRequest({
-    sessionId: "session-1",
-    repository: "cmdr-chara/evidenceforge",
-    base: "determination",
-    head: "fix/demo",
-    title: "fix: config order",
-    body: "Evidence-backed remediation",
-    expectedHeadSha: "abc123",
-    patchDigest: "f".repeat(64),
-  });
+  const state = buildState();
+  state.task.repository = "cmdr-chara/evidenceforge";
+  state.patchDigest = "f".repeat(64);
+  return {
+    state,
+    ...coordinator.preparePullRequest({
+      sessionId: "session-1",
+      repository: state.task.repository,
+      base: "determination",
+      head: "fix/demo",
+      title: "fix: config order",
+      body: "Evidence-backed remediation",
+      expectedHeadSha: state.task.revision,
+      patchDigest: state.patchDigest,
+      binding: artifactBindingFor(state, "EXTERNAL"),
+    }),
+  };
 }
 
 test("external PR cannot commit before approval", () => {
@@ -40,14 +48,15 @@ test("PR request timeout path requires reconciliation before retry", () => {
   assert.equal(coordinator.mustReconcileBeforeRetry(approved), true);
 });
 
-test("external result reconciliation records evidence", () => {
+test("external result reconciliation records exact PR evidence", () => {
   const store = new EvidenceStore();
   const coordinator = new ExternalActionCoordinator(undefined, store);
-  const { action, approval } = prepare(coordinator);
-  approval.status = "APPROVED";
-  const committed = coordinator.markCommitted(coordinator.applyApproval(action, approval));
-  const state = buildState();
-  state.externalAction = committed;
+  const prepared = prepare(coordinator);
+  prepared.approval.status = "APPROVED";
+  const committed = coordinator.markCommitted(
+    coordinator.applyApproval(prepared.action, prepared.approval),
+  );
+  prepared.state.externalAction = committed;
   const event: RuntimeEvent = {
     id: "reconcile-1",
     type: "EXTERNAL_RECONCILIATION",
@@ -56,13 +65,52 @@ test("external result reconciliation records evidence", () => {
     payload: {},
   };
   store.recordEvent(event);
-  const reconciled = coordinator.reconcile(state, event, "#219", "abc123");
+  const reconciled = coordinator.reconcile(prepared.state, event, {
+    identifier: "#219",
+    repository: committed.preparedArguments.repository,
+    base: committed.preparedArguments.base,
+    head: committed.preparedArguments.head,
+    headSha: committed.preparedArguments.expectedHeadSha,
+    operationId: committed.operationId,
+    idempotencyKey: committed.idempotencyKey,
+  });
   assert.equal(reconciled.status, "RECONCILED");
   assert.ok(reconciled.evidenceId);
   assert.ok(store.hasEvidence(reconciled.evidenceId));
 });
 
-test("idempotency key is stable for session and patch", () => {
+test("same commit on a different PR target is rejected", () => {
+  const store = new EvidenceStore();
+  const coordinator = new ExternalActionCoordinator(undefined, store);
+  const prepared = prepare(coordinator);
+  prepared.approval.status = "APPROVED";
+  prepared.state.externalAction = coordinator.markCommitted(
+    coordinator.applyApproval(prepared.action, prepared.approval),
+  );
+  const event: RuntimeEvent = {
+    id: "reconcile-wrong-pr",
+    type: "EXTERNAL_RECONCILIATION",
+    source: "github-mcp",
+    timestamp: new Date().toISOString(),
+    payload: {},
+  };
+  store.recordEvent(event);
+  assert.throws(
+    () =>
+      coordinator.reconcile(prepared.state, event, {
+        identifier: "#999",
+        repository: prepared.state.task.repository,
+        base: "other-base",
+        head: "fix/demo",
+        headSha: prepared.state.task.revision,
+        operationId: prepared.state.externalAction!.operationId,
+        idempotencyKey: prepared.state.externalAction!.idempotencyKey,
+      }),
+    /exact prepared identity/,
+  );
+});
+
+test("idempotency key is stable for session, patch, and action", () => {
   const coordinator = new ExternalActionCoordinator();
   assert.equal(prepare(coordinator).action.idempotencyKey, prepare(coordinator).action.idempotencyKey);
 });
