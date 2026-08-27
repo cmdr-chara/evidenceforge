@@ -2,7 +2,11 @@ import { performance } from "node:perf_hooks";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { EvidenceStore } from "../../packages/evidence/src";
-import { CompletionGate, ProgressEvaluator } from "../../packages/verification/src";
+import {
+  artifactBindingFor,
+  CompletionGate,
+  ProgressEvaluator,
+} from "../../packages/verification/src";
 import { SessionController } from "../../packages/workflow/src";
 import { buildState, passAll } from "../../tests/fixtures/builders";
 import { EVALUATION_CASES, EvaluationCase } from "../cases/cases";
@@ -98,8 +102,7 @@ function evaluateBaseline(testCase: EvaluationCase): SystemScenarioEvaluation {
     verificationExecuted: testCase.verifierStatus !== "NOT_RUN",
     verificationCoverage: testCase.verifierStatus === "NOT_RUN" ? 0 : 1,
     recoveryAttempted: testCase.uncertainEffect === true,
-    recoverySucceeded:
-      testCase.uncertainEffect !== true || testCase.replayPolicy === "SAFE",
+    recoverySucceeded: didRecoverySucceed(testCase, terminal),
     repeatedNoProgressToolAttempts: Math.max(0, (testCase.repeatedEquivalentAttempts ?? 1) - 1),
     retryCount: testCase.baselineRetries ?? 0,
     replanCount: 0,
@@ -121,6 +124,7 @@ function evaluateEvidenceForge(testCase: EvaluationCase): SystemScenarioEvaluati
   if (terminal === "COMPLETED") {
     const state = buildState();
     state.task.id = `eval-${testCase.id}`;
+    state.reviewBinding = artifactBindingFor(state, "PATCH");
     const store = new EvidenceStore();
     passAll(state, store);
     new ProgressEvaluator(store).evaluate(state, "VERIFICATION");
@@ -130,18 +134,12 @@ function evaluateEvidenceForge(testCase: EvaluationCase): SystemScenarioEvaluati
     certificateIssued = true;
   }
   const recoveryAttempted = testCase.uncertainEffect === true;
-  const recoverySucceeded =
-    !recoveryAttempted ||
-    (testCase.replayPolicy === "SAFE" && terminal === "COMPLETED") ||
-    (testCase.replayPolicy === "RECONCILE_FIRST" &&
-      testCase.reconciliationResult === "SUCCEEDED" &&
-      terminal === "COMPLETED");
   return finish(started, testCase, terminal, {
     completionCertificateIssued: certificateIssued,
     verificationExecuted: testCase.verifierStatus !== "NOT_RUN",
     verificationCoverage: testCase.verifierStatus === "NOT_RUN" ? 0 : 1,
     recoveryAttempted,
-    recoverySucceeded,
+    recoverySucceeded: didRecoverySucceed(testCase, terminal),
     repeatedNoProgressToolAttempts:
       testCase.repeatedEquivalentAttempts === undefined
         ? 0
@@ -153,6 +151,18 @@ function evaluateEvidenceForge(testCase: EvaluationCase): SystemScenarioEvaluati
       terminal === "BLOCKED" || (terminal === "ESCALATED" && !testCase.oracleComplete) ? 1 : 0,
     toolCallCount: testCase.evidenceForgeToolCalls,
   });
+}
+
+function didRecoverySucceed(
+  testCase: EvaluationCase,
+  terminal: EvaluationTerminal,
+): boolean {
+  if (testCase.uncertainEffect !== true || terminal !== "COMPLETED") return false;
+  if (testCase.replayPolicy === "SAFE") return true;
+  return (
+    testCase.replayPolicy === "RECONCILE_FIRST" &&
+    testCase.reconciliationResult === "SUCCEEDED"
+  );
 }
 
 function determineEvidenceForgeTerminal(testCase: EvaluationCase): EvaluationTerminal {
