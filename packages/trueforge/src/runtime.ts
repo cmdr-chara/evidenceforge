@@ -2,6 +2,7 @@ import { ApprovalRequest, digestCanonical, RuntimeEvent, SessionState } from "..
 import { EvidenceStore } from "../../evidence/src";
 import { isRuntimeCheckpointStore, SessionStore } from "../../persistence/src";
 import { EventJournal } from "../../telemetry/src";
+import { artifactBindingMatchesState } from "../../verification/src";
 import {
   ApprovalResponse,
   RunTurnInput,
@@ -53,6 +54,7 @@ export class DurableTrueForgeRuntime {
   }
 
   public async start(state: SessionState, message: string): Promise<SessionState> {
+    if (state.status !== "ACTIVE") throw new Error("non-active session cannot start a TrueForge turn");
     const sessionId = state.trueForgeSessionId ?? (await this.adapter.createSession());
     state.trueForgeSessionId = sessionId;
     await this.persist(state);
@@ -101,6 +103,9 @@ export class DurableTrueForgeRuntime {
       const operation = state.operations.find(
         (candidate) => candidate.id === provenance.originatingOperationId,
       );
+      const externalBindingInvalid =
+        persistedApproval.risk === "EXTERNAL_REVERSIBLE" &&
+        !artifactBindingMatchesState(provenance.binding, state, "EXTERNAL");
       if (
         provenance.actionDigest !== digestCanonical(persistedApproval.normalizedArguments) ||
         provenance.repository !== state.task.repository ||
@@ -109,7 +114,8 @@ export class DurableTrueForgeRuntime {
         provenance.consumedAt !== undefined ||
         Date.parse(provenance.expiresAt) <= Date.now() ||
         operation?.actionType !== persistedApproval.action ||
-        operation.argumentDigest !== provenance.actionDigest
+        operation.argumentDigest !== provenance.actionDigest ||
+        externalBindingInvalid
       ) {
         throw new Error("approval provenance is stale, substituted, expired, or consumed");
       }
@@ -149,6 +155,7 @@ export class DurableTrueForgeRuntime {
   }
 
   public async resume(state: SessionState): Promise<SessionState> {
+    if (state.status !== "ACTIVE") throw new Error("terminal session cannot resume TrueForge");
     if (
       state.trueForgeSessionId === undefined ||
       state.activeTurnId === undefined ||
@@ -177,19 +184,28 @@ export class DurableTrueForgeRuntime {
   }
 
   private async handleEvent(state: SessionState, event: RuntimeEvent): Promise<void> {
-    const isNewEvent = this.evidenceStore.getEvent(event.id) === undefined;
-    if (!isNewEvent) return;
-    this.evidenceStore.recordEvent(event);
+    if (state.status !== "ACTIVE") return;
+    if (!this.evidenceStore.recordEvent(event)) return;
+
     const violation = this.diagnosticGuard.observe(event);
     if (violation !== undefined) blockForDiagnosticViolation(state, violation);
     if (violation === undefined) this.projector.project(state, event);
-    if (event.type === "TURN_CREATED") {
+    if (event.type === "TURN_CREATED" && state.status === "ACTIVE") {
       state.activeTurnId = readTurnId(event.payload) ?? state.activeTurnId;
     }
-    if (event.sequenceNumber !== undefined) state.lastSequenceNumber = event.sequenceNumber;
+    if (event.sequenceNumber !== undefined) {
+      state.lastSequenceNumber = Math.max(state.lastSequenceNumber ?? 0, event.sequenceNumber);
+    }
+    if (state.status !== "ACTIVE" && state.terminalSequenceNumber === undefined) {
+      state.terminalSequenceNumber = event.sequenceNumber ?? state.lastSequenceNumber;
+      if (state.terminalSequenceNumber !== undefined) {
+        state.lastSequenceNumber = state.terminalSequenceNumber;
+      }
+    }
+
     await this.journal.append(event);
     await this.persist(state);
-    if (violation !== undefined && state.trueForgeSessionId !== undefined) {
+    if (state.status !== "ACTIVE" && state.trueForgeSessionId !== undefined) {
       await this.cancelOnce(state.trueForgeSessionId);
     }
     await this.onEvent?.(event, structuredClone(state));
@@ -201,8 +217,7 @@ export class DurableTrueForgeRuntime {
     try {
       await this.adapter.cancelSession(sessionId);
     } catch {
-      // The durable BLOCKED state is authoritative even if the best-effort cancel races
-      // with a terminal server event or the transport is unavailable.
+      // The durable terminal state is authoritative even if best-effort cancellation races.
     }
   }
 
@@ -217,7 +232,11 @@ export class DurableTrueForgeRuntime {
 
 function applyStreamCursor(state: SessionState, result: StreamResult): void {
   state.activeTurnId = result.turnId ?? state.activeTurnId;
-  state.lastSequenceNumber = result.lastSequenceNumber;
+  if (state.terminalSequenceNumber !== undefined) {
+    state.lastSequenceNumber = state.terminalSequenceNumber;
+    return;
+  }
+  state.lastSequenceNumber = Math.max(state.lastSequenceNumber ?? 0, result.lastSequenceNumber);
 }
 
 function readTurnId(payload: unknown): string | undefined {
