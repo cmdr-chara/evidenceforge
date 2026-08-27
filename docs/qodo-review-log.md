@@ -7,16 +7,16 @@ Record only genuine Qodo findings and follow-up evidence.
 - PR: https://github.com/cmdr-chara/evidenceforge/pull/2
 - Aggregate Agentic Review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 - Earlier follow-up request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
-- Final reviewed SHA: `7555f0f01f1af1f198d665333098619d05408230`
+- Latest reviewed SHA: `29290cbf6b9511eaa7860d581c243fbdbfb19231`
 - Final exact-SHA request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
-- Qodo exact-SHA update: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440921739
-- GitHub Actions evidence: runs `33084240703` and `33084235854`, all required steps green including 159/159 tests.
+- Latest Qodo exact-SHA update: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5442750603
+- GitHub Actions evidence: runs `33097953798` and `33097959561`, all required steps green including 196/196 tests.
 
 Qodo previously marked **Old patch evidence reused** and **Stale certificate completes state** resolved after the earlier P0.1 batch. Additional earlier findings such as specialist budgets, missing explicit specialist terminal status, blocked-stream mutation, and sequential fan-out were also resolved/outdated in Qodo's thread state before this reconstruction.
 
 ## Current High / Medium finding disposition
 
-Qodo's aggregate review was observed after its exact-SHA update. It reports `Bugs (1)`: every implementable finding below is resolved; the remaining read-only boundary is explicitly SDK-blocked.
+Qodo's aggregate review was observed after its exact-SHA update for `29290cb…`. Its prior cursor/path findings are resolved; three newly surfaced runtime transaction findings have local remediations pending exact-head confirmation. The read-only boundary remains explicitly SDK-blocked.
 
 | Severity | Finding | Disposition | Evidence in reconstructed batch |
 |---|---|---|---|
@@ -33,6 +33,9 @@ Qodo's aggregate review was observed after its exact-SHA update. It reports `Bug
 | High | Streamed calls lost on restart | RESOLVED by Qodo | all streamed deltas persist; projector rehydrates event index; restart-before-tool-response integration test |
 | Medium | Failed tools shown successful | RESOLVED by Qodo | malformed/error/nonzero tool responses map to ERROR activity; tests cover malformed + nonzero exit |
 | Medium | Initial activity disappears after restart | RESOLVED by Qodo | `Incident accepted` reconstructed deterministically from persisted task data; restart snapshot test |
+| High | Generation drain can hang | REMEDIATED — PENDING Qodo | bounded generation drain plus bounded terminal persistence/cancellation; hanging journal/checkpoint/observer regressions |
+| High | Approval effect stays started | REMEDIATED — PENDING Qodo | drain and final-persistence failures mark `EFFECT_UNCERTAIN` before terminal persistence; two regressions |
+| High | Checkpoint bypasses event journal | REMEDIATED — PENDING Qodo | validate on isolated evidence, append journal first, then admit/project/checkpoint; journal-failure regression |
 | High | Read-only boundary is unenforced | **BLOCKED — TrueForge SDK 0.1.3 limitation** | inspected SDK exposes dynamic-subagent enablement but no per-subagent pre-execution tool allowlist/interceptor |
 
 ## P0.4 blocked rationale
@@ -51,6 +54,8 @@ No second orchestration framework is introduced and no post-execution detector i
 Qodo's exact review of `d9a79c0069c6dac0c71dee38d8312d36c680ec48` added two implementable Highs: **File results lack revision binding** and **Timed-out callbacks persist late**. The subsequent candidate binds GitHub file artifacts using response-level repository/commit identity and introduces a stream-generation fence that suppresses callbacks released after timeout. Both include regressions and remain pending exact-head Qodo confirmation until published.
 
 Qodo's next exact review of `89a8d64603f135963804ec164e4d66c74fb236d9` marked both Highs resolved and added **Initial turns lose restart cursor** and **File path binding is missing**. The subsequent candidate serializes durable event commits during the active stream, preserves initial turn/cursor/evidence for resume, drains an accepted in-flight commit before terminal fail-closed persistence, and requires exact normalized request-path identity for file/resource/directory evidence. These remediations include crash/resume, timeout, traversal, mismatched-path, and unrelated-child regressions and await exact-head Qodo confirmation.
+
+Qodo's exact review of `29290cbf6b9511eaa7860d581c243fbdbfb19231` marked both cursor/path findings resolved and added **Generation drain can hang**, **Approval effect stays started**, and **Checkpoint bypasses event journal**. The current candidate provides bounded fail-closed draining, uncertainty before terminal persistence for approved effects, and journal-first event admission. The local suite is 201/201; publication, exact-head CI, and Qodo confirmation remain required.
 
 1. Preserve the exact-SHA Qodo links in the submission evidence.
 2. Request and inspect Qodo against the subsequent exact SHA.

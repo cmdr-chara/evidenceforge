@@ -111,21 +111,23 @@ A credentialed TrueForge/model turn was observed in session `01m11zp6dfp08dq520e
 
 The application control plane was then hardened around the official GitHub MCP schema. Application-only identity fields are never sent to GitHub. `create_pull_request` produces only a minimal receipt; a later `pull_request_read`, bound to an earlier authoritative `get_commit` of the proposed head, must reconcile repository/base/head/head SHA before external evidence can commit. TrueForge stream deadlines now cover iteration, event callbacks, completed-turn replay, iterator cleanup, and session-creation failure, with durable fail-closed regressions.
 
-The integrated unpublished candidate passes format, lint, typecheck, **196/196 tests**, evaluation smoke, fixture demo, build, CI-mode doctor, and diff integrity locally. It is not labeled an externally verified final SHA until publication and exact-head CI/Qodo observation.
+The earlier integrated candidate passed format, lint, typecheck, **196/196 tests**, evaluation smoke, fixture demo, build, CI-mode doctor, and diff integrity locally before publication and exact-head CI/Qodo observation.
 
 Qodo's review of the first published hardening commit identified two additional Highs. GitHub file evidence had to bind repository/revision in the connector response, not merely in the request; plain file/directory payloads are now rejected unless an explicit trusted envelope carries both identities, while official `repo://…/sha/<commit>/…` resources remain supported. TrueForge callback deadlines also needed a runtime generation fence because `Promise.race` does not cancel the losing callback; a callback released after timeout is now prevented from journaling, persisting, cancelling, or notifying after terminal cutoff. Both paths have deterministic regressions and require exact-head Qodo confirmation after publication.
 
 The next exact-SHA Qodo pass marked both of those Highs resolved and exposed two further edge cases. Event commits are now serialized and persisted while the stream remains active, so an initial `TURN_CREATED` ID/cursor/evidence survives a process interruption and can resume; failure closes admission, drains the single in-flight commit, then writes the terminal checkpoint before any queued late work. GitHub file evidence additionally requires the exact normalized requested path: files/resources must match it, and directory entries must be valid direct children without traversal or absolute-path ambiguity.
 
-## Verified final branch baseline
+The published `29290cb…` candidate passed both push and PR workflows. Qodo marked those cursor/path findings resolved and exposed three further transaction boundaries: drain itself could hang, an approved effect could remain `EFFECT_STARTED` after drain/final-persistence failure, and checkpoint projection preceded journal durability. The next candidate bounds generation drain and terminal cleanup, records `EFFECT_UNCERTAIN` before blocking, and performs journal-first event admission. Hanging journal/checkpoint/observer cases and both approval-failure paths are covered; the full local suite is **201/201** pending exact-head CI/Qodo.
+
+## Latest verified branch baseline
 
 Final branch SHA:
 
-`7555f0f01f1af1f198d665333098619d05408230`
+`29290cbf6b9511eaa7860d581c243fbdbfb19231`
 
 GitHub Actions run:
 
-`33084240703` and `33084235854`
+`33097953798` and `33097959561`
 
 Observed green steps:
 
@@ -133,14 +135,14 @@ Observed green steps:
 - `pnpm format:check`;
 - `pnpm lint`;
 - `pnpm typecheck`;
-- `pnpm test` — **159 / 159 passed**;
+- `pnpm test` — **196 / 196 passed**;
 - `pnpm eval:smoke`;
 - `pnpm demo:fixture`;
 - `pnpm build`;
 - `pnpm doctor`;
 - `git diff --check`.
 
-Both workflows passed on the final documentation/code SHA. Qodo then updated its aggregate review against the same SHA, resolving every implementable finding and retaining the SDK-blocked read-only High.
+Both workflows passed on that exact documentation/code SHA. Qodo then updated its aggregate review against the same SHA, resolving the preceding cursor/path findings and surfacing the three runtime transaction findings remediated in the next candidate. The SDK-blocked read-only High remains separate and visible.
 
 ## Remaining external/human gates
 

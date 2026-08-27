@@ -36,6 +36,18 @@ export interface TrueForgeRuntimeAdapter {
   ): Promise<StreamResult>;
 }
 
+export interface TrueForgeRuntimeOptions {
+  /**
+   * Maximum time spent waiting for callbacks already admitted to a stream
+   * generation to settle after the adapter has failed. This is deliberately
+   * separate from the TrueForge stream deadline: a provider can time out
+   * while a callback is still blocked on local durability or observation.
+   */
+  drainTimeoutMs?: number;
+}
+
+const DEFAULT_DRAIN_TIMEOUT_MS = 5_000;
+
 /**
  * A stream callback can outlive the Promise that consumed the stream (for
  * example, when the consumer's deadline wins a Promise.race). The callback
@@ -47,6 +59,7 @@ class StreamGeneration {
   private accepting = true;
   private pending: Promise<void> = Promise.resolve();
   private failure: unknown;
+  private drainPromise: Promise<void> | undefined;
 
   public close(): void {
     this.open = false;
@@ -82,8 +95,17 @@ class StreamGeneration {
     return queued;
   }
 
-  public async drain(): Promise<void> {
-    await this.pending;
+  public drain(timeoutMs: number): Promise<void> {
+    this.drainPromise ??= this.waitForDrain(timeoutMs);
+    return this.drainPromise;
+  }
+
+  private async waitForDrain(timeoutMs: number): Promise<void> {
+    await awaitWithTimeout(
+      this.pending,
+      timeoutMs,
+      new Error(`TrueForge callback generation did not drain within ${timeoutMs}ms`),
+    );
     if (this.failure !== undefined) throw this.failure;
   }
 }
@@ -94,6 +116,7 @@ export class DurableTrueForgeRuntime {
   private readonly cancelledSessions = new Set<string>();
   private readonly applicationReducer?: (state: SessionState, event: RuntimeEvent) => void;
   private activeGeneration: StreamGeneration | undefined;
+  private readonly drainTimeoutMs: number;
 
   public constructor(
     private readonly adapter: TrueForgeRuntimeAdapter | TrueForgeSdkAdapter,
@@ -106,10 +129,12 @@ export class DurableTrueForgeRuntime {
     ) => void | Promise<void>,
     projector?: TrueForgeEventProjector,
     applicationReducer?: (state: SessionState, event: RuntimeEvent) => void,
+    options?: TrueForgeRuntimeOptions,
   ) {
     this.projector = projector ?? new TrueForgeEventProjector(undefined, evidenceStore);
     this.diagnosticGuard = new DiagnosticContractGuard(evidenceStore.listEvents());
     this.applicationReducer = applicationReducer;
+    this.drainTimeoutMs = normalizeDrainTimeout(options?.drainTimeoutMs);
   }
 
   public async start(state: SessionState, message: string): Promise<SessionState> {
@@ -122,7 +147,12 @@ export class DurableTrueForgeRuntime {
       return state;
     }
     state.trueForgeSessionId = sessionId;
-    await this.persist(state);
+    try {
+      await this.persistWithinBound(state);
+    } catch (error) {
+      await this.failClosedStream(state, error);
+      return state;
+    }
 
     const generation = this.beginGeneration();
     let result: StreamResult;
@@ -140,7 +170,7 @@ export class DurableTrueForgeRuntime {
     }
     generation.stopAccepting();
     try {
-      await generation.drain();
+      await generation.drain(this.drainTimeoutMs);
     } catch (error) {
       await this.abortGeneration(generation);
       await this.failClosedStream(state, error);
@@ -148,7 +178,11 @@ export class DurableTrueForgeRuntime {
     }
     generation.close();
     applyStreamCursor(state, result);
-    await this.persist(state);
+    try {
+      await this.persistWithinBound(state);
+    } catch (error) {
+      await this.failClosedStream(state, error);
+    }
     return state;
   }
 
@@ -205,7 +239,13 @@ export class DurableTrueForgeRuntime {
       startedOperationId = operation.id;
       markEffectStarted(state, operation.id);
       provenance.consumedAt = new Date().toISOString();
-      await this.persist(state);
+      try {
+        await this.persistWithinBound(state);
+      } catch (error) {
+        this.markStartedOperationUncertain(state, startedOperationId);
+        await this.failClosedStream(state, error);
+        return state;
+      }
     }
     this.restoreCorrelatedToolCalls(state);
     const generation = this.beginGeneration();
@@ -226,27 +266,27 @@ export class DurableTrueForgeRuntime {
       );
     } catch (error) {
       await this.abortGeneration(generation);
-      if (startedOperationId !== undefined) {
-        const operation = state.operations.find((candidate) => candidate.id === startedOperationId);
-        if (operation?.status === "EFFECT_STARTED") {
-          markEffectUncertain(state, startedOperationId);
-          await this.persist(state);
-        }
-      }
+      await this.markStartedOperationUncertain(state, startedOperationId);
       await this.failClosedStream(state, error);
       return state;
     }
     generation.stopAccepting();
     try {
-      await generation.drain();
+      await generation.drain(this.drainTimeoutMs);
     } catch (error) {
       await this.abortGeneration(generation);
+      await this.markStartedOperationUncertain(state, startedOperationId);
       await this.failClosedStream(state, error);
       return state;
     }
     generation.close();
     applyStreamCursor(state, result);
-    await this.persist(state);
+    try {
+      await this.persistWithinBound(state);
+    } catch (error) {
+      this.markStartedOperationUncertain(state, startedOperationId);
+      await this.failClosedStream(state, error);
+    }
     return state;
   }
 
@@ -277,7 +317,7 @@ export class DurableTrueForgeRuntime {
     }
     generation.stopAccepting();
     try {
-      await generation.drain();
+      await generation.drain(this.drainTimeoutMs);
     } catch (error) {
       await this.abortGeneration(generation);
       await this.failClosedStream(state, error);
@@ -285,7 +325,11 @@ export class DurableTrueForgeRuntime {
     }
     generation.close();
     applyStreamCursor(state, result);
-    await this.persist(state);
+    try {
+      await this.persistWithinBound(state);
+    } catch (error) {
+      await this.failClosedStream(state, error);
+    }
     return state;
   }
 
@@ -311,12 +355,27 @@ export class DurableTrueForgeRuntime {
   private async abortGeneration(generation: StreamGeneration): Promise<void> {
     generation.close();
     try {
-      await generation.drain();
+      await generation.drain(this.drainTimeoutMs);
     } catch {
       // A commit that was already in flight may fail after the adapter has
-      // failed. Its failure is observed by the generation, but must not
-      // prevent the caller from writing the authoritative BLOCKED checkpoint.
-      // The caller retains the adapter/commit error as the bounded reason.
+      // failed, or it may never settle. Its failure is observed by the
+      // generation, but must not prevent the caller from writing the
+      // authoritative BLOCKED checkpoint. The caller retains the
+      // adapter/commit error as the bounded reason.
+    }
+  }
+
+  private markStartedOperationUncertain(
+    state: SessionState,
+    operationId: string | undefined,
+  ): void {
+    if (operationId === undefined) return;
+    const operation = state.operations.find((candidate) => candidate.id === operationId);
+    // A successful tool response may have already settled the operation. In
+    // that case the external outcome is known and must not be erased merely
+    // because a later observer/drain callback failed.
+    if (operation?.status === "EFFECT_STARTED") {
+      markEffectUncertain(state, operationId);
     }
   }
 
@@ -335,6 +394,19 @@ export class DurableTrueForgeRuntime {
     generation: StreamGeneration,
   ): Promise<void> {
     if (!this.generationIsOpen(generation) || state.status !== "ACTIVE") return;
+
+    // Validate admission on an isolated copy before touching the durable
+    // journal. This preserves idempotency/conflict checks without admitting
+    // an event whose journal write is going to fail.
+    const candidateEvidence = EvidenceStore.restore(this.evidenceStore.export());
+    if (!candidateEvidence.recordEvent(event)) return;
+
+    // Journal first: evidence and projections are admitted only after the
+    // event has a durable trace. If this append fails, failClosedStream can
+    // checkpoint a BLOCKED state without the unjournaled event.
+    if (!this.generationIsOpen(generation)) return;
+    await this.journal.append(event);
+    if (!this.generationIsOpen(generation)) return;
     if (!this.evidenceStore.recordEvent(event)) return;
 
     const violation = this.diagnosticGuard.observe(event);
@@ -358,11 +430,8 @@ export class DurableTrueForgeRuntime {
 
     // Promise.race cannot cancel a callback that is already in this pipeline.
     // If the generation closes while one of these operations is pending, the
-    // in-flight operation is drained before failClosedStream persists the
-    // terminal checkpoint, and no later operation from this generation starts.
-    if (!this.generationIsOpen(generation)) return;
-    await this.journal.append(event);
-    if (!this.generationIsOpen(generation)) return;
+    // in-flight operation is drained (up to the bounded abort deadline) and
+    // no later operation from this generation starts.
     await this.persist(state);
     if (!this.generationIsOpen(generation)) return;
     if (state.status !== "ACTIVE" && state.trueForgeSessionId !== undefined) {
@@ -376,7 +445,11 @@ export class DurableTrueForgeRuntime {
     if (this.cancelledSessions.has(sessionId)) return;
     this.cancelledSessions.add(sessionId);
     try {
-      await this.adapter.cancelSession(sessionId);
+      await awaitWithTimeout(
+        this.adapter.cancelSession(sessionId),
+        this.drainTimeoutMs,
+        new Error(`TrueForge session cancellation did not settle within ${this.drainTimeoutMs}ms`),
+      );
     } catch {
       // The durable terminal state is authoritative even if best-effort cancellation races.
     }
@@ -393,8 +466,17 @@ export class DurableTrueForgeRuntime {
       state.version += 1;
       state.terminalSequenceNumber ??= state.lastSequenceNumber;
     }
-    await this.persist(state);
-    if (state.trueForgeSessionId !== undefined) await this.cancelOnce(state.trueForgeSessionId);
+    // Persistence and cancellation are independent best-effort terminal
+    // actions. Start both before awaiting either one so a stuck checkpoint
+    // cannot delay the provider cancellation (and vice versa). The timeout
+    // also keeps this fail-closed path bounded when a callback dependency
+    // never settles.
+    const persistence = this.persistWithinBound(state);
+    const cancellation =
+      state.trueForgeSessionId === undefined
+        ? Promise.resolve()
+        : this.cancelOnce(state.trueForgeSessionId);
+    await Promise.allSettled([persistence, cancellation]);
   }
 
   private async persist(state: SessionState): Promise<void> {
@@ -403,6 +485,14 @@ export class DurableTrueForgeRuntime {
       return;
     }
     await this.sessionStore.save(state);
+  }
+
+  private async persistWithinBound(state: SessionState): Promise<void> {
+    await awaitWithTimeout(
+      this.persist(state),
+      this.drainTimeoutMs,
+      new Error(`TrueForge checkpoint did not settle within ${this.drainTimeoutMs}ms`),
+    );
   }
 }
 
@@ -420,4 +510,30 @@ function readTurnId(payload: unknown): string | undefined {
   const record = payload as Record<string, unknown>;
   const value = record.turnId ?? record.turn_id;
   return typeof value === "string" ? value : undefined;
+}
+
+function normalizeDrainTimeout(value: number | undefined): number {
+  if (value === undefined) return DEFAULT_DRAIN_TIMEOUT_MS;
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error("drainTimeoutMs must be a finite non-negative number");
+  }
+  return Math.max(1, Math.ceil(value));
+}
+
+async function awaitWithTimeout<T>(
+  promise: PromiseLike<T>,
+  timeoutMs: number,
+  timeoutError: Error,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(timeoutError), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }

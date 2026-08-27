@@ -64,13 +64,13 @@
 
 ## Quality
 
-Last externally verified branch baseline: `7555f0f01f1af1f198d665333098619d05408230`, GitHub Actions runs `33084240703` and `33084235854`. Current unpublished candidate: all local gates green, **196/196 tests**; exact-head CI still required after publication.
+Last externally verified branch baseline: `29290cbf6b9511eaa7860d581c243fbdbfb19231`, GitHub Actions runs `33097953798` and `33097959561`. Current unpublished candidate: all local gates green, **201/201 tests**; exact-head CI still required after publication.
 
 - [x] `pnpm install --frozen-lockfile`.
 - [x] `pnpm format:check`.
 - [x] `pnpm lint`.
 - [x] `pnpm typecheck`.
-- [x] `pnpm test` — **159/159 passed**.
+- [x] `pnpm test` — **201/201 passed locally**; exact-head CI pending publication.
 - [x] `pnpm eval:smoke`.
 - [x] `pnpm demo:fixture`.
 - [x] `pnpm build`.
@@ -87,7 +87,7 @@ Last externally verified branch baseline: `7555f0f01f1af1f198d665333098619d05408
 - [x] Every currently implementable open High/Medium finding has repository-side code + test remediation.
 - [x] Read-only pre-execution finding documented as SDK-blocked rather than falsely resolved.
 - [x] Request `/agentic_review` on the final exact SHA: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
-- [x] Inspect final Qodo response: exact-SHA update https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440921739; one SDK-blocked High remains.
+- [x] Inspect latest published-head Qodo response: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5442750603.
 - [ ] Human merge after required review/live gates.
 
 ## Demo vertical slice required before submission
@@ -132,7 +132,7 @@ Last externally verified branch baseline: `7555f0f01f1af1f198d665333098619d05408
 - [x] Public repository exists.
 - [ ] Credentialed live sponsor vertical slice complete.
 - [ ] Exact viewport/200% visual check complete.
-- [ ] Exact-head Qodo re-review after the latest two implementable High remediations; the SDK-blocked High remains disclosed.
+- [ ] Exact-head Qodo re-review after the latest three implementable runtime remediations; the SDK-blocked High remains disclosed.
 - [ ] Human merge complete.
 - [ ] Demo video URL added.
 - [ ] Blog URL added if entering blog category.

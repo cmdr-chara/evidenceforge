@@ -3,20 +3,28 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ApprovalRequest, RuntimeEvent, SessionState } from "../../packages/domain/src";
+import {
+  ApprovalRequest,
+  digestCanonical,
+  RuntimeEvent,
+  SessionState,
+} from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
 import {
   JsonRuntimeCheckpointStore,
   JsonSessionStore,
 } from "../../packages/persistence/src";
 import { EventJournal } from "../../packages/telemetry/src";
+import { artifactBindingFor } from "../../packages/verification/src";
 import {
   DurableTrueForgeRuntime,
+  ApprovalResponse,
   RunTurnInput,
   StreamResult,
   TrueForgeRuntimeAdapter,
   TrueForgeStreamTimeoutError,
 } from "../../packages/trueforge/src";
+import { createOperationIntent } from "../../packages/workflow/src";
 import { buildState } from "../fixtures/builders";
 
 class FailingStreamAdapter implements TrueForgeRuntimeAdapter {
@@ -134,6 +142,16 @@ class CountingSessionStore extends JsonSessionStore {
 
   public override async save(state: SessionState): Promise<void> {
     this.saves.push(structuredClone(state));
+    await super.save(state);
+  }
+}
+
+class FinalApprovalPersistenceFailureStore extends CountingSessionStore {
+  private calls = 0;
+
+  public override async save(state: SessionState): Promise<void> {
+    this.calls += 1;
+    if (this.calls === 2) throw new Error("final approval checkpoint failed");
     await super.save(state);
   }
 }
@@ -318,6 +336,244 @@ class MidPipelineTimeoutAdapter implements TrueForgeRuntimeAdapter {
     this.journal.releaseAppend();
     await this.callback;
   }
+}
+
+class NeverResolvingCheckpointStore extends JsonRuntimeCheckpointStore {
+  public readonly snapshots: Array<{
+    state: SessionState;
+    evidence: ReturnType<EvidenceStore["export"]>;
+  }> = [];
+  private resolveStarted!: () => void;
+  public readonly blockedCheckpointStarted = new Promise<void>((resolve) => {
+    this.resolveStarted = resolve;
+  });
+  private calls = 0;
+
+  public override async saveCheckpoint(
+    state: SessionState,
+    evidenceStore: EvidenceStore,
+  ): Promise<void> {
+    this.calls += 1;
+    this.snapshots.push({
+      state: structuredClone(state),
+      evidence: evidenceStore.export(),
+    });
+    if (this.calls === 1) {
+      await super.saveCheckpoint(state, evidenceStore);
+      return;
+    }
+    if (this.calls === 2) this.resolveStarted();
+    await new Promise<void>(() => undefined);
+  }
+}
+
+class CheckpointHangAdapter implements TrueForgeRuntimeAdapter {
+  public cancellations = 0;
+
+  public constructor(private readonly checkpoints: NeverResolvingCheckpointStore) {}
+
+  public async createSession(): Promise<string> {
+    return "tf-checkpoint-hang";
+  }
+
+  public async cancelSession(sessionId: string): Promise<void> {
+    assert.equal(sessionId, "tf-checkpoint-hang");
+    this.cancellations += 1;
+  }
+
+  public async runTurn(input: RunTurnInput): Promise<StreamResult> {
+    const event: RuntimeEvent = {
+      id: "checkpoint-hang-event",
+      type: "TURN_CREATED",
+      source: "trueforge:turn.created",
+      timestamp: "2026-08-27T15:00:00.000Z",
+      sequenceNumber: 1,
+      payload: { type: "turn.created", turnId: "checkpoint-hang-turn" },
+    };
+    // The adapter may emit without awaiting the callback. This leaves the
+    // runtime's event commit waiting on the intentionally stuck checkpoint.
+    void input.onEvent?.(event);
+    await this.checkpoints.blockedCheckpointStarted;
+    throw new TrueForgeStreamTimeoutError(30);
+  }
+
+  public async submitApprovals(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async resumeTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+}
+
+class ObserverHangAdapter implements TrueForgeRuntimeAdapter {
+  public cancellations = 0;
+  private resolveObserverStarted!: () => void;
+  public readonly observerStarted = new Promise<void>((resolve) => {
+    this.resolveObserverStarted = resolve;
+  });
+
+  public async createSession(): Promise<string> {
+    return "tf-observer-hang";
+  }
+
+  public async cancelSession(sessionId: string): Promise<void> {
+    assert.equal(sessionId, "tf-observer-hang");
+    this.cancellations += 1;
+  }
+
+  public async runTurn(input: RunTurnInput): Promise<StreamResult> {
+    const event: RuntimeEvent = {
+      id: "observer-hang-event",
+      type: "TURN_CREATED",
+      source: "trueforge:turn.created",
+      timestamp: "2026-08-27T15:00:00.000Z",
+      sequenceNumber: 1,
+      payload: { type: "turn.created", turnId: "observer-hang-turn" },
+    };
+    void input.onEvent?.(event);
+    await this.observerStarted;
+    throw new TrueForgeStreamTimeoutError(30);
+  }
+
+  public async submitApprovals(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async resumeTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public markObserverStarted(): void {
+    this.resolveObserverStarted();
+  }
+}
+
+class ApprovalDrainFailureAdapter implements TrueForgeRuntimeAdapter {
+  public cancellations = 0;
+  private resolveReady!: () => void;
+  public readonly streamReady = new Promise<void>((resolve) => {
+    this.resolveReady = resolve;
+  });
+
+  public constructor(private readonly journal: BlockingJournal) {}
+
+  public async createSession(): Promise<string> {
+    return "tf-approval-drain";
+  }
+
+  public async cancelSession(sessionId: string): Promise<void> {
+    assert.equal(sessionId, "tf-approval-drain");
+    this.cancellations += 1;
+  }
+
+  public async runTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async submitApprovals(
+    sessionId: string,
+    _approvals: ApprovalResponse[],
+    onEvent?: RunTurnInput["onEvent"],
+  ): Promise<StreamResult> {
+    const event: RuntimeEvent = {
+      id: "approval-drain-failure-event",
+      type: "TURN_CREATED",
+      source: "trueforge:turn.created",
+      timestamp: "2026-08-27T15:00:00.000Z",
+      sequenceNumber: 1,
+      payload: { type: "turn.created", turnId: "approval-drain-turn" },
+    };
+    const callback = onEvent?.(event);
+    if (callback !== undefined) void Promise.resolve(callback).catch(() => undefined);
+    await this.journal.appendStarted;
+    this.resolveReady();
+    return {
+      sessionId,
+      turnId: "approval-drain-turn",
+      lastSequenceNumber: 1,
+      events: [event],
+      paused: false,
+      requiredActions: [],
+    };
+  }
+
+  public async resumeTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+}
+
+class ApprovalFinalPersistenceAdapter implements TrueForgeRuntimeAdapter {
+  public cancellations = 0;
+
+  public async createSession(): Promise<string> {
+    return "tf-approval-final-persist";
+  }
+
+  public async cancelSession(sessionId: string): Promise<void> {
+    assert.equal(sessionId, "tf-approval-final-persist");
+    this.cancellations += 1;
+  }
+
+  public async runTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async submitApprovals(sessionId: string): Promise<StreamResult> {
+    return {
+      sessionId,
+      turnId: "approval-final-persist-turn",
+      lastSequenceNumber: 1,
+      events: [],
+      paused: false,
+      requiredActions: [],
+    };
+  }
+
+  public async resumeTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+}
+
+function addApprovedExternalOperation(state: SessionState): ApprovalRequest {
+  const normalizedArguments = { head: "fix/demo" };
+  state.operations.push(
+    createOperationIntent({
+      id: "operation-approval-drain",
+      actionType: "github.create_pull_request",
+      tool: "github.create_pull_request",
+      normalizedArguments,
+      repository: state.task.repository,
+      revision: state.task.revision,
+      risk: "EXTERNAL_REVERSIBLE",
+      replayPolicy: "RECONCILE_FIRST",
+      expectedEvidence: ["tool result"],
+    }),
+  );
+  const issuedAt = new Date(Date.now() - 1_000).toISOString();
+  const approval: ApprovalRequest = {
+    id: "approval-drain",
+    action: "github.create_pull_request",
+    normalizedArguments,
+    risk: "EXTERNAL_REVERSIBLE",
+    reason: "external write",
+    reversible: true,
+    status: "APPROVED",
+    toolCallId: "call-approval-drain",
+    threadId: "main",
+    provenance: {
+      actionDigest: digestCanonical(normalizedArguments),
+      repository: state.task.repository,
+      revision: state.task.revision,
+      risk: "EXTERNAL_REVERSIBLE",
+      originatingOperationId: "operation-approval-drain",
+      binding: artifactBindingFor(state, "EXTERNAL"),
+      issuedAt,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    },
+  };
+  state.approvals.push(approval);
+  return approval;
 }
 
 test("runtime durably blocks and cancels a timed-out initial TrueForge turn", async () => {
@@ -571,7 +827,7 @@ test("runtime checkpoints an accepted turn before an in-flight stream can crash"
   }
 });
 
-test("runtime drains an in-flight commit before the timeout checkpoint wins", async () => {
+test("late journal completion cannot admit an event after the timeout cutoff", async () => {
   const root = await mkdtemp(join(tmpdir(), "evidenceforge-mid-pipeline-timeout-"));
   try {
     const journal = new BlockingJournal(join(root, "events.jsonl"));
@@ -603,8 +859,8 @@ test("runtime drains an in-flight commit before the timeout checkpoint wins", as
 
     assert.equal(updated.status, "BLOCKED");
     assert.equal(updated.phase, "BLOCKED");
-    assert.equal(updated.terminalSequenceNumber, 1);
-    assert.equal(updated.activeTurnId, "mid-pipeline-turn");
+    assert.equal(updated.terminalSequenceNumber, undefined);
+    assert.equal(updated.activeTurnId, undefined);
     assert.equal(adapter.cancellations, 1);
     assert.deepEqual(observed, []);
     assert.equal(journal.appendCalls, 1);
@@ -615,11 +871,8 @@ test("runtime drains an in-flight commit before the timeout checkpoint wins", as
     const finalCheckpoint = await checkpoints.loadCheckpoint(state.task.id);
     assert.ok(finalCheckpoint);
     assert.equal(finalCheckpoint.state.status, "BLOCKED");
-    assert.equal(finalCheckpoint.state.terminalSequenceNumber, 1);
-    assert.deepEqual(
-      finalCheckpoint.evidenceStore.listEvents().map((event) => event.id),
-      ["mid-pipeline-event"],
-    );
+    assert.equal(finalCheckpoint.state.terminalSequenceNumber, undefined);
+    assert.deepEqual(finalCheckpoint.evidenceStore.listEvents(), []);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -658,8 +911,8 @@ test("runtime still writes the terminal checkpoint when an in-flight journal fai
     assert.equal(updated.status, "BLOCKED");
     assert.equal(updated.phase, "BLOCKED");
     assert.equal(updated.blockedReason, "TrueForge turn stream exceeded the 30-second deadline");
-    assert.equal(updated.terminalSequenceNumber, 1);
-    assert.equal(updated.activeTurnId, "mid-pipeline-turn");
+    assert.equal(updated.terminalSequenceNumber, undefined);
+    assert.equal(updated.activeTurnId, undefined);
     assert.equal(adapter.cancellations, 1);
     assert.deepEqual(observed, []);
     assert.equal(journal.appendCalls, 1);
@@ -670,11 +923,200 @@ test("runtime still writes the terminal checkpoint when an in-flight journal fai
     const finalCheckpoint = await checkpoints.loadCheckpoint(state.task.id);
     assert.ok(finalCheckpoint);
     assert.equal(finalCheckpoint.state.status, "BLOCKED");
+    assert.equal(finalCheckpoint.state.terminalSequenceNumber, undefined);
+    assert.deepEqual(finalCheckpoint.evidenceStore.listEvents(), []);
+    assert.deepEqual(await journal.readAll(), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("runtime terminalizes and cancels when an in-flight journal never settles", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-never-journal-"));
+  try {
+    const journal = new BlockingJournal(join(root, "events.jsonl"));
+    const adapter = new MidPipelineTimeoutAdapter(journal);
+    const checkpoints = new CountingCheckpointStore(join(root, "checkpoints"));
+    const state = buildState();
+    const runtime = new DurableTrueForgeRuntime(
+      adapter,
+      checkpoints,
+      new EvidenceStore(),
+      journal,
+      undefined,
+      undefined,
+      undefined,
+      { drainTimeoutMs: 15 },
+    );
+
+    const startedAt = Date.now();
+    const startPromise = runtime.start(state, "investigate");
+    await adapter.failureObserved;
+    const updated = await startPromise;
+
+    assert.ok(Date.now() - startedAt < 500);
+    assert.equal(updated.status, "BLOCKED");
+    assert.equal(adapter.cancellations, 1);
+    assert.deepEqual(
+      checkpoints.checkpoints.map((checkpoint) => checkpoint.status),
+      ["ACTIVE", "BLOCKED"],
+    );
+    const finalCheckpoint = await checkpoints.loadCheckpoint(state.task.id);
+    assert.ok(finalCheckpoint);
+    assert.equal(finalCheckpoint.state.status, "BLOCKED");
+    assert.deepEqual(finalCheckpoint.evidenceStore.listEvents(), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("runtime terminalizes and cancels when a checkpoint never settles", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-never-checkpoint-"));
+  try {
+    const checkpoints = new NeverResolvingCheckpointStore(join(root, "checkpoints"));
+    const adapter = new CheckpointHangAdapter(checkpoints);
+    const state = buildState();
+    const runtime = new DurableTrueForgeRuntime(
+      adapter,
+      checkpoints,
+      new EvidenceStore(),
+      new EventJournal(join(root, "events.jsonl")),
+      undefined,
+      undefined,
+      undefined,
+      { drainTimeoutMs: 15 },
+    );
+
+    const startedAt = Date.now();
+    const updated = await runtime.start(state, "investigate");
+
+    assert.ok(Date.now() - startedAt < 500);
+    assert.equal(updated.status, "BLOCKED");
+    assert.equal(adapter.cancellations, 1);
+    assert.equal(checkpoints.snapshots[0]?.state.status, "ACTIVE");
+    assert.equal(checkpoints.snapshots[1]?.state.status, "ACTIVE");
+    assert.equal(checkpoints.snapshots.at(-1)?.state.status, "BLOCKED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("runtime terminalizes and cancels when an observer never settles", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-never-observer-"));
+  try {
+    const adapter = new ObserverHangAdapter();
+    const checkpoints = new CountingCheckpointStore(join(root, "checkpoints"));
+    const evidence = new EvidenceStore();
+    const state = buildState();
+    const runtime = new DurableTrueForgeRuntime(
+      adapter,
+      checkpoints,
+      evidence,
+      new EventJournal(join(root, "events.jsonl")),
+      async () => {
+        adapter.markObserverStarted();
+        await new Promise<void>(() => undefined);
+      },
+      undefined,
+      undefined,
+      { drainTimeoutMs: 15 },
+    );
+
+    const startedAt = Date.now();
+    const updated = await runtime.start(state, "investigate");
+
+    assert.ok(Date.now() - startedAt < 500);
+    assert.equal(updated.status, "BLOCKED");
+    assert.equal(adapter.cancellations, 1);
+    assert.deepEqual(
+      checkpoints.checkpoints.map((checkpoint) => checkpoint.status),
+      ["ACTIVE", "ACTIVE", "BLOCKED"],
+    );
+    const finalCheckpoint = await checkpoints.loadCheckpoint(state.task.id);
+    assert.ok(finalCheckpoint);
+    assert.equal(finalCheckpoint.state.status, "BLOCKED");
     assert.deepEqual(
       finalCheckpoint.evidenceStore.listEvents().map((event) => event.id),
-      ["mid-pipeline-event"],
+      ["observer-hang-event"],
     );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("approval drain failure marks an effect uncertain before terminal persistence", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-approval-drain-"));
+  try {
+    const journal = new BlockingJournal(
+      join(root, "events.jsonl"),
+      new Error("approval journal failed"),
+    );
+    const adapter = new ApprovalDrainFailureAdapter(journal);
+    const sessions = new CountingSessionStore(join(root, "sessions"));
+    const state = buildState();
+    state.trueForgeSessionId = "tf-approval-drain";
+    const approval = addApprovedExternalOperation(state);
+    const runtime = new DurableTrueForgeRuntime(
+      adapter,
+      sessions,
+      new EvidenceStore(),
+      journal,
+      undefined,
+      undefined,
+      undefined,
+      { drainTimeoutMs: 15 },
+    );
+
+    const approvalPromise = runtime.submitApproval(state, approval, "APPROVED");
+    await adapter.streamReady;
+    journal.releaseAppend();
+    const updated = await approvalPromise;
+
+    assert.equal(updated.status, "BLOCKED");
+    assert.equal(updated.operations[0]?.status, "EFFECT_UNCERTAIN");
+    assert.equal(adapter.cancellations, 1);
+    assert.deepEqual(
+      sessions.saves.map((snapshot) => snapshot.operations[0]?.status),
+      ["EFFECT_STARTED", "EFFECT_UNCERTAIN"],
+    );
+    assert.equal(sessions.saves.at(-1)?.status, "BLOCKED");
     assert.deepEqual(await journal.readAll(), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("approval final persistence failure marks an effect uncertain before blocking", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-approval-final-persist-"));
+  try {
+    const adapter = new ApprovalFinalPersistenceAdapter();
+    const sessions = new FinalApprovalPersistenceFailureStore(join(root, "sessions"));
+    const state = buildState();
+    state.trueForgeSessionId = "tf-approval-final-persist";
+    const approval = addApprovedExternalOperation(state);
+    const runtime = new DurableTrueForgeRuntime(
+      adapter,
+      sessions,
+      new EvidenceStore(),
+      new EventJournal(join(root, "events.jsonl")),
+      undefined,
+      undefined,
+      undefined,
+      { drainTimeoutMs: 15 },
+    );
+
+    const updated = await runtime.submitApproval(state, approval, "APPROVED");
+
+    assert.equal(updated.status, "BLOCKED");
+    assert.equal(updated.operations[0]?.status, "EFFECT_UNCERTAIN");
+    assert.equal(adapter.cancellations, 1);
+    assert.deepEqual(
+      sessions.saves.map((snapshot) => [snapshot.status, snapshot.operations[0]?.status]),
+      [
+        ["ACTIVE", "EFFECT_STARTED"],
+        ["BLOCKED", "EFFECT_UNCERTAIN"],
+      ],
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
