@@ -296,6 +296,25 @@ test("get_file_contents requires a structured artifact at the exact commit revis
       prepared.repository,
       prepared.expectedHeadSha,
     ));
+  assert.throws(
+    () => validateIncidentRead(
+      "get_file_contents",
+      args,
+      {
+        repository: prepared.repository,
+        revision: prepared.expectedHeadSha,
+        artifact: {
+          type: "file",
+          path: "other.md",
+          sha: "a".repeat(40),
+          content: "wrong path",
+        },
+      },
+      prepared.repository,
+      prepared.expectedHeadSha,
+    ),
+    /not bound to incident revision/,
+  );
   for (const malformed of [
     {},
     { content: [] },
@@ -306,7 +325,7 @@ test("get_file_contents requires a structured artifact at the exact commit revis
       content: [{
         type: "resource",
         resource: {
-          uri: `repo://${prepared.repository}/refs/heads/main/contents/README.md`,
+          uri: `repo://${prepared.repository}/sha/${prepared.expectedHeadSha}/contents/other.md`,
           mimeType: "text/plain",
           text: "wrong revision binding",
         },
@@ -324,6 +343,11 @@ test("get_file_contents requires a structured artifact at the exact commit revis
         text: JSON.stringify([{ type: "file", path: "README.md", sha: "a".repeat(40), content: "misrouted directory" }]),
       }],
     },
+    {
+      repository: prepared.repository,
+      revision: prepared.expectedHeadSha,
+      artifact: [{ type: "file", path: "src/unrelated.ts", sha: "a".repeat(40), content: "wrong child" }],
+    },
   ]) {
     assert.throws(
       () => validateIncidentRead("get_file_contents", args, malformed, prepared.repository, prepared.expectedHeadSha),
@@ -340,6 +364,19 @@ test("get_file_contents requires a structured artifact at the exact commit revis
     ),
     /not bound to incident revision/,
   );
+  for (const path of ["../README.md", "/README.md", "src/../README.md", "src//README.md", "src/./README.md"]) {
+    assert.throws(
+      () => validateIncidentRead(
+        "get_file_contents",
+        { ...args, path },
+        validFile,
+        prepared.repository,
+        prepared.expectedHeadSha,
+      ),
+      /not bound to incident revision/,
+      `unsafe requested path ${path} was accepted`,
+    );
+  }
 });
 
 test("incident revision binding never searches titles, bodies, or comments", () => {

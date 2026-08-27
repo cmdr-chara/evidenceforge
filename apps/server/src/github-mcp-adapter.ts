@@ -381,7 +381,10 @@ export function validateIncidentRead(
   const repository = repositoryFromArguments(toolName, args, expectedRepository);
   const result = unwrapResult(resultValue);
   if (isFailureResult(result)) throw new Error(`GitHub ${toolName} returned a failure`);
-  if (!resultHasRevision(toolName, args, result, expectedRepository, expectedRevision)) {
+  const requestedPath = toolName === "get_file_contents"
+    ? normalizeRequestedPath(args)
+    : undefined;
+  if (!resultHasRevision(toolName, args, result, expectedRepository, expectedRevision, requestedPath)) {
     throw new Error(`GitHub ${toolName} is not bound to incident revision ${expectedRevision}`);
   }
   return {
@@ -430,14 +433,16 @@ function resultHasRevision(
   result: Record<string, unknown>,
   expectedRepository: string,
   revision: string,
+  requestedPath: string | undefined,
 ): boolean {
   if (toolName === "get_commit") {
     return (readString(args, "sha") ?? readString(args, "ref")) === revision &&
       explicitCommitSha(result) === revision;
   }
   if (toolName === "get_file_contents") {
-    return fileContentsRequestIsBound(args, revision) &&
-      hasStructuredFileContents(result, expectedRepository, revision);
+    return requestedPath !== undefined &&
+      fileContentsRequestIsBound(args, revision) &&
+      hasStructuredFileContents(result, expectedRepository, revision, requestedPath);
   }
   // These tools do not take a revision argument.  Only inspect the
   // tool-specific, authoritative fields below; never recurse through titles,
@@ -469,11 +474,12 @@ function hasStructuredFileContents(
   result: Record<string, unknown>,
   expectedRepository: string,
   revision: string,
+  requestedPath: string,
 ): boolean {
-  if (hasVerifiedFileContentsEnvelope(result, expectedRepository, revision)) return true;
   const payloads = structuredPayloads(result);
   for (const payload of payloads) {
-    if (isOfficialFileResource(payload, expectedRepository, revision)) return true;
+    if (hasVerifiedFileContentsEnvelope(asRecord(payload), expectedRepository, revision, requestedPath) ||
+      isOfficialFileResource(payload, expectedRepository, revision, requestedPath)) return true;
   }
   return false;
 }
@@ -482,6 +488,7 @@ function hasVerifiedFileContentsEnvelope(
   result: Record<string, unknown>,
   expectedRepository: string,
   revision: string,
+  requestedPath: string,
 ): boolean {
   const repository = readString(result, "repository");
   const responseRevision = readString(result, "revision") ??
@@ -490,38 +497,50 @@ function hasVerifiedFileContentsEnvelope(
   const artifact = result.artifact;
   return repository === expectedRepository &&
     responseRevision === revision &&
-    (isFileArtifactData(artifact) || isDirectoryArtifact(artifact));
+    (isFileArtifactData(artifact, requestedPath) || isDirectoryArtifact(artifact, requestedPath));
 }
 
-function isOfficialFileResource(value: unknown, expectedRepository: string, revision: string): boolean {
-  const record = asRecord(value);
+function isOfficialFileResource(
+  value: unknown,
+  expectedRepository: string,
+  revision: string,
+  requestedPath: string,
+): boolean {
   const resource = readResource(value);
   if (resource === undefined) return false;
   const uri = readString(resource, "uri");
   const hasContent = typeof resource.text === "string" || typeof resource.blob === "string";
-  return uri !== undefined && hasContent && resourceUriIsBound(uri, expectedRepository, revision);
+  return uri !== undefined && hasContent && resourceUriIsBound(uri, expectedRepository, revision) === requestedPath;
 }
 
-function isFileArtifactData(value: unknown): boolean {
+function isFileArtifactData(value: unknown, requestedPath: string): boolean {
   const record = asRecord(value);
   if (readString(record, "type") !== "file") return false;
-  const path = readString(record, "path") ?? readString(record, "name");
+  const path = normalizeArtifactPath(readString(record, "path") ?? readString(record, "name"));
   const content = record.content;
   const blob = record.blob;
   const sha = readString(record, "sha");
-  return path !== undefined &&
+  return requestedPath.length > 0 &&
+    path === requestedPath &&
     sha !== undefined &&
     /^[a-f0-9]{7,64}$/i.test(sha) &&
     (typeof content === "string" || typeof blob === "string");
 }
 
-function isDirectoryArtifact(value: unknown): boolean {
-  if (!Array.isArray(value) || value.length === 0) return false;
-  return value.every((entry) => {
+function isDirectoryArtifact(value: unknown, requestedPath: string): boolean {
+  const entries = Array.isArray(value)
+    ? value
+    : (() => {
+        const record = asRecord(value);
+        return readString(record, "type") === "directory" ? asArray(record.entries) : [];
+      })();
+  if (entries.length === 0) return false;
+  return entries.every((entry) => {
     const record = asRecord(entry);
     const type = readString(record, "type");
-    const path = readString(record, "path") ?? readString(record, "name");
+    const path = normalizeArtifactPath(readString(record, "path") ?? readString(record, "name"));
     return path !== undefined &&
+      isDirectChildPath(path, requestedPath) &&
       (type === "file" || type === "dir" || type === "symlink" || type === "submodule");
   });
 }
@@ -533,12 +552,49 @@ function readResource(value: unknown): Record<string, unknown> | undefined {
   return Object.keys(resource).length === 0 ? undefined : resource;
 }
 
-function resourceUriIsBound(uri: string, expectedRepository: string, revision: string): boolean {
+function resourceUriIsBound(uri: string, expectedRepository: string, revision: string): string | undefined {
   // The official server emits repo://.../sha/<commit>/contents/... for an
   // exact SHA request.  Do not accept a branch/tag URI for revision evidence.
   const [owner, repo] = expectedRepository.split("/");
-  const match = uri.match(/^repo:\/\/([^/]+)\/([^/]+)\/sha\/([^/]+)\/contents(?:\/|$)/);
-  return match?.[1] === owner && match?.[2] === repo && match?.[3] === revision;
+  const match = uri.match(/^repo:\/\/([^/]+)\/([^/]+)\/sha\/([^/]+)\/contents(?:\/(.*))?$/);
+  if (match?.[1] !== owner || match?.[2] !== repo || match?.[3] !== revision) return undefined;
+  return normalizeArtifactPath(match[4] ?? "");
+}
+
+function normalizeRequestedPath(args: Record<string, unknown>): string | undefined {
+  const raw = args.path;
+  // The official schema makes path optional and defaults it to the repository
+  // root. Treat an omitted path (and the server's root spellings) as the
+  // directory root, while rejecting empty file identities later.
+  if (raw === undefined) return "";
+  if (typeof raw !== "string") return undefined;
+  if (raw === "" || raw === "/") return "";
+  return normalizeArtifactPath(raw);
+}
+
+function normalizeArtifactPath(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    return undefined;
+  }
+  if (decoded.length === 0 || decoded.startsWith("/") || decoded.includes("\\") || decoded.includes("\0")) {
+    return undefined;
+  }
+  const segments = decoded.split("/");
+  if (segments.some((segment) => segment.length === 0 || segment === "." || segment === "..")) {
+    return undefined;
+  }
+  return segments.join("/");
+}
+
+function isDirectChildPath(path: string, directory: string): boolean {
+  const prefix = directory.length === 0 ? "" : `${directory}/`;
+  if (!path.startsWith(prefix)) return false;
+  const child = path.slice(prefix.length);
+  return child.length > 0 && !child.includes("/");
 }
 
 function explicitSemanticRevision(

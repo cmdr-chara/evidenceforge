@@ -5,7 +5,10 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { ApprovalRequest, RuntimeEvent, SessionState } from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
-import { JsonSessionStore } from "../../packages/persistence/src";
+import {
+  JsonRuntimeCheckpointStore,
+  JsonSessionStore,
+} from "../../packages/persistence/src";
 import { EventJournal } from "../../packages/telemetry/src";
 import {
   DurableTrueForgeRuntime,
@@ -85,8 +88,7 @@ class SessionCreationFailureAdapter extends SingleEventAdapter {
 
 class LateCallbackAdapter implements TrueForgeRuntimeAdapter {
   public cancellations = 0;
-  private callback: Promise<void> | undefined;
-  private release: (() => void) | undefined;
+  private callback: (() => Promise<void>) | undefined;
 
   public async createSession(): Promise<string> {
     return "tf-late-callback";
@@ -106,19 +108,11 @@ class LateCallbackAdapter implements TrueForgeRuntimeAdapter {
       sequenceNumber: 1,
       payload: { type: "turn.created", turnId: "late-callback-turn" },
     };
-    let releaseGate!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      releaseGate = resolve;
-    });
-    this.release = releaseGate;
-    this.callback = (async () => {
-      // The callback starts while the generation is open. Runtime event
-      // handling only stages the event; the pending adapter continuation
-      // models a stream callback that outlives the losing Promise.race.
-      const handled = input.onEvent?.(event);
-      await gate;
-      await handled;
-    })();
+    this.callback = async () => {
+      await input.onEvent?.(event);
+    };
+    // The adapter has already handed the callback to the stream consumer,
+    // but the consumer's deadline wins before the callback is released.
     throw new TrueForgeStreamTimeoutError(30);
   }
 
@@ -131,8 +125,7 @@ class LateCallbackAdapter implements TrueForgeRuntimeAdapter {
   }
 
   public async releaseCallback(): Promise<void> {
-    this.release?.();
-    await this.callback;
+    await this.callback?.();
   }
 }
 
@@ -142,6 +135,188 @@ class CountingSessionStore extends JsonSessionStore {
   public override async save(state: SessionState): Promise<void> {
     this.saves.push(structuredClone(state));
     await super.save(state);
+  }
+}
+
+class BlockingJournal extends EventJournal {
+  private resolveStarted!: () => void;
+  private resolveRelease!: () => void;
+  private readonly release = new Promise<void>((resolve) => {
+    this.resolveRelease = resolve;
+  });
+  public readonly appendStarted = new Promise<void>((resolve) => {
+    this.resolveStarted = resolve;
+  });
+  public appendCalls = 0;
+
+  public constructor(
+    journalPath: string,
+    private readonly appendFailure?: Error,
+  ) {
+    super(journalPath);
+  }
+
+  public override async append(event: RuntimeEvent): Promise<void> {
+    this.appendCalls += 1;
+    this.resolveStarted();
+    await this.release;
+    if (this.appendFailure !== undefined) throw this.appendFailure;
+    await super.append(event);
+  }
+
+  public releaseAppend(): void {
+    this.resolveRelease();
+  }
+}
+
+class CountingCheckpointStore extends JsonRuntimeCheckpointStore {
+  public readonly checkpoints: SessionState[] = [];
+
+  public override async saveCheckpoint(
+    state: SessionState,
+    evidenceStore: EvidenceStore,
+  ): Promise<void> {
+    this.checkpoints.push(structuredClone(state));
+    await super.saveCheckpoint(state, evidenceStore);
+  }
+}
+
+class InFlightStreamAdapter implements TrueForgeRuntimeAdapter {
+  private resolveCrash!: () => void;
+  public readonly checkpointObserved = new Promise<void>((resolve) => {
+    this.resolveCrash = resolve;
+  });
+
+  public async createSession(): Promise<string> {
+    return "tf-in-flight";
+  }
+
+  public async cancelSession(): Promise<void> {}
+
+  public async runTurn(input: RunTurnInput): Promise<StreamResult> {
+    const event: RuntimeEvent = {
+      id: "in-flight-turn-created",
+      type: "TURN_CREATED",
+      source: "trueforge:turn.created",
+      timestamp: "2026-08-27T15:00:00.000Z",
+      sequenceNumber: 1,
+      payload: { type: "turn.created", turnId: "in-flight-turn" },
+    };
+    await input.onEvent?.(event);
+    this.resolveCrash();
+    await new Promise<void>(() => undefined);
+    return {
+      sessionId: input.sessionId,
+      turnId: "in-flight-turn",
+      lastSequenceNumber: 1,
+      events: [event],
+      paused: false,
+      requiredActions: [],
+    };
+  }
+
+  public async submitApprovals(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async resumeTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+}
+
+class ResumeAfterCrashAdapter implements TrueForgeRuntimeAdapter {
+  public async createSession(): Promise<string> {
+    return "tf-resumed";
+  }
+
+  public async cancelSession(): Promise<void> {}
+
+  public async runTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async submitApprovals(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async resumeTurn(
+    sessionId: string,
+    turnId: string,
+    afterSequenceNumber: number,
+    onEvent?: RunTurnInput["onEvent"],
+  ): Promise<StreamResult> {
+    const event: RuntimeEvent = {
+      id: "in-flight-resume-message",
+      type: "MODEL_MESSAGE",
+      source: "trueforge:model.message",
+      threadId: "main",
+      timestamp: "2026-08-27T15:00:01.000Z",
+      sequenceNumber: afterSequenceNumber + 1,
+      payload: {
+        type: "model.message",
+        id: "in-flight-resume-message",
+        threadId: "main",
+        content: "resume",
+      },
+    };
+    await onEvent?.(event);
+    return {
+      sessionId,
+      turnId,
+      lastSequenceNumber: event.sequenceNumber ?? afterSequenceNumber,
+      events: [event],
+      paused: false,
+      requiredActions: [],
+    };
+  }
+}
+
+class MidPipelineTimeoutAdapter implements TrueForgeRuntimeAdapter {
+  private callback: Promise<void> | undefined;
+  private resolveFailure!: () => void;
+  public readonly failureObserved = new Promise<void>((resolve) => {
+    this.resolveFailure = resolve;
+  });
+
+  public constructor(private readonly journal: BlockingJournal) {}
+
+  public async createSession(): Promise<string> {
+    return "tf-mid-pipeline";
+  }
+
+  public cancellations = 0;
+
+  public async cancelSession(sessionId: string): Promise<void> {
+    assert.equal(sessionId, "tf-mid-pipeline");
+    this.cancellations += 1;
+  }
+
+  public async runTurn(input: RunTurnInput): Promise<StreamResult> {
+    const event: RuntimeEvent = {
+      id: "mid-pipeline-event",
+      type: "TURN_CREATED",
+      source: "trueforge:turn.created",
+      timestamp: "2026-08-27T15:00:00.000Z",
+      sequenceNumber: 1,
+      payload: { type: "turn.created", turnId: "mid-pipeline-turn" },
+    };
+    this.callback = input.onEvent?.(event) ?? Promise.resolve();
+    await this.journal.appendStarted;
+    this.resolveFailure();
+    throw new TrueForgeStreamTimeoutError(30);
+  }
+
+  public async submitApprovals(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async resumeTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async releaseCallback(): Promise<void> {
+    this.journal.releaseAppend();
+    await this.callback;
   }
 }
 
@@ -338,6 +513,168 @@ test("runtime fences a callback released after a timed-out stream", async () => 
     assert.equal(observed.length, observedBeforeRelease);
     assert.equal(adapter.cancellations, 1);
     assert.equal((await sessions.load(state.task.id))?.status, "BLOCKED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("runtime checkpoints an accepted turn before an in-flight stream can crash", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-in-flight-checkpoint-"));
+  try {
+    const adapter = new InFlightStreamAdapter();
+    const checkpoints = new JsonRuntimeCheckpointStore(join(root, "checkpoints"));
+    const evidence = new EvidenceStore();
+    const state = buildState();
+    const runtime = new DurableTrueForgeRuntime(
+      adapter,
+      checkpoints,
+      evidence,
+      new EventJournal(join(root, "events.jsonl")),
+    );
+
+    // The adapter intentionally never returns after the first event. The
+    // checkpoint observed here is the state a restarted process can resume.
+    const startPromise = runtime.start(state, "investigate");
+    await adapter.checkpointObserved;
+    const checkpoint = await checkpoints.loadCheckpoint(state.task.id);
+    assert.ok(checkpoint);
+    assert.equal(checkpoint.state.status, "ACTIVE");
+    assert.equal(checkpoint.state.activeTurnId, "in-flight-turn");
+    assert.equal(checkpoint.state.lastSequenceNumber, 1);
+    assert.deepEqual(
+      checkpoint.evidenceStore.listEvents().map((event) => event.id),
+      ["in-flight-turn-created"],
+    );
+
+    const resumed = await new DurableTrueForgeRuntime(
+      new ResumeAfterCrashAdapter(),
+      checkpoints,
+      checkpoint.evidenceStore,
+      new EventJournal(join(root, "events.jsonl")),
+    ).resume(checkpoint.state);
+    assert.equal(resumed.status, "ACTIVE");
+    assert.equal(resumed.activeTurnId, "in-flight-turn");
+    assert.equal(resumed.lastSequenceNumber, 2);
+    const resumedCheckpoint = await checkpoints.loadCheckpoint(state.task.id);
+    assert.ok(resumedCheckpoint);
+    assert.equal(resumedCheckpoint.state.lastSequenceNumber, 2);
+    assert.deepEqual(
+      resumedCheckpoint.evidenceStore.listEvents().map((event) => event.id),
+      ["in-flight-turn-created", "in-flight-resume-message"],
+    );
+
+    // Keep the simulated crashed process from retaining a rejected promise;
+    // its no-handle wait is deliberately left pending until test teardown.
+    void startPromise;
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("runtime drains an in-flight commit before the timeout checkpoint wins", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-mid-pipeline-timeout-"));
+  try {
+    const journal = new BlockingJournal(join(root, "events.jsonl"));
+    const adapter = new MidPipelineTimeoutAdapter(journal);
+    const checkpoints = new CountingCheckpointStore(join(root, "checkpoints"));
+    const evidence = new EvidenceStore();
+    const observed: RuntimeEvent[] = [];
+    const state = buildState();
+    const runtime = new DurableTrueForgeRuntime(
+      adapter,
+      checkpoints,
+      evidence,
+      journal,
+      (event) => {
+        observed.push(event);
+      },
+    );
+
+    const startPromise = runtime.start(state, "investigate");
+    await adapter.failureObserved;
+    // Let the rejected adapter turn reach the runtime catch, which closes the
+    // generation and waits for the blocked journal operation to drain.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(journal.appendCalls, 1);
+    assert.equal(checkpoints.checkpoints.length, 1);
+
+    await adapter.releaseCallback();
+    const updated = await startPromise;
+
+    assert.equal(updated.status, "BLOCKED");
+    assert.equal(updated.phase, "BLOCKED");
+    assert.equal(updated.terminalSequenceNumber, 1);
+    assert.equal(updated.activeTurnId, "mid-pipeline-turn");
+    assert.equal(adapter.cancellations, 1);
+    assert.deepEqual(observed, []);
+    assert.equal(journal.appendCalls, 1);
+    assert.deepEqual(
+      checkpoints.checkpoints.map((checkpoint) => checkpoint.status),
+      ["ACTIVE", "BLOCKED"],
+    );
+    const finalCheckpoint = await checkpoints.loadCheckpoint(state.task.id);
+    assert.ok(finalCheckpoint);
+    assert.equal(finalCheckpoint.state.status, "BLOCKED");
+    assert.equal(finalCheckpoint.state.terminalSequenceNumber, 1);
+    assert.deepEqual(
+      finalCheckpoint.evidenceStore.listEvents().map((event) => event.id),
+      ["mid-pipeline-event"],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("runtime still writes the terminal checkpoint when an in-flight journal fails", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-mid-pipeline-journal-failure-"));
+  try {
+    const journal = new BlockingJournal(
+      join(root, "events.jsonl"),
+      new Error("simulated journal failure"),
+    );
+    const adapter = new MidPipelineTimeoutAdapter(journal);
+    const checkpoints = new CountingCheckpointStore(join(root, "checkpoints"));
+    const evidence = new EvidenceStore();
+    const observed: RuntimeEvent[] = [];
+    const state = buildState();
+    const runtime = new DurableTrueForgeRuntime(
+      adapter,
+      checkpoints,
+      evidence,
+      journal,
+      (event) => {
+        observed.push(event);
+      },
+    );
+
+    const startPromise = runtime.start(state, "investigate");
+    await adapter.failureObserved;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(checkpoints.checkpoints.length, 1);
+
+    await assert.rejects(adapter.releaseCallback(), /simulated journal failure/);
+    const updated = await startPromise;
+
+    assert.equal(updated.status, "BLOCKED");
+    assert.equal(updated.phase, "BLOCKED");
+    assert.equal(updated.blockedReason, "TrueForge turn stream exceeded the 30-second deadline");
+    assert.equal(updated.terminalSequenceNumber, 1);
+    assert.equal(updated.activeTurnId, "mid-pipeline-turn");
+    assert.equal(adapter.cancellations, 1);
+    assert.deepEqual(observed, []);
+    assert.equal(journal.appendCalls, 1);
+    assert.deepEqual(
+      checkpoints.checkpoints.map((checkpoint) => checkpoint.status),
+      ["ACTIVE", "BLOCKED"],
+    );
+    const finalCheckpoint = await checkpoints.loadCheckpoint(state.task.id);
+    assert.ok(finalCheckpoint);
+    assert.equal(finalCheckpoint.state.status, "BLOCKED");
+    assert.deepEqual(
+      finalCheckpoint.evidenceStore.listEvents().map((event) => event.id),
+      ["mid-pipeline-event"],
+    );
+    assert.deepEqual(await journal.readAll(), []);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

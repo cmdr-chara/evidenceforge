@@ -64,7 +64,7 @@
 
 ## Quality
 
-Last externally verified branch baseline: `7555f0f01f1af1f198d665333098619d05408230`, GitHub Actions runs `33084240703` and `33084235854`. Current unpublished candidate: all local gates green, **193/193 tests**; exact-head CI still required after publication.
+Last externally verified branch baseline: `7555f0f01f1af1f198d665333098619d05408230`, GitHub Actions runs `33084240703` and `33084235854`. Current unpublished candidate: all local gates green, **196/196 tests**; exact-head CI still required after publication.
 
 - [x] `pnpm install --frozen-lockfile`.
 - [x] `pnpm format:check`.

@@ -45,12 +45,8 @@ export interface TrueForgeRuntimeAdapter {
 class StreamGeneration {
   private open = true;
   private accepting = true;
-  public readonly events: RuntimeEvent[] = [];
-  public readonly diagnosticGuard: DiagnosticContractGuard;
-
-  public constructor(events: RuntimeEvent[]) {
-    this.diagnosticGuard = new DiagnosticContractGuard(events);
-  }
+  private pending: Promise<void> = Promise.resolve();
+  private failure: unknown;
 
   public close(): void {
     this.open = false;
@@ -65,15 +61,36 @@ class StreamGeneration {
     this.accepting = false;
   }
 
-  public accept(event: RuntimeEvent): boolean {
-    if (!this.open || !this.accepting) return false;
-    this.events.push(structuredClone(event));
-    return true;
+  public enqueue(task: () => Promise<void>): Promise<void> {
+    if (!this.open || !this.accepting) return Promise.resolve();
+    const queued = this.pending.then(
+      async () => {
+        if (!this.open || this.failure !== undefined) return;
+        try {
+          await task();
+        } catch (error) {
+          this.failure ??= error;
+          throw error;
+        }
+      },
+    );
+    this.pending = queued.catch(() => undefined);
+    // Adapters are allowed to invoke callbacks without awaiting them. Keep
+    // the queued rejection observed in that case while still returning the
+    // original promise to adapters that do await it.
+    void queued.catch(() => undefined);
+    return queued;
+  }
+
+  public async drain(): Promise<void> {
+    await this.pending;
+    if (this.failure !== undefined) throw this.failure;
   }
 }
 
 export class DurableTrueForgeRuntime {
   private readonly projector: TrueForgeEventProjector;
+  private readonly diagnosticGuard: DiagnosticContractGuard;
   private readonly cancelledSessions = new Set<string>();
   private readonly applicationReducer?: (state: SessionState, event: RuntimeEvent) => void;
   private activeGeneration: StreamGeneration | undefined;
@@ -91,6 +108,7 @@ export class DurableTrueForgeRuntime {
     applicationReducer?: (state: SessionState, event: RuntimeEvent) => void,
   ) {
     this.projector = projector ?? new TrueForgeEventProjector(undefined, evidenceStore);
+    this.diagnosticGuard = new DiagnosticContractGuard(evidenceStore.listEvents());
     this.applicationReducer = applicationReducer;
   }
 
@@ -106,7 +124,7 @@ export class DurableTrueForgeRuntime {
     state.trueForgeSessionId = sessionId;
     await this.persist(state);
 
-    const generation = this.beginGeneration(this.evidenceStore.listEvents());
+    const generation = this.beginGeneration();
     let result: StreamResult;
     try {
       result = await this.adapter.runTurn({
@@ -116,15 +134,15 @@ export class DurableTrueForgeRuntime {
         generation,
       });
     } catch (error) {
-      generation.close();
+      await this.abortGeneration(generation);
       await this.failClosedStream(state, error);
       return state;
     }
     generation.stopAccepting();
     try {
-      await this.commitGeneration(state, generation);
+      await generation.drain();
     } catch (error) {
-      generation.close();
+      await this.abortGeneration(generation);
       await this.failClosedStream(state, error);
       return state;
     }
@@ -190,7 +208,7 @@ export class DurableTrueForgeRuntime {
       await this.persist(state);
     }
     this.restoreCorrelatedToolCalls(state);
-    const generation = this.beginGeneration(this.evidenceStore.listEvents());
+    const generation = this.beginGeneration();
     let result: StreamResult;
     try {
       result = await this.adapter.submitApprovals(
@@ -207,7 +225,7 @@ export class DurableTrueForgeRuntime {
         generation,
       );
     } catch (error) {
-      generation.close();
+      await this.abortGeneration(generation);
       if (startedOperationId !== undefined) {
         const operation = state.operations.find((candidate) => candidate.id === startedOperationId);
         if (operation?.status === "EFFECT_STARTED") {
@@ -220,9 +238,9 @@ export class DurableTrueForgeRuntime {
     }
     generation.stopAccepting();
     try {
-      await this.commitGeneration(state, generation);
+      await generation.drain();
     } catch (error) {
-      generation.close();
+      await this.abortGeneration(generation);
       await this.failClosedStream(state, error);
       return state;
     }
@@ -242,7 +260,7 @@ export class DurableTrueForgeRuntime {
       throw new Error("session cannot resume without persisted TrueForge session, turn, and sequence IDs");
     }
     this.restoreCorrelatedToolCalls(state);
-    const generation = this.beginGeneration(this.evidenceStore.listEvents());
+    const generation = this.beginGeneration();
     let result: StreamResult;
     try {
       result = await this.adapter.resumeTurn(
@@ -253,15 +271,15 @@ export class DurableTrueForgeRuntime {
         generation,
       );
     } catch (error) {
-      generation.close();
+      await this.abortGeneration(generation);
       await this.failClosedStream(state, error);
       return state;
     }
     generation.stopAccepting();
     try {
-      await this.commitGeneration(state, generation);
+      await generation.drain();
     } catch (error) {
-      generation.close();
+      await this.abortGeneration(generation);
       await this.failClosedStream(state, error);
       return state;
     }
@@ -279,9 +297,9 @@ export class DurableTrueForgeRuntime {
     }
   }
 
-  private beginGeneration(events: RuntimeEvent[]): StreamGeneration {
+  private beginGeneration(): StreamGeneration {
     this.activeGeneration?.close();
-    const generation = new StreamGeneration(events);
+    const generation = new StreamGeneration();
     this.activeGeneration = generation;
     return generation;
   }
@@ -290,68 +308,68 @@ export class DurableTrueForgeRuntime {
     return this.activeGeneration === generation && generation.isOpen();
   }
 
+  private async abortGeneration(generation: StreamGeneration): Promise<void> {
+    generation.close();
+    try {
+      await generation.drain();
+    } catch {
+      // A commit that was already in flight may fail after the adapter has
+      // failed. Its failure is observed by the generation, but must not
+      // prevent the caller from writing the authoritative BLOCKED checkpoint.
+      // The caller retains the adapter/commit error as the bounded reason.
+    }
+  }
+
   private async handleEvent(
     state: SessionState,
     event: RuntimeEvent,
     generation: StreamGeneration,
   ): Promise<void> {
     if (state.status !== "ACTIVE" || !this.generationIsOpen(generation)) return;
-    generation.accept(event);
+    await generation.enqueue(() => this.commitEvent(state, event, generation));
   }
 
-  private async commitGeneration(
+  private async commitEvent(
     state: SessionState,
+    event: RuntimeEvent,
     generation: StreamGeneration,
   ): Promise<void> {
-    if (!this.generationIsOpen(generation)) {
-      throw new Error("TrueForge stream generation closed before commit");
+    if (!this.generationIsOpen(generation) || state.status !== "ACTIVE") return;
+    if (!this.evidenceStore.recordEvent(event)) return;
+
+    const violation = this.diagnosticGuard.observe(event);
+    if (violation !== undefined) blockForDiagnosticViolation(state, violation);
+    if (violation === undefined) this.projector.project(state, event);
+    if (violation === undefined && state.status === "ACTIVE") {
+      this.applicationReducer?.(state, event);
+    }
+    if (event.type === "TURN_CREATED" && state.status === "ACTIVE") {
+      state.activeTurnId = readTurnId(event.payload) ?? state.activeTurnId;
+    }
+    if (event.sequenceNumber !== undefined) {
+      state.lastSequenceNumber = Math.max(state.lastSequenceNumber ?? 0, event.sequenceNumber);
+    }
+    if (state.status !== "ACTIVE" && state.terminalSequenceNumber === undefined) {
+      state.terminalSequenceNumber = event.sequenceNumber ?? state.lastSequenceNumber;
+      if (state.terminalSequenceNumber !== undefined) {
+        state.lastSequenceNumber = state.terminalSequenceNumber;
+      }
     }
 
-    for (const event of generation.events) {
-      if (!this.generationIsOpen(generation)) {
-        throw new Error("TrueForge stream generation closed during commit");
-      }
-      if (state.status !== "ACTIVE") break;
-      if (!this.evidenceStore.recordEvent(event)) continue;
-
-      const violation = generation.diagnosticGuard.observe(event);
-      if (violation !== undefined) blockForDiagnosticViolation(state, violation);
-      if (violation === undefined) this.projector.project(state, event);
-      if (violation === undefined && state.status === "ACTIVE") {
-        this.applicationReducer?.(state, event);
-      }
-      if (event.type === "TURN_CREATED" && state.status === "ACTIVE") {
-        state.activeTurnId = readTurnId(event.payload) ?? state.activeTurnId;
-      }
-      if (event.sequenceNumber !== undefined) {
-        state.lastSequenceNumber = Math.max(state.lastSequenceNumber ?? 0, event.sequenceNumber);
-      }
-      if (state.status !== "ACTIVE" && state.terminalSequenceNumber === undefined) {
-        state.terminalSequenceNumber = event.sequenceNumber ?? state.lastSequenceNumber;
-        if (state.terminalSequenceNumber !== undefined) {
-          state.lastSequenceNumber = state.terminalSequenceNumber;
-        }
-      }
-
-      if (!this.generationIsOpen(generation)) {
-        throw new Error("TrueForge stream generation closed during commit");
-      }
-      await this.journal.append(event);
-      if (!this.generationIsOpen(generation)) {
-        throw new Error("TrueForge stream generation closed during commit");
-      }
-      await this.persist(state);
-      if (!this.generationIsOpen(generation)) {
-        throw new Error("TrueForge stream generation closed during commit");
-      }
-      if (state.status !== "ACTIVE" && state.trueForgeSessionId !== undefined) {
-        await this.cancelOnce(state.trueForgeSessionId);
-      }
-      if (!this.generationIsOpen(generation)) {
-        throw new Error("TrueForge stream generation closed during commit");
-      }
-      await this.onEvent?.(event, structuredClone(state));
+    // Promise.race cannot cancel a callback that is already in this pipeline.
+    // If the generation closes while one of these operations is pending, the
+    // in-flight operation is drained before failClosedStream persists the
+    // terminal checkpoint, and no later operation from this generation starts.
+    if (!this.generationIsOpen(generation)) return;
+    await this.journal.append(event);
+    if (!this.generationIsOpen(generation)) return;
+    await this.persist(state);
+    if (!this.generationIsOpen(generation)) return;
+    if (state.status !== "ACTIVE" && state.trueForgeSessionId !== undefined) {
+      await this.cancelOnce(state.trueForgeSessionId);
     }
+    if (!this.generationIsOpen(generation)) return;
+    await this.onEvent?.(event, structuredClone(state));
   }
 
   private async cancelOnce(sessionId: string): Promise<void> {

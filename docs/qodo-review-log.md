@@ -50,6 +50,8 @@ No second orchestration framework is introduced and no post-execution detector i
 
 Qodo's exact review of `d9a79c0069c6dac0c71dee38d8312d36c680ec48` added two implementable Highs: **File results lack revision binding** and **Timed-out callbacks persist late**. The subsequent candidate binds GitHub file artifacts using response-level repository/commit identity and introduces a stream-generation fence that suppresses callbacks released after timeout. Both include regressions and remain pending exact-head Qodo confirmation until published.
 
+Qodo's next exact review of `89a8d64603f135963804ec164e4d66c74fb236d9` marked both Highs resolved and added **Initial turns lose restart cursor** and **File path binding is missing**. The subsequent candidate serializes durable event commits during the active stream, preserves initial turn/cursor/evidence for resume, drains an accepted in-flight commit before terminal fail-closed persistence, and requires exact normalized request-path identity for file/resource/directory evidence. These remediations include crash/resume, timeout, traversal, mismatched-path, and unrelated-child regressions and await exact-head Qodo confirmation.
+
 1. Preserve the exact-SHA Qodo links in the submission evidence.
 2. Request and inspect Qodo against the subsequent exact SHA.
 3. Keep the SDK-blocked High visible; do not relabel post-result detection as prevention.

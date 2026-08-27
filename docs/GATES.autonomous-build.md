@@ -6,7 +6,7 @@ Status values: `PASS`, `BLOCKED`, `PENDING_REVIEW`, `MANUAL`.
 
 ## Verified implementation baseline
 
-Last externally verified baseline SHA `7555f0f01f1af1f198d665333098619d05408230` passed GitHub Actions runs `33084240703` and `33084235854`. The subsequent candidate passes every required local gate with 193/193 tests; exact-head CI remains required after publication.
+Last externally verified baseline SHA `7555f0f01f1af1f198d665333098619d05408230` passed GitHub Actions runs `33084240703` and `33084235854`. The subsequent candidate passes every required local gate with 196/196 tests; exact-head CI remains required after publication.
 
 | Gate | Status | Evidence / blocker |
 |---|---|---|
@@ -17,7 +17,7 @@ Last externally verified baseline SHA `7555f0f01f1af1f198d665333098619d05408230`
 | Format | PASS | exact-SHA CI |
 | Lint | PASS | exact-SHA CI |
 | Typecheck | PASS | exact-SHA CI |
-| Test suite | PASS | 159/159 on externally verified baseline; 193/193 on the unpublished local candidate |
+| Test suite | PASS | 159/159 on externally verified baseline; 196/196 on the unpublished local candidate |
 | Eval smoke | PASS | exact-SHA CI |
 | Demo fixture | PASS | exact-SHA CI; fixture is not live sponsor evidence |
 | Build | PASS | exact-SHA CI |
@@ -52,7 +52,7 @@ Last externally verified baseline SHA `7555f0f01f1af1f198d665333098619d05408230`
 | Live skill materialization | PASS | four configured skills were observed in a credentialed TrueForge session |
 | Live human approval pause/resume | BLOCKED | requires live runtime event |
 | Real PR created by EvidenceForge | BLOCKED | requires live TrueForge/MCP and human authorization |
-| Latest Qodo re-review | PENDING_REVIEW | review of `d9a79c0…` added two implementable Highs; both have code/regression remediation in the subsequent candidate; exact-head re-review required |
+| Latest Qodo re-review | PENDING_REVIEW | review of `89a8d64…` resolved its prior two Highs and added cursor-durability/path-binding Highs; both have code/regression remediation in the subsequent candidate |
 | Human merge | BLOCKED | PR #2 must remain unmerged until human decision |
 | Demo video/publication/submission | BLOCKED | requires live sponsor evidence and human account actions |
 
@@ -60,7 +60,7 @@ Last externally verified baseline SHA `7555f0f01f1af1f198d665333098619d05408230`
 
 Observed aggregate review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 
-Qodo updated its aggregate through SHA `d9a79c0…` and found two new implementable Highs: response-level revision binding for GitHub file artifacts and late effects from timed-out callbacks. Both are remediated with deterministic regressions in the subsequent candidate; Qodo must re-review its exact published SHA. The read-only pre-execution specialist boundary remains **BLOCKED** for the SDK reason documented in `docs/qodo-review-log.md`.
+Qodo updated its aggregate through SHA `89a8d64…`, resolved the response-binding and timeout-race Highs, then identified initial-turn cursor durability and exact file-path binding. The subsequent candidate durably serializes accepted stream events before completion and binds file/directory/resource responses to the normalized requested path. Both have deterministic regressions and require exact-head Qodo confirmation. The read-only pre-execution specialist boundary remains **BLOCKED** for the SDK reason documented in `docs/qodo-review-log.md`.
 
 ## Release decision
 
