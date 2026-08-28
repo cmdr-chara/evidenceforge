@@ -6,12 +6,12 @@ Record only genuine Qodo findings and observed follow-up evidence.
 
 - PR: https://github.com/cmdr-chara/evidenceforge/pull/2
 - Aggregate Agentic Review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
-- Exact executable-code-head request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5454755804
+- Latest exact executable-code-head request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5455477708
 - The final post-documentation exact-SHA request and result are recorded in the PR body because this file cannot contain the SHA of its own commit.
 
 ## Current disposition
 
-The prior exact code-head aggregate marks **Root cause is fabricated** resolved and reports a newer implementable High, **Unresolved references become evidence**. The current candidate addresses that newer finding: exact incident context plus exact reproduction no longer produces a synthetic hypothesis or PASS, and a causal claim becomes a non-authoritative `OPEN` observation only after every cited string resolves to an earlier successful tool result from the same named specialist thread. Model-authored locations, unresolved strings, failed outputs, transport keys, and cross-thread results are not promoted to artifact references. Exact-SHA Qodo confirmation remains external.
+The exact code-head aggregate for `917de0ab2edab1f2b49c7a4ea8f1707737402286` marks every implementable finalization finding resolved. Exact incident context plus exact reproduction no longer produces a synthetic hypothesis or PASS, and a causal claim becomes a non-authoritative `OPEN` observation only after every cited string resolves with lexical boundaries to an earlier successful tool result from the same named specialist thread. Model-authored locations, unresolved strings, failed or nested-failed outputs, transport keys, cross-thread results, and ambiguous prefixes are not promoted to artifact references.
 
 The standing SDK-boundary High is **Read-only boundary is unenforced**. It is valid but blocked by the public TrueForge SDK `0.1.3` surface. The SDK enables dynamic subagents but exposes no per-dynamic-subagent pre-execution tool allowlist, interceptor, or separate capability set.
 
@@ -23,8 +23,8 @@ EvidenceForge does not label prompt instructions or post-event rejection as equi
 |---|---|---|---|
 | High | Root cause is fabricated | RESOLVED | context + reproduction alone remains PENDING; structured causal observation + exact evidence is required for application PASS |
 | High | Unresolved references become evidence | RESOLVED | Qodo's exact-SHA aggregate for `5f7fc10c2327b56dea18645f15035520e48f40ee` marks the finding resolved after same-thread successful-tool-result grounding and its missing, failed, transport-key, and cross-thread regressions |
-| High | Failed nested results accepted | FIXED — PENDING EXACT-SHA QODO | bounded recursive validation now rejects nested failure states before any result string can ground diagnostic evidence |
-| High | Reference prefixes miscorrelate evidence | FIXED — PENDING EXACT-SHA QODO | reference matching now requires lexical boundaries and rejects location prefixes such as `runtime.ts:12` against `runtime.ts:123` |
+| High | Failed nested results accepted | RESOLVED | Qodo's exact-SHA aggregate for `917de0ab2edab1f2b49c7a4ea8f1707737402286` marks the bounded recursive rejection and regression resolved |
+| High | Reference prefixes miscorrelate evidence | RESOLVED | Qodo's exact-SHA aggregate for `917de0ab2edab1f2b49c7a4ea8f1707737402286` marks lexical-boundary matching and its prefix regression resolved |
 | Medium | Root-cause steps are reversed | RESOLVED | Qodo's exact-SHA aggregate for `8d8ee23b14bb91bd40fc8d369d6894be30be4757` no longer reports the finding after reproduction was ordered before root-cause promotion |
 | Medium | Serialization bypasses prompt cap | RESOLVED | task validation measures actual JSON-serialized objective/constraints; hostile control-character regression |
 | Medium | Fixture reset command omitted | RESOLVED IN THIS COMMIT | demo preparation invokes `pnpm demo:reset` before fixture validation |
