@@ -441,11 +441,12 @@ function createHarness(): Harness {
     createdAt: "2026-08-26T14:00:00.000Z",
   });
   const store = new EvidenceStore();
+  const projector = new TrueForgeEventProjector(undefined, store);
   return {
     state: createSessionState(task, buildCiSuccessContract(task)),
     store,
-    projector: new TrueForgeEventProjector(undefined, store),
-    reducer: new LiveWorkflowReducer(store),
+    projector,
+    reducer: new LiveWorkflowReducer(store, (callId) => projector.getToolCall(callId)),
     sequence: 0,
   };
 }

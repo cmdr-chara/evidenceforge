@@ -23,6 +23,7 @@ import {
   DurableTrueForgeRuntime,
   loadTrueForgeConfig,
   TrueForgeSdkAdapter,
+  TrueForgeEventProjector,
   VerifierManifestEntry,
 } from "../../../packages/trueforge/src";
 import {
@@ -328,7 +329,11 @@ export class LiveIncidentService {
     taskId: string,
   ): DurableTrueForgeRuntime {
     const config = loadTrueForgeConfig();
-    const workflow = new LiveWorkflowReducer(evidenceStore);
+    const projector = new TrueForgeEventProjector(undefined, evidenceStore);
+    const workflow = new LiveWorkflowReducer(
+      evidenceStore,
+      (callId) => projector.getToolCall(callId),
+    );
     return new DurableTrueForgeRuntime(
       new TrueForgeSdkAdapter(config),
       this.checkpoints,
@@ -347,7 +352,7 @@ export class LiveIncidentService {
           taskId,
         );
       },
-      undefined,
+      projector,
       (state, event) => workflow.apply(state, event),
     );
   }

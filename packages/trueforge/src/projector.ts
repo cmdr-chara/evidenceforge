@@ -15,7 +15,7 @@ import {
   createOperationIntent,
   settleOperation,
 } from "../../workflow/src";
-import { TrueForgeEventIndex } from "./event-index";
+import { IndexedToolCall, TrueForgeEventIndex } from "./event-index";
 import { TrueForgeVerifierProjector } from "./verifier-projection";
 
 export interface RuntimeProjection {
@@ -55,6 +55,10 @@ export class TrueForgeEventProjector {
       toolType: serverName === undefined ? undefined : "mcp",
       serverName,
     });
+  }
+
+  public getToolCall(id: string): IndexedToolCall | undefined {
+    return this.eventIndex.getToolCall(id);
   }
 
   public project(state: SessionState, event: RuntimeEvent): RuntimeProjection {

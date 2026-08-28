@@ -18,7 +18,10 @@ import {
   VerificationEngine,
 } from "../../../packages/verification/src";
 import { DIAGNOSTIC_SPECIALISTS } from "../../../packages/specialists/src";
-import { normalizeTrueForgeToolCall } from "../../../packages/trueforge/src";
+import {
+  IndexedToolCall,
+  normalizeTrueForgeToolCall,
+} from "../../../packages/trueforge/src";
 import { SessionController } from "../../../packages/workflow/src";
 import {
   isGitHubReadOnlyTool,
@@ -128,7 +131,10 @@ export class LiveWorkflowReducer {
   private readonly processedEvents = new Set<string>();
   private readonly authoritativeHeadShas = new Map<string, string>();
 
-  public constructor(private readonly evidenceStore: EvidenceStore) {
+  public constructor(
+    private readonly evidenceStore: EvidenceStore,
+    private readonly resolveIndexedToolCall?: (id: string) => IndexedToolCall | undefined,
+  ) {
     for (const event of evidenceStore.listEvents()) this.indexDiagnosticThread(event);
   }
 
@@ -912,6 +918,19 @@ export class LiveWorkflowReducer {
     const payload = asRecord(event.payload);
     const callId = readString(payload, "toolCallId") ?? readString(payload, "tool_call_id");
     if (callId === undefined) return undefined;
+    const correlated = this.resolveIndexedToolCall?.(callId);
+    if (correlated !== undefined) {
+      const args = parseArguments(correlated.arguments);
+      if (args === undefined) return undefined;
+      return {
+        id: correlated.id,
+        name: correlated.name,
+        arguments: args,
+        threadId: correlated.threadId,
+        serverName: correlated.serverName,
+        toolType: correlated.toolType,
+      };
+    }
     for (const candidate of this.evidenceStore.listEvents().reverse()) {
       const candidatePayload = asRecord(candidate.payload);
       const rawCalls = candidatePayload.toolCalls ?? candidatePayload.tool_calls;
