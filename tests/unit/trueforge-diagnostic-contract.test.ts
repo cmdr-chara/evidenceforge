@@ -31,9 +31,9 @@ test("diagnostic contract rejects a specialist after its tool budget", () => {
   assert.equal(evaluateDiagnosticContract(events)?.code, "TOOL_BUDGET_EXCEEDED");
 });
 
-test("diagnostic contract accepts the observed nine-call live specialist trace", () => {
+test("diagnostic contract accepts the observed protocol-inclusive live specialist trace", () => {
   const events = [turnCreated(), ...fanOut()];
-  for (let index = 0; index < 9; index += 1) {
+  for (let index = 0; index < 13; index += 1) {
     events.push(toolResult("thread-1", index));
   }
   assert.equal(evaluateDiagnosticContract(events), undefined);
