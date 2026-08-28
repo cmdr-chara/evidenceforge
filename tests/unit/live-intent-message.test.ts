@@ -224,19 +224,19 @@ test("completed active turn continues in a new turn instead of replaying compact
   });
   rejects((candidate) => {
     candidate.externalAction = {
-    operationId: "operation-live",
-    type: "pull_request",
-    idempotencyKey: "idempotency-live",
-    replayPolicy: "RECONCILE_FIRST",
-    status: "PREPARED",
-    preparedArguments: {
-      repository: state.task.repository,
-      base: "determination",
-      head: "feat/foundation-control-plane",
-      title: "EvidenceForge live repair",
-      body: "Application-approved pull request body",
-      expectedHeadSha: "b".repeat(40),
-    },
+      operationId: "operation-live",
+      type: "pull_request",
+      idempotencyKey: "idempotency-live",
+      replayPolicy: "RECONCILE_FIRST",
+      status: "PREPARED",
+      preparedArguments: {
+        repository: state.task.repository,
+        base: "determination",
+        head: "feat/foundation-control-plane",
+        title: "EvidenceForge live repair",
+        body: "Application-approved pull request body",
+        expectedHeadSha: "b".repeat(40),
+      },
       binding: artifactBindingFor(candidate, "EXTERNAL"),
     };
   });
@@ -250,7 +250,14 @@ test("completed active turn continues in a new turn instead of replaying compact
   assert.match(buildLiveContinuationMessage(state), /Only the human approval path authorizes the write/);
 });
 
-test("live task accepts bounded incident text at the documented limits", () => {
+test("live task accepts bounded incident text at the serialized limit", () => {
+  const finalConstraintLength =
+    TASK_PROMPT_TEXT_MAX_LENGTH -
+    (TASK_OBJECTIVE_MAX_LENGTH + 2) -
+    1 -
+    40 -
+    1 -
+    (TASK_CONSTRAINT_MAX_LENGTH * 3 + 13);
   const task = createTask({
     objective: "o".repeat(TASK_OBJECTIVE_MAX_LENGTH),
     repository: "r",
@@ -260,18 +267,39 @@ test("live task accepts bounded incident text at the documented limits", () => {
       "c".repeat(TASK_CONSTRAINT_MAX_LENGTH),
       "c".repeat(TASK_CONSTRAINT_MAX_LENGTH),
       "c".repeat(TASK_CONSTRAINT_MAX_LENGTH),
-      "c".repeat(
-        TASK_PROMPT_TEXT_MAX_LENGTH -
-          TASK_OBJECTIVE_MAX_LENGTH -
-          1 -
-          40 -
-          1 -
-          TASK_CONSTRAINT_MAX_LENGTH * 3,
-      ),
+      "c".repeat(finalConstraintLength),
     ],
   });
+  const promptTextLength =
+    JSON.stringify(task.objective).length +
+    task.repository.length +
+    task.revision.length +
+    task.source.runId.length +
+    JSON.stringify(task.constraints).length;
 
   assert.equal(task.objective.length, TASK_OBJECTIVE_MAX_LENGTH);
+  assert.equal(promptTextLength, TASK_PROMPT_TEXT_MAX_LENGTH);
+});
+
+test("live task rejects prompt text that expands beyond the cap during JSON serialization", () => {
+  const objective = "\u0000".repeat(1_400);
+  assert.ok(objective.length < TASK_PROMPT_TEXT_MAX_LENGTH);
+  assert.ok(JSON.stringify(objective).length > TASK_PROMPT_TEXT_MAX_LENGTH);
+
+  assert.throws(
+    () =>
+      createTask({
+        objective,
+        repository: "cmdr-chara/evidenceforge",
+        revision: "a".repeat(40),
+        runId: "33153999792",
+      }),
+    (error: unknown) =>
+      error instanceof DomainValidationError &&
+      error.issues.includes(
+        `task prompt text must be at most ${TASK_PROMPT_TEXT_MAX_LENGTH} characters in aggregate`,
+      ),
+  );
 });
 
 test("live task rejects oversized objective, constraints, and aggregate prompt text", () => {
