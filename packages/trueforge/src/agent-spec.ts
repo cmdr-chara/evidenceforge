@@ -6,7 +6,10 @@ export const TRUEFORGE_REASONING_EFFORT = "high";
 export const TRUEFORGE_SPECIALIST_REQUESTED_TOOL_BUDGET = 12;
 // TrueForge also records protocol-level MCP discovery responses. Keep a small
 // envelope above the model-visible budget while retaining a strict hard cap.
-export const TRUEFORGE_SPECIALIST_TOOL_BUDGET = 16;
+// The model-facing budget remains 12. TrueForge can emit a small number of
+// protocol/tool-discovery responses around those requested calls, so the
+// application hard stop keeps a bounded eight-result transport allowance.
+export const TRUEFORGE_SPECIALIST_TOOL_BUDGET = 20;
 
 export interface TrueForgeAgentSpec {
   model: { name: string; params: Record<string, unknown> };

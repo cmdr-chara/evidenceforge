@@ -40,7 +40,7 @@ test("TrueForge agent spec bounds per-thread work and requires convergence", () 
   assert.equal(spec.model.params.reasoning_effort, TRUEFORGE_REASONING_EFFORT);
   assert.equal(TRUEFORGE_REASONING_EFFORT, "high");
   assert.equal(TRUEFORGE_SPECIALIST_REQUESTED_TOOL_BUDGET, 12);
-  assert.equal(TRUEFORGE_SPECIALIST_TOOL_BUDGET, 16);
+  assert.equal(TRUEFORGE_SPECIALIST_TOOL_BUDGET, 20);
   assert.match(
     spec.instructions,
     new RegExp(`at most ${TRUEFORGE_SPECIALIST_REQUESTED_TOOL_BUDGET} tool calls`),
