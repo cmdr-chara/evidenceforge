@@ -73,13 +73,7 @@ test("live reducer projections persist through the runtime checkpoint boundary",
 
 test("live workflow accepts an official GitHub read and rejects synthetic incident controls", () => {
   const harness = createHarness();
-  const feed = (event: RuntimeEvent): void => {
-    harness.sequence += 1;
-    event.sequenceNumber = harness.sequence;
-    assert.equal(harness.store.recordEvent(event), true);
-    harness.projector.project(harness.state, event);
-    harness.reducer.apply(harness.state, event);
-  };
+  const feed = createFeed(harness);
 
   feed(turnCreated());
   for (const [index, name] of [
@@ -130,15 +124,9 @@ test("live workflow accepts an official GitHub read and rejects synthetic incide
   assert.equal(harness.state.completionCertificate, undefined);
 });
 
-test("live workflow correlates TrueForge call_tool GitHub context with exact reproduction", () => {
+test("live workflow does not infer root cause from exact context and reproduction alone", () => {
   const harness = createHarness();
-  const feed = (event: RuntimeEvent): void => {
-    harness.sequence += 1;
-    event.sequenceNumber = harness.sequence;
-    assert.equal(harness.store.recordEvent(event), true);
-    harness.projector.project(harness.state, event);
-    harness.reducer.apply(harness.state, event);
-  };
+  const feed = createFeed(harness);
 
   feed(turnCreated());
   for (const [index, name] of [
@@ -147,40 +135,11 @@ test("live workflow correlates TrueForge call_tool GitHub context with exact rep
     "Dependency / Configuration Investigator",
   ].entries()) {
     feed(threadCreated(index + 1, name));
-    feed({
-      ...event("THREAD_DONE", `thread-done-${index + 1}`, {
-        type: "thread.done",
-        threadId: `thread-${index + 1}`,
-        state: { status: "done" },
-      }),
-      threadId: `thread-${index + 1}`,
-    });
+    feed(diagnosticThreadDone(index + 1));
   }
 
-  feed(metaToolCall("call-context-meta", "github", "get_commit", {
-    owner: "cmdr-chara",
-    repo: "evidenceforge",
-    sha: harness.state.task.revision,
-  }));
-  feed(toolResponse("call-context-meta", {
-    success: true,
-    response: {
-      sha: harness.state.task.revision,
-      repository: harness.state.task.repository,
-      commit: { message: "workflow failure" },
-    },
-  }));
-
-  feed(structuredCall("call-reproduce", "sandbox", "exec", {
-    intent: "evidenceforge.verify:failure-reproduced",
-    command: "node --test demo/incident-fixture/test/config.test.mjs",
-    cwd: "/workspace/repository",
-    timeoutSeconds: 180,
-  }, "main", "truefoundry-system"));
-  feed(toolResponse("call-reproduce", {
-    success: true,
-    response: { exitCode: 1, result: "CONFIG_VALIDATION_ORDER" },
-  }));
+  feedExactIncidentContext(harness, feed, "call-context-without-cause");
+  feedExactReproduction(feed, "call-reproduce-without-cause");
 
   assert.equal(
     harness.state.successCriteria.find((criterion) => criterion.id === "incident-context")?.status,
@@ -192,22 +151,89 @@ test("live workflow correlates TrueForge call_tool GitHub context with exact rep
   );
   assert.equal(
     harness.state.successCriteria.find((criterion) => criterion.id === "root-cause-supported")?.status,
-    "PASS",
+    "PENDING",
   );
+  assert.equal(harness.state.hypotheses.length, 0);
+  assert.equal(harness.state.phase, "INVESTIGATING");
+  assert.equal(harness.state.status, "ACTIVE");
+  assert.equal(harness.state.completionCertificate, undefined);
+});
+
+test("live workflow requires structured diagnostic causal evidence before root cause passes", () => {
+  const harness = createHarness();
+  const feed = createFeed(harness);
+
+  feed(turnCreated());
+  const specialists = [
+    "Repository Investigator",
+    "Failure / Log Investigator",
+    "Dependency / Configuration Investigator",
+  ];
+  for (const [index, name] of specialists.entries()) {
+    feed(threadCreated(index + 1, name));
+    feed(
+      diagnosticThreadDone(
+        index + 1,
+        name === "Failure / Log Investigator" ? causalDiagnosticOutput() : undefined,
+      ),
+    );
+  }
+
+  feedExactIncidentContext(harness, feed, "call-context-with-cause");
+  feedExactReproduction(feed, "call-reproduce-with-cause");
+
+  const rootCause = harness.state.successCriteria.find(
+    (criterion) => criterion.id === "root-cause-supported",
+  );
+  assert.equal(rootCause?.status, "PASS");
+  assert.equal(rootCause?.evidenceIds.length, 1);
+  const gateEvidence = harness.store.getEvidence(rootCause?.evidenceIds[0] ?? "");
+  assert.equal(gateEvidence?.sourceTool, "evidenceforge.root-cause-gate");
+  assert.equal(gateEvidence?.metadata?.diagnosticEvidenceCount, 1);
+  assert.equal(gateEvidence?.metadata?.supportingEvidenceCount, 3);
+  assert.equal(harness.state.hypotheses.length, 1);
   assert.equal(harness.state.hypotheses[0]?.status, "SUPPORTED");
-  assert.equal(harness.state.hypotheses[0]?.supportingEvidence.length, 2);
+  assert.equal(harness.state.hypotheses[0]?.supportingEvidence.length, 3);
+  assert.match(
+    harness.state.hypotheses[0]?.statement ?? "",
+    /Causal mechanism:/,
+  );
   assert.equal(harness.state.phase, "PATCHING");
+  assert.equal(harness.state.status, "ACTIVE");
+  assert.equal(harness.state.completionCertificate, undefined);
+});
+
+test("live workflow blocks malformed claimed diagnostic causality", () => {
+  const harness = createHarness();
+  const feed = createFeed(harness);
+
+  feed(turnCreated());
+  feed(threadCreated(1, "Repository Investigator"));
+  feed(diagnosticThreadDone(1, {
+    schemaVersion: 1,
+    findings: ["The command failed."],
+    rootCauseHypotheses: [{
+      id: "symptom-only",
+      cause: "The command at the incident revision returns a non-zero exit status.",
+      affectedLocations: ["test output"],
+      evidenceReferences: ["CONFIG_VALIDATION_ORDER"],
+      status: "SUPPORTED",
+    }],
+    unresolvedQuestions: [],
+  }));
+
+  assert.equal(harness.state.status, "BLOCKED");
+  assert.match(harness.state.blockedReason ?? "", /causal evidence schema/);
+  assert.equal(
+    harness.state.successCriteria.find((criterion) => criterion.id === "root-cause-supported")?.status,
+    "PENDING",
+  );
+  assert.equal(harness.state.completionCertificate, undefined);
 });
 
 test("live workflow accepts only a digest-bound isolated reviewer result", () => {
   const harness = createHarness();
-  const feed = (event: RuntimeEvent): void => {
-    harness.sequence += 1;
-    event.sequenceNumber = harness.sequence;
-    assert.equal(harness.store.recordEvent(event), true);
-    harness.projector.project(harness.state, event);
-    harness.reducer.apply(harness.state, event);
-  };
+  const feed = createFeed(harness);
   feed(turnCreated());
   for (const [index, name] of [
     "Repository Investigator",
@@ -306,13 +332,7 @@ test("live external publishing stores only an official PR receipt and requires a
     threadId: "main",
   }];
 
-  const record = (event: RuntimeEvent): void => {
-    harness.sequence += 1;
-    event.sequenceNumber = harness.sequence;
-    assert.equal(harness.store.recordEvent(event), true);
-    harness.projector.project(harness.state, event);
-    harness.reducer.apply(harness.state, event);
-  };
+  const record = createFeed(harness);
   record(structuredCall("call-pr", "github", "create_pull_request", official));
   record(toolResponse("call-pr", {
     success: true,
@@ -451,6 +471,72 @@ function createHarness(): Harness {
   };
 }
 
+function createFeed(harness: Harness): (event: RuntimeEvent) => void {
+  return (runtimeEvent: RuntimeEvent): void => {
+    harness.sequence += 1;
+    runtimeEvent.sequenceNumber = harness.sequence;
+    assert.equal(harness.store.recordEvent(runtimeEvent), true);
+    harness.projector.project(harness.state, runtimeEvent);
+    harness.reducer.apply(harness.state, runtimeEvent);
+  };
+}
+
+function feedExactIncidentContext(
+  harness: Harness,
+  feed: (event: RuntimeEvent) => void,
+  callId: string,
+): void {
+  feed(metaToolCall(callId, "github", "get_commit", {
+    owner: "cmdr-chara",
+    repo: "evidenceforge",
+    sha: harness.state.task.revision,
+  }));
+  feed(toolResponse(callId, {
+    success: true,
+    response: {
+      sha: harness.state.task.revision,
+      repository: harness.state.task.repository,
+      commit: { message: "workflow failure" },
+    },
+  }));
+}
+
+function feedExactReproduction(
+  feed: (event: RuntimeEvent) => void,
+  callId: string,
+): void {
+  feed(structuredCall(callId, "sandbox", "exec", {
+    intent: "evidenceforge.verify:failure-reproduced",
+    command: "node --test demo/incident-fixture/test/config.test.mjs",
+    cwd: "/workspace/repository",
+    timeoutSeconds: 180,
+  }, "main", "truefoundry-system"));
+  feed(toolResponse(callId, {
+    success: true,
+    response: { exitCode: 1, result: "CONFIG_VALIDATION_ORDER" },
+  }));
+}
+
+function causalDiagnosticOutput(): Record<string, unknown> {
+  return {
+    schemaVersion: 1,
+    findings: [
+      "The adapter reports transport success independently from process exit status.",
+    ],
+    rootCauseHypotheses: [{
+      id: "nonzero-exit-misclassification",
+      cause:
+        "The sandbox result adapter discards the authoritative non-zero process exit status.",
+      causalMechanism:
+        "The workflow observes a successful transport envelope and classifies the failed command as OK before checking its exit code.",
+      affectedLocations: ["packages/trueforge/src/runtime.ts:projectToolResult"],
+      evidenceReferences: ["CONFIG_VALIDATION_ORDER", "runtime.ts:projectToolResult"],
+      status: "SUPPORTED",
+    }],
+    unresolvedQuestions: [],
+  };
+}
+
 function turnCreated(): RuntimeEvent {
   return event("TURN_CREATED", "turn-created", { type: "turn.created", turnId: "turn-1" });
 }
@@ -462,6 +548,25 @@ function threadCreated(index: number, name: string): RuntimeEvent {
       threadId: `thread-${index}`,
       agentInfo: { type: "dynamic", name },
       parent: { threadId: "main", toolCallId: `fanout-${index}` },
+    }),
+    threadId: `thread-${index}`,
+  };
+}
+
+function diagnosticThreadDone(
+  index: number,
+  output?: Record<string, unknown>,
+): RuntimeEvent {
+  return {
+    ...event("THREAD_DONE", `thread-done-${index}`, {
+      type: "thread.done",
+      threadId: `thread-${index}`,
+      state: {
+        status: "done",
+        ...(output === undefined
+          ? {}
+          : { output: { content: JSON.stringify(output) } }),
+      },
     }),
     threadId: `thread-${index}`,
   };
