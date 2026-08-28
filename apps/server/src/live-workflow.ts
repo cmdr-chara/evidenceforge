@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import {
   Evidence,
-  Hypothesis,
   PullRequestIdentity,
   RuntimeEvent,
   SessionState,
@@ -34,6 +33,11 @@ import {
   validateIncidentRead,
   validatePullRequestReadCall,
 } from "./github-mcp-adapter";
+import {
+  DiagnosticOutputError,
+  projectDiagnosticRootCauseClaims,
+  projectSupportedRootCause,
+} from "./live-root-cause";
 
 /**
  * Structured intents understood by the application-owned live reducer.
@@ -44,7 +48,6 @@ import {
  */
 export const LIVE_CONTROL_INTENTS = {
   incidentContext: "evidenceforge.incident-context",
-  hypothesisLedger: "evidenceforge.hypothesis-ledger",
   patch: "evidenceforge.patch",
   review: "evidenceforge.review",
   externalReconcile: "evidenceforge.external-reconcile",
@@ -149,6 +152,7 @@ export class LiveWorkflowReducer {
     }
     if (event.type === "THREAD_DONE") {
       this.projectThreadDone(state, event);
+      this.projectRootCause(state, event);
       this.advance(state);
       return;
     }
@@ -166,7 +170,7 @@ export class LiveWorkflowReducer {
         this.projectStructuredIntent(state, event, call);
       }
       this.projectExternalCommit(state, event, call);
-      this.projectCorroboratedRootCause(state, event);
+      this.projectRootCause(state, event);
       this.advance(state);
     }
   }
@@ -209,9 +213,21 @@ export class LiveWorkflowReducer {
     }
     const owner = this.diagnosticThreads.get(threadId);
     if (owner === undefined) return;
-    const status = readString(asRecord(asRecord(event.payload).state), "status");
+    const threadState = asRecord(asRecord(event.payload).state);
+    const status = readString(threadState, "status");
     if (status !== "done") {
       block(state, "application-owned diagnostic thread did not complete successfully");
+      return;
+    }
+    try {
+      projectDiagnosticRootCauseClaims(state, event, owner, this.evidenceStore);
+    } catch (error) {
+      block(
+        state,
+        error instanceof DiagnosticOutputError
+          ? error.message
+          : "diagnostic causal evidence could not be projected",
+      );
       return;
     }
     const step = state.plan.steps.find((candidate) => candidate.owner === owner);
@@ -222,51 +238,18 @@ export class LiveWorkflowReducer {
     });
   }
 
-  private projectCorroboratedRootCause(state: SessionState, event: RuntimeEvent): void {
-    const criterion = findCriterion(state, "root-cause-supported");
-    if (criterion === undefined || criterion.status === "PASS") return;
-    const incident = findCriterion(state, "incident-context");
-    const reproduction = findCriterion(state, "failure-reproduced");
-    if (incident?.status !== "PASS" || reproduction?.status !== "PASS") return;
-    const supportingEvidence = [...incident.evidenceIds, ...reproduction.evidenceIds];
-    if (
-      supportingEvidence.length < 2 ||
-      supportingEvidence.some((id) => this.evidenceStore.getEvidence(id) === undefined)
-    ) return;
-
-    const artifactRef = `artifact://${state.task.id}/hypothesis-ledger.json`;
-    const claim =
-      "Application correlated exact-revision GitHub context with the independently reproduced failure signature";
-    const evidence = createEvidence({
-      id: `live-${event.id}-root-cause-supported`,
-      kind: "VERIFICATION",
-      sourceEventId: event.id,
-      sourceTool: "evidenceforge.corroborate",
-      claim,
-      artifactRefs: [artifactRef],
-      outcome: "PASS",
-      binding: artifactBindingFor(state, "INCIDENT"),
-      timestamp: event.timestamp,
-      metadata: { supportingEvidenceCount: supportingEvidence.length },
-    });
-    this.evidenceStore.recordEvidence(evidence);
-    Object.assign(state, new SessionController(state).upsertHypothesis({
-      id: `hypothesis-${state.task.id}-exact-revision-failure`,
-      statement:
-        "Behavior at the exact incident revision is consistent with the independently reproduced failure signature.",
-      status: "SUPPORTED",
-      supportingEvidence,
-      contradictingEvidence: [],
-    }));
-    Object.assign(state, new SessionController(state).applyVerification({
-      criterionId: criterion.id,
-      status: "PASS",
-      verifier: criterion.verifier.kind,
-      evidenceIds: [evidence.id],
-      details: claim,
-      deterministic: true,
-      binding: evidence.binding,
-    }));
+  private projectRootCause(state: SessionState, event: RuntimeEvent): void {
+    if (state.status !== "ACTIVE") return;
+    try {
+      projectSupportedRootCause(state, event, this.evidenceStore);
+    } catch (error) {
+      block(
+        state,
+        error instanceof DiagnosticOutputError
+          ? error.message
+          : "root-cause evidence could not be validated",
+      );
+    }
   }
 
   private projectIndependentReviewThread(state: SessionState, event: RuntimeEvent): void {
@@ -317,7 +300,7 @@ export class LiveWorkflowReducer {
   ): void {
     if (isGithubCall(call)) {
       // Official GitHub MCP calls have no EvidenceForge intent/artifact
-      // fields.  A pull-request read is either incident evidence or the
+      // fields. A pull-request read is either incident evidence or the
       // post-create reconciliation step, selected by durable action state.
       if (call.name === "pull_request_read") {
         if (state.externalAction?.status === "COMMITTED") {
@@ -337,7 +320,7 @@ export class LiveWorkflowReducer {
       }
       if (call.name === "create_pull_request") {
         // The result is handled by projectExternalCommit after the approval
-        // state has been made durable.  Do not interpret its request here.
+        // state has been made durable. Do not interpret its request here.
         return;
       }
       block(state, `GitHub MCP tool ${call.name} is not an admissible live operation`);
@@ -346,8 +329,6 @@ export class LiveWorkflowReducer {
     const intent = readString(call.arguments, "intent");
     if (intent === LIVE_CONTROL_INTENTS.incidentContext) {
       this.projectIncidentContext(state, event, call);
-    } else if (intent === LIVE_CONTROL_INTENTS.hypothesisLedger) {
-      this.projectHypothesisLedger(state, event, call);
     } else if (intent === LIVE_CONTROL_INTENTS.patch) {
       this.projectPatch(state, event, call);
     } else if (intent === LIVE_CONTROL_INTENTS.review) {
@@ -440,60 +421,6 @@ export class LiveWorkflowReducer {
       return;
     }
     this.applySchemaEvidence(state, event, call, criterion.id, expectedRef, "authoritative incident context");
-  }
-
-  private projectHypothesisLedger(
-    state: SessionState,
-    event: RuntimeEvent,
-    call: ToolCallDescriptor,
-  ): void {
-    if (!isAuthoritativeReadCall(call)) {
-      block(state, "hypothesis ledger intent must be fulfilled by a correlated read-only connector");
-      return;
-    }
-    const criterion = findCriterion(state, "root-cause-supported");
-    if (criterion === undefined) {
-      block(state, "success contract is missing the root-cause-supported criterion");
-      return;
-    }
-    const expectedRef = `artifact://${state.task.id}/hypothesis-ledger.json`;
-    if (readString(call.arguments, "artifactRef") !== expectedRef) {
-      block(state, "hypothesis ledger intent requested the wrong application artifact");
-      return;
-    }
-    const response = this.requireSuccessfulResponse(state, event, "hypothesis ledger");
-    if (response === undefined) return;
-    const artifactRefs = readStringArray(response.result, "artifactRefs") ??
-      readStringArray(response.root, "artifactRefs") ?? [];
-    if (!artifactRefs.includes(expectedRef)) {
-      block(state, "hypothesis ledger result did not produce the required artifact");
-      return;
-    }
-    const hypotheses = parseHypotheses(response.result.hypotheses ?? response.root.hypotheses);
-    if (hypotheses === undefined || hypotheses.length === 0) {
-      block(state, "hypothesis ledger result has no valid structured hypotheses");
-      return;
-    }
-    const knownEvidence = new Set(state.evidenceIds);
-    if (hypotheses.some((hypothesis) =>
-      [...hypothesis.supportingEvidence, ...hypothesis.contradictingEvidence].some(
-        (id) => !knownEvidence.has(id),
-      ))) {
-      block(state, "hypothesis ledger references evidence outside the application ledger");
-      return;
-    }
-    if (!hypotheses.some((hypothesis) =>
-      (hypothesis.status === "SUPPORTED" || hypothesis.status === "CONFIRMED") &&
-      hypothesis.supportingEvidence.length > 0,
-    )) {
-      block(state, "hypothesis ledger contains no supported root-cause hypothesis");
-      return;
-    }
-    this.applySchemaEvidence(state, event, call, criterion.id, expectedRef, "structured root-cause hypothesis ledger");
-    for (const hypothesis of hypotheses) {
-      const next = new SessionController(state).upsertHypothesis(hypothesis);
-      Object.assign(state, next);
-    }
   }
 
   private projectPatch(
@@ -1112,33 +1039,6 @@ function readThreadIdentity(event: RuntimeEvent): { id: string; name: string } |
   return { id, name };
 }
 
-function parseHypotheses(value: unknown): Hypothesis[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const parsed: Hypothesis[] = [];
-  for (const item of value) {
-    const record = asRecord(item);
-    const id = readString(record, "id");
-    const statement = readString(record, "statement");
-    const status = readString(record, "status");
-    if (
-      id === undefined || statement === undefined ||
-      !["OPEN", "SUPPORTED", "REFUTED", "CONFIRMED"].includes(status ?? "")
-    ) return undefined;
-    const supportingEvidence = readStringArray(record, "supportingEvidence") ??
-      readStringArray(record, "supportingEvidenceIds") ?? [];
-    const contradictingEvidence = readStringArray(record, "contradictingEvidence") ??
-      readStringArray(record, "contradictingEvidenceIds") ?? [];
-    parsed.push({
-      id,
-      statement,
-      status: status as Hypothesis["status"],
-      supportingEvidence,
-      contradictingEvidence,
-    });
-  }
-  return parsed;
-}
-
 function readIdentity(value: unknown): PullRequestIdentity | undefined {
   const record = asRecord(value);
   const identifier = readString(record, "identifier") ??
@@ -1171,11 +1071,6 @@ function isSuccessfulResponse(response: ParsedToolResponse): boolean {
 
 function isGithubCall(call: ToolCallDescriptor): boolean {
   return call.serverName?.toLowerCase() === "github" && call.threadId.length > 0;
-}
-
-function isAuthoritativeReadCall(call: ToolCallDescriptor): boolean {
-  const server = call.serverName?.toLowerCase();
-  return server !== undefined && server !== "sandbox" && server !== "evidenceforge" && call.name !== "exec";
 }
 
 function isSandboxExec(call: ToolCallDescriptor): boolean {
