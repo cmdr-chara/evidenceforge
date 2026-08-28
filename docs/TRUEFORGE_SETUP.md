@@ -85,6 +85,8 @@ TrueForge model-message deltas remain durably journaled and projected for tool-c
 
 The inline agent spec configures GitHub tool approval for `@write` and `@destructive`. EvidenceForge also applies its own risk policy. The PR action must be prepared in exact form and approved before the TrueForge `user.tool_approval` resume event is submitted.
 
+If a completed TrueForge turn stops after review without requesting the PR action, EvidenceForge may open one bounded continuation turn in the same session. That path is enabled only when the latest durable event is a `turn.done` with no required action, every non-external criterion and the current patch-bound reviewer are PASS, `external-pr` is still PENDING, and no terminal state, prepared action, or pending approval exists. The continuation performs only the authoritative head read and one approval-paused PR request.
+
 ## Troubleshooting
 
 | Symptom | Action |

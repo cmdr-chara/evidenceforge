@@ -398,27 +398,52 @@ export function shouldContinueCompletedTurn(
 ): boolean {
   if (
     state.status !== "ACTIVE" ||
+    state.phase !== "REVIEWING" ||
+    state.terminalSequenceNumber !== undefined ||
+    state.trueForgeSessionId === undefined ||
     state.activeTurnId === undefined ||
-    state.lastSequenceNumber === undefined
+    state.lastSequenceNumber === undefined ||
+    state.externalAction !== undefined ||
+    state.approvals.some((approval) => approval.status === "PENDING") ||
+    (state.reviewerVerdict !== "PASS" && state.reviewerVerdict !== "PASS_WITH_WARNINGS") ||
+    !artifactBindingMatchesState(state.reviewBinding, state, "PATCH")
   ) {
     return false;
   }
-  return events.some((event) => {
-    if (event.type !== "TURN_DONE" || event.sequenceNumber !== state.lastSequenceNumber) {
-      return false;
-    }
-    const payload = asUnknownRecord(event.payload);
-    return readString(asUnknownRecord(payload.state), "status") === "done";
-  });
+  if (
+    state.successCriteria.some((criterion) =>
+      criterion.verifier.kind === "EXTERNAL_STATE"
+        ? criterion.required && criterion.status !== "PENDING"
+        : criterion.required && criterion.status !== "PASS",
+    )
+  ) {
+    return false;
+  }
+  const latest = events.at(-1);
+  if (latest?.type !== "TURN_DONE" || latest.sequenceNumber !== state.lastSequenceNumber) {
+    return false;
+  }
+  const turnState = asUnknownRecord(asUnknownRecord(latest.payload).state);
+  const requiredActions = turnState.requiredActions ?? turnState.required_actions;
+  return (
+    readString(turnState, "status") === "done" &&
+    Array.isArray(requiredActions) &&
+    requiredActions.length === 0
+  );
 }
 
 export function buildLiveContinuationMessage(state: SessionState): string {
   return [
-    `Continue EvidenceForge task ${state.task.id} from its durable application state.`,
-    `The application phase is ${state.phase}; do not repeat diagnostics, reproduction, patching, deterministic verification, or independent review that already has current PASS evidence.`,
-    "If independent review is PASS and external-pr remains pending, obtain the authoritative GitHub head commit with the official get_commit schema, then issue the exact official create_pull_request tool call targeting determination.",
-    "Issuing create_pull_request must pause for TrueForge and EvidenceForge human approval. Do not merely describe readiness, do not bypass approval, and never merge the pull request.",
-    "Application state and CompletionGate remain authoritative; prose cannot change criterion status or claim completion.",
+    "This is an application-authorized continuation turn in the existing TrueForge session.",
+    'The prior turn is terminal: turn.done, status "done", requiredActions [].',
+    "The current patch has an application-bound independent-review PASS.",
+    "Do not rerun diagnostics, reproduction, patching, deterministic verification, or independent review.",
+    "Do not edit files, commit, push, merge, or claim completion.",
+    `First call the official GitHub get_commit schema for repository ${state.task.repository} and sha feat/foundation-control-plane.`,
+    `Then issue exactly one official GitHub create_pull_request call for repository ${state.task.repository}, head feat/foundation-control-plane, and base determination, using the application-approved title and body.`,
+    "Do not include EvidenceForge-specific fields in the GitHub tool arguments.",
+    "Stop immediately when TrueForge emits tool.approval_required. Do not retry or issue a second pull-request call.",
+    "Only the human approval path authorizes the write. Application state and CompletionGate remain authoritative.",
   ].join("\n");
 }
 

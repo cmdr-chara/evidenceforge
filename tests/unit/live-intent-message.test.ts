@@ -18,6 +18,7 @@ import {
   TASK_PROMPT_TEXT_MAX_LENGTH,
 } from "../../packages/domain/src";
 import { buildVerifierManifest } from "../../packages/trueforge/src";
+import { artifactBindingFor } from "../../packages/verification/src";
 import { buildEvidenceForgeLiveCiSuccessContract } from "../../packages/workflow/src";
 
 test("live task objective and constraints are bound into the TrueForge message as untrusted data", () => {
@@ -147,6 +148,12 @@ test("completed active turn continues in a new turn instead of replaying compact
   state.trueForgeSessionId = "session-live";
   state.activeTurnId = "turn-live";
   state.lastSequenceNumber = 42;
+  state.patchDigest = "a".repeat(64);
+  state.reviewerVerdict = "PASS_WITH_WARNINGS";
+  state.reviewBinding = artifactBindingFor(state, "PATCH");
+  for (const criterion of state.successCriteria) {
+    criterion.status = criterion.verifier.kind === "EXTERNAL_STATE" ? "PENDING" : "PASS";
+  }
   const done: RuntimeEvent = {
     id: "event-turn-done",
     type: "TURN_DONE",
@@ -158,8 +165,84 @@ test("completed active turn continues in a new turn instead of replaying compact
 
   assert.equal(shouldContinueCompletedTurn(state, [done]), true);
   assert.equal(shouldContinueCompletedTurn(state, [{ ...done, sequenceNumber: 41 }]), false);
-  assert.match(buildLiveContinuationMessage(state), /issue the exact official create_pull_request/);
-  assert.match(buildLiveContinuationMessage(state), /never merge/);
+  assert.equal(
+    shouldContinueCompletedTurn(state, [done, { ...done, id: "later", type: "MODEL_MESSAGE" }]),
+    false,
+  );
+  const rejects = (mutate: (candidate: typeof state) => void, events = [done]): void => {
+    const candidate = structuredClone(state);
+    mutate(candidate);
+    assert.equal(shouldContinueCompletedTurn(candidate, events), false);
+  };
+  rejects((candidate) => {
+    candidate.status = "BLOCKED";
+  });
+  rejects((candidate) => {
+    candidate.phase = "VERIFYING";
+  });
+  rejects((candidate) => {
+    candidate.terminalSequenceNumber = 42;
+  });
+  rejects((candidate) => {
+    candidate.trueForgeSessionId = undefined;
+  });
+  rejects((candidate) => {
+    candidate.activeTurnId = undefined;
+  });
+  rejects((candidate) => {
+    candidate.lastSequenceNumber = undefined;
+  });
+  rejects((candidate) => {
+    candidate.reviewerVerdict = undefined;
+  });
+  rejects((candidate) => {
+    candidate.reviewBinding = { ...candidate.reviewBinding!, patchDigest: "b".repeat(64) };
+  });
+  rejects((candidate) => {
+    candidate.successCriteria.find((criterion) => criterion.id === "lint")!.status = "PENDING";
+  });
+  rejects((candidate) => {
+    candidate.successCriteria.find(
+      (criterion) => criterion.verifier.kind === "EXTERNAL_STATE",
+    )!.status = "PASS";
+  });
+  rejects((candidate) => {
+    candidate.approvals.push({
+      id: "approval-live",
+      action: "create_pull_request",
+      normalizedArguments: {},
+      risk: "EXTERNAL_REVERSIBLE",
+      reason: "human review required",
+      reversible: true,
+      status: "PENDING",
+    });
+  });
+  rejects((candidate) => {
+    candidate.externalAction = {
+    operationId: "operation-live",
+    type: "pull_request",
+    idempotencyKey: "idempotency-live",
+    replayPolicy: "RECONCILE_FIRST",
+    status: "PREPARED",
+    preparedArguments: {
+      repository: state.task.repository,
+      base: "determination",
+      head: "feat/foundation-control-plane",
+      title: "EvidenceForge live repair",
+      body: "Application-approved pull request body",
+      expectedHeadSha: "b".repeat(40),
+    },
+      binding: artifactBindingFor(candidate, "EXTERNAL"),
+    };
+  });
+  assert.equal(
+    shouldContinueCompletedTurn(state, [
+      { ...done, payload: { type: "turn.done", state: { status: "done", requiredActions: [{}] } } },
+    ]),
+    false,
+  );
+  assert.match(buildLiveContinuationMessage(state), /exactly one official GitHub create_pull_request/);
+  assert.match(buildLiveContinuationMessage(state), /Only the human approval path authorizes the write/);
 });
 
 test("live task accepts bounded incident text at the documented limits", () => {
