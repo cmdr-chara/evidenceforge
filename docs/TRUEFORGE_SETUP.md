@@ -69,6 +69,10 @@ Before any deterministic verifier runs, EvidenceForge gives the supervisor one e
 
 After the serialized edit and before any post-patch verifier, the supervisor must run the exact application-owned `evidenceforge.patch` manifest (`git diff --binary` in `/workspace/repository`). After all deterministic checks pass, it creates exactly one read-only `Independent Patch Reviewer`; EvidenceForge accepts only strict JSON bound to that patch digest with no critical blockers. GitHub calls may arrive through TrueForge's `call_tool` system envelope and are credited only when the inner MCP server, tool, and input are structurally valid.
 
+Set the Daytona provider's default command timeout to at least `300000` ms. TrueForge 0.1.4 does not expose a per-call timeout field on the model-facing `sandbox.exec` schema, so the provider default must cover the longest immutable verifier (`pnpm test`, 300 seconds). EvidenceForge still records and validates the verifier manifest's application-owned timeout.
+
+The live supervisor is restricted to EvidenceForge's GitHub operation allowlist: `get_commit`, `get_file_contents`, `issue_read`, `list_issues`, `list_pull_requests`, `search_issues`, `search_pull_requests`, and read-only `pull_request_read`; `create_pull_request` becomes admissible only after application approval. Any other operation, including `search_commits`, blocks the run.
+
 ## Approval behavior
 
 The inline agent spec configures GitHub tool approval for `@write` and `@destructive`. EvidenceForge also applies its own risk policy. The PR action must be prepared in exact form and approved before the TrueForge `user.tool_approval` resume event is submitted.
@@ -82,6 +86,7 @@ The inline agent spec configures GitHub tool approval for `@write` and `@destruc
 | model call fails | verify provider credentials in TrueForge |
 | GitHub MCP auth pause | complete MCP authorization, then resume with empty input as documented |
 | sandbox unavailable | configure Daytona in TrueForge settings |
+| a complete verifier stops at about 60 seconds | set the TrueForge Daytona provider command timeout to at least `300000` ms; do not shorten the verifier |
 | sandbox reports `/usr/bin/bash: no such file or directory` | inspect the requested `cwd`; Daytona can return this message when `/workspace/repository` was not materialized. Start a new live task with the current EvidenceForge bootstrap manifest instead of resuming a terminal turn |
 | bootstrap cannot install the pinned runtime | verify outbound access to `github.com`, `nodejs.org`, and the package registry from Daytona; do not substitute host execution |
 | skills absent | add git-backed skills and keep sandbox enabled |

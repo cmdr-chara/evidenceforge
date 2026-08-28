@@ -272,4 +272,4 @@ The idempotency key is `SHA-256(sessionId + ":" + patchDigest)`. The approval is
 
 The web console defaults to a labeled deterministic fixture to make control behavior reviewable. It uses real EvidenceForge state, evidence, policy, and CompletionGate code, but does not claim sponsor service activity.
 
-Live mode uses the TrueForge SDK adapter and fails closed when the TrueForge server, model, GitHub MCP, Daytona credentials, or skills are unavailable.
+Live mode uses the TrueForge SDK adapter and fails closed when the TrueForge server, model, GitHub MCP, Daytona credentials, or skills are unavailable. Its GitHub MCP boundary is an explicit operation allowlist; discovering a tool in the connector does not make that tool admissible to the control plane.
