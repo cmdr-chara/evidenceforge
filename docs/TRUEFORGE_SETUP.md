@@ -89,6 +89,8 @@ The inline agent spec configures GitHub tool approval for `@write` and `@destruc
 
 If a completed TrueForge turn stops after review without requesting the PR action, EvidenceForge may open one bounded continuation turn in the same session. That path is enabled only when the latest durable event is a `turn.done` with no required action, every non-external criterion and the current patch-bound reviewer are PASS, `external-pr` is still PENDING, and no terminal state, prepared action, or pending approval exists. The continuation performs only the authoritative head read and one approval-paused PR request.
 
+For the public profile, publishing is bound to `head: feat/foundation-control-plane` and `base: determination`. The supervisor must read the current head with `get_commit` before requesting `create_pull_request`; a skipped head read or a substituted base such as `main` blocks the task before any external write.
+
 ## Troubleshooting
 
 | Symptom | Action |

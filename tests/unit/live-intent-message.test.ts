@@ -57,6 +57,9 @@ test("live task objective and constraints are bound into the TrueForge message a
   assert.match(message, /git diff --binary \| sha256sum/);
   assert.match(message, /"command": "pnpm test:unit"/);
   assert.match(message, /incident context with exactly one GitHub get_commit call/);
+  assert.match(message, /sha "feat\/foundation-control-plane"/);
+  assert.match(message, /base "determination"/);
+  assert.match(message, /Do not use "main" as the base/);
   assert.match(message, /Do not call search_issues, search_pull_requests/);
   assert.match(message, /only admissible GitHub MCP operations are get_commit/);
   assert.match(message, /Do not call any other GitHub MCP operation, including search_commits/);
