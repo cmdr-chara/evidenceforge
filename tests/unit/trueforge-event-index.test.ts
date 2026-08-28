@@ -66,6 +66,70 @@ test("TrueForge tool response correlates with the originating model tool call", 
   assert.deepEqual(result.artifactRefs, ["artifact://stdout"]);
 });
 
+test("TrueForge call_tool envelope indexes the inner GitHub MCP identity", () => {
+  const index = new TrueForgeEventIndex();
+  index.ingest({
+    type: "model.message",
+    id: "message-call-tool",
+    threadId: "main",
+    toolCalls: [{
+      id: "call-github",
+      type: "function",
+      function: {
+        name: "call_tool",
+        arguments: JSON.stringify({
+          mcp_server: "github",
+          tool_name: "get_commit",
+          input: { owner: "cmdr-chara", repo: "evidenceforge", sha: "deadbeef" },
+        }),
+      },
+      toolInfo: { type: "truefoundry-system", name: "call_tool" },
+    }],
+  });
+
+  const call = index.getToolCall("call-github");
+  assert.equal(call?.serverName, "github");
+  assert.equal(call?.name, "get_commit");
+  assert.deepEqual(JSON.parse(call?.arguments ?? "{}"), {
+    owner: "cmdr-chara",
+    repo: "evidenceforge",
+    sha: "deadbeef",
+  });
+  const result = index.toolResultFrom({
+    type: "tool.response",
+    id: "response-call-tool",
+    toolCallId: "call-github",
+    content: JSON.stringify({ success: true, response: { sha: "deadbeef" } }),
+  });
+  assert.equal(result.tool, "github.get_commit");
+});
+
+test("malformed call_tool envelope cannot acquire an authoritative connector identity", () => {
+  const index = new TrueForgeEventIndex();
+  index.ingest({
+    type: "model.message",
+    id: "message-malformed-call-tool",
+    threadId: "main",
+    toolCalls: [{
+      id: "call-malformed",
+      type: "function",
+      function: {
+        name: "call_tool",
+        arguments: JSON.stringify({
+          mcp_server: "github",
+          tool_name: "get_commit",
+          input: "not-an-object",
+        }),
+      },
+      toolInfo: { type: "truefoundry-system", name: "call_tool" },
+    }],
+  });
+
+  const call = index.getToolCall("call-malformed");
+  assert.equal(call?.name, "call_tool");
+  assert.equal(call?.serverName, undefined);
+});
+
 test("streamed model-message deltas are merged before a tool response is correlated", () => {
   const index = new TrueForgeEventIndex();
   index.ingest({

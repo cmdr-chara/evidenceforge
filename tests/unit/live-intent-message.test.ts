@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildLiveIncidentMessage,
+  buildSandboxPatchCaptureManifest,
   buildSandboxBootstrapManifest,
 } from "../../apps/server/src/live-service";
 import {
@@ -42,7 +43,19 @@ test("live task objective and constraints are bound into the TrueForge message a
   assert.match(message, /evidenceforge\.bootstrap:repository/);
   assert.match(message, /node-v22\.14\.0-linux-x64\.tar\.gz/);
   assert.match(message, /pnpm@11\.16\.0/);
+  assert.match(message, /evidenceforge\.patch/);
+  assert.match(message, /git diff --binary/);
+  assert.match(message, /Independent Patch Reviewer/);
+  assert.match(message, /git diff --binary \| sha256sum/);
   assert.match(message, /CompletionGate owns that decision/);
+});
+
+test("patch capture manifest is exact and has no environment override", () => {
+  assert.deepEqual(buildSandboxPatchCaptureManifest(), {
+    intent: "evidenceforge.patch",
+    command: "git diff --binary",
+    cwd: "/workspace/repository",
+  });
 });
 
 test("sandbox bootstrap shell-quotes untrusted repository and revision values", () => {

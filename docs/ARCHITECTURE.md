@@ -185,7 +185,7 @@ Exactly three diagnostic specialists run during `INVESTIGATING`:
 
 Their contexts are isolated, but TrueForge documents that subagents share the same tools and sandbox. Therefore their capabilities explicitly forbid file writes, patching, installation, commits, and external writes. The main thread aggregates their structured results. Reproduction and patching then run serially.
 
-The reviewer runs later with fresh context and receives the task, final diff, concise evidence, verifier results, contract, and constraints—but not the patching transcript.
+After the three diagnostics finish and every deterministic verifier passes, one dynamic subagent named `Independent Patch Reviewer` runs with fresh, read-only context. Its strict JSON verdict must include the SHA-256 of the current `git diff --binary`, no critical blockers, and an allowed verdict. EvidenceForge rejects early, duplicate, prose-only, or stale-digest review output. The reviewer receives the task, final diff, concise evidence, verifier results, contract, and constraints—but not the patching transcript.
 
 ## 11. Tool architecture
 
@@ -198,6 +198,8 @@ get_incident_context({ repository, runId })
 ```
 
 Raw shell is confined to the sandbox and uses explicit argv, cwd, timeout, network policy, and output bounds. `sudo` is rejected. Structured text edits use exact single-match targets, reject overlap and stale base digests, serialize writes to the same file, and emit before/after and patch SHA-256 metadata. Shell access remains available because real repository work cannot be reduced to structured edits alone.
+
+TrueForge may expose an MCP request through its system `call_tool` envelope. EvidenceForge normalizes only a well-formed envelope with string `mcp_server`, string `tool_name`, and object `input`; malformed envelopes retain the non-authoritative outer identity. After a mutation, the supervisor must capture `git diff --binary` with the application-owned `evidenceforge.patch` manifest before any patch-bound verifier can run.
 
 ## 12. Context strategy
 

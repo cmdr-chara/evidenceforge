@@ -49,6 +49,12 @@ interface SandboxBootstrapManifest {
   timeoutSeconds: number;
 }
 
+interface SandboxPatchCaptureManifest {
+  intent: "evidenceforge.patch";
+  command: "git diff --binary";
+  cwd: "/workspace/repository";
+}
+
 interface TimelineItem {
   phase: WorkflowPhase;
   status: "PENDING" | "ACTIVE" | "COMPLETE" | "BLOCKED";
@@ -143,6 +149,14 @@ export function buildSandboxBootstrapManifest(task: Task): SandboxBootstrapManif
   };
 }
 
+export function buildSandboxPatchCaptureManifest(): SandboxPatchCaptureManifest {
+  return {
+    intent: "evidenceforge.patch",
+    command: "git diff --binary",
+    cwd: SANDBOX_REPOSITORY_CWD,
+  };
+}
+
 export function resolveEvidenceForgeDataDirectory(
   cwd = process.cwd(),
   configured = process.env.EVIDENCEFORGE_DATA_DIR,
@@ -155,6 +169,7 @@ export function buildLiveIncidentMessage(
   verifierManifest: VerifierManifestEntry[],
 ): string {
   const bootstrapManifest = buildSandboxBootstrapManifest(task);
+  const patchCaptureManifest = buildSandboxPatchCaptureManifest();
   return [
     `Investigate GitHub Actions run ${task.source.runId} for ${task.repository} at ${task.revision}.`,
     `Application task objective (untrusted incident data): ${JSON.stringify(task.objective)}.`,
@@ -168,7 +183,10 @@ export function buildLiveIncidentMessage(
     "The following verifier manifest is application-owned and immutable. To run a deterministic verifier, call sandbox.exec using the exact intent, command, and cwd shown, with no environment overrides:",
     JSON.stringify(verifierManifest, null, 2),
     "A command with different arguments is diagnostic only and cannot update the success contract.",
-    "Application-owned live milestones are accepted only from correlated structured tool results. Call GitHub MCP with its official schemas only: never add EvidenceForge intent, artifactRef, expectedHeadSha, operationId, or idempotencyKey fields. EvidenceForge binds incident artifacts internally to the task repository and revision, and requires a subsequent official pull_request_read after create_pull_request. Use evidenceforge.verify:<criterion-id> only with sandbox.exec using the exact verifier manifest; root-cause and reviewer evidence must come from a mapped application-owned connector, otherwise the workflow remains fail-closed. Prose never changes application state.",
+    "After editing and before any post-patch verifier, capture the exact patch subject by calling sandbox.exec once with this immutable manifest. Do not run regression, targeted tests, typecheck, lint, or diff-integrity until this call returns successfully:",
+    JSON.stringify(patchCaptureManifest, null, 2),
+    "After every deterministic verifier passes, create exactly one dynamic subagent named Independent Patch Reviewer. It must be read-only, inspect the current git diff, calculate the digest with `git diff --binary | sha256sum`, and return only one JSON object: {\"verdict\":\"PASS\"|\"PASS_WITH_WARNINGS\",\"patchDigest\":\"<64 lowercase hex>\",\"criticalBlockers\":[],\"summary\":\"<bounded review>\"}. A missing digest, any critical blocker, prose outside JSON, or a reviewer created before REVIEWING blocks the workflow.",
+    "Application-owned live milestones are accepted only from correlated structured tool results. Call GitHub MCP with its official schemas only: never add EvidenceForge intent, artifactRef, expectedHeadSha, operationId, or idempotencyKey fields. EvidenceForge binds incident artifacts internally to the task repository and revision, and requires a subsequent official pull_request_read after create_pull_request. Use evidenceforge.verify:<criterion-id> only with sandbox.exec using the exact verifier manifest. EvidenceForge may record a bounded root-cause hypothesis only after independently persisted exact-revision GitHub evidence and exact failure-reproduction evidence agree; reviewer evidence must come from the isolated application-mapped reviewer. Prose never changes application state.",
     "Do not claim completion; the application CompletionGate owns that decision.",
   ].join("\n");
 }

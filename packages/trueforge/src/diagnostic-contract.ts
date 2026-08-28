@@ -7,6 +7,8 @@ export const REQUIRED_DIAGNOSTIC_SPECIALISTS = [
   "Dependency / Configuration Investigator",
 ] as const;
 
+export const INDEPENDENT_REVIEWER_NAME = "Independent Patch Reviewer";
+
 export interface DiagnosticContractViolation {
   code:
     | "UNEXPECTED_SPECIALIST"
@@ -30,6 +32,7 @@ export class DiagnosticContractGuard {
   private readonly observedNames = new Set<string>();
   private readonly completedThreads = new Set<string>();
   private readonly toolResults = new Map<string, number>();
+  private reviewThreadId: string | undefined;
   private violation: DiagnosticContractViolation | undefined;
 
   public constructor(events: RuntimeEvent[] = []) {
@@ -77,6 +80,25 @@ export class DiagnosticContractGuard {
       const threadId =
         event.threadId ?? readString(payload, "threadId") ?? readString(payload, "thread_id");
 
+      if (name === INDEPENDENT_REVIEWER_NAME) {
+        if (
+          parentThreadId !== "main" ||
+          agentType !== "dynamic" ||
+          threadId === undefined ||
+          parentToolCallId === undefined ||
+          this.reviewThreadId !== undefined ||
+          this.specialists.size !== REQUIRED_DIAGNOSTIC_SPECIALISTS.length ||
+          [...this.specialists.keys()].some((id) => !this.completedThreads.has(id))
+        ) {
+          return this.fail(
+            "UNEXPECTED_SPECIALIST",
+            "TrueForge created the independent reviewer before diagnostics completed or with invalid identity",
+          );
+        }
+        this.reviewThreadId = threadId;
+        return undefined;
+      }
+
       if (parentThreadId !== "main") {
         return this.fail(
           "INVALID_PARENT",
@@ -121,6 +143,17 @@ export class DiagnosticContractGuard {
         );
       }
       if (event.threadId === "main") return undefined;
+      if (event.threadId === this.reviewThreadId) {
+        const count = (this.toolResults.get(event.threadId) ?? 0) + 1;
+        this.toolResults.set(event.threadId, count);
+        if (count > TRUEFORGE_SPECIALIST_TOOL_BUDGET) {
+          return this.fail(
+            "TOOL_BUDGET_EXCEEDED",
+            `TrueForge independent reviewer exceeded the ${TRUEFORGE_SPECIALIST_TOOL_BUDGET}-tool budget`,
+          );
+        }
+        return undefined;
+      }
       if (!this.specialists.has(event.threadId)) {
         return this.fail(
           "UNKNOWN_SPECIALIST_THREAD",
@@ -150,6 +183,16 @@ export class DiagnosticContractGuard {
           "MALFORMED_EVENT",
           "TrueForge completed a diagnostic thread without a thread ID",
         );
+      }
+      if (event.threadId === this.reviewThreadId) {
+        const status = readString(asRecord(asRecord(event.payload).state), "status");
+        if (status !== "done") {
+          return this.fail(
+            "FAILED_SPECIALIST",
+            "TrueForge independent reviewer did not complete successfully",
+          );
+        }
+        return undefined;
       }
       if (!this.specialists.has(event.threadId)) {
         return this.fail(
@@ -198,6 +241,7 @@ export class DiagnosticContractGuard {
     this.observedNames.clear();
     this.completedThreads.clear();
     this.toolResults.clear();
+    this.reviewThreadId = undefined;
     this.violation = undefined;
   }
 

@@ -4,12 +4,54 @@ import { RuntimeEvent } from "../../packages/domain/src";
 import {
   DiagnosticContractGuard,
   evaluateDiagnosticContract,
+  INDEPENDENT_REVIEWER_NAME,
   REQUIRED_DIAGNOSTIC_SPECIALISTS,
   TRUEFORGE_SPECIALIST_TOOL_BUDGET,
 } from "../../packages/trueforge/src";
 
 test("diagnostic contract accepts exactly three completed named specialists", () => {
   assert.equal(evaluateDiagnosticContract(validTurn()), undefined);
+});
+
+test("diagnostic contract allows one reviewer only after all diagnostics complete", () => {
+  const events = [
+    turnCreated(),
+    ...fanOut(),
+    ...REQUIRED_DIAGNOSTIC_SPECIALISTS.map((_name, index) =>
+      threadDone(`thread-${index + 1}`),
+    ),
+    threadCreated("review-thread", INDEPENDENT_REVIEWER_NAME),
+    toolResult("review-thread", 0),
+    threadDone("review-thread"),
+    turnDone(),
+  ];
+  assert.equal(evaluateDiagnosticContract(events), undefined);
+});
+
+test("diagnostic contract rejects an early or duplicate independent reviewer", () => {
+  assert.equal(
+    evaluateDiagnosticContract([
+      turnCreated(),
+      ...fanOut(),
+      threadCreated("early-review", INDEPENDENT_REVIEWER_NAME),
+    ])?.code,
+    "UNEXPECTED_SPECIALIST",
+  );
+  const completed = [
+    turnCreated(),
+    ...fanOut(),
+    ...REQUIRED_DIAGNOSTIC_SPECIALISTS.map((_name, index) =>
+      threadDone(`thread-${index + 1}`),
+    ),
+  ];
+  assert.equal(
+    evaluateDiagnosticContract([
+      ...completed,
+      threadCreated("review-one", INDEPENDENT_REVIEWER_NAME),
+      threadCreated("review-two", INDEPENDENT_REVIEWER_NAME),
+    ])?.code,
+    "UNEXPECTED_SPECIALIST",
+  );
 });
 
 test("diagnostic contract rejects a second fan-out", () => {

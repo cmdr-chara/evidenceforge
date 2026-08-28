@@ -67,6 +67,8 @@ Use the live form with `owner/repository`, GitHub Actions run ID, and exact fail
 
 Before any deterministic verifier runs, EvidenceForge gives the supervisor one exact, application-owned Daytona bootstrap manifest. It checks out the requested revision into `/workspace/repository`, installs the same pinned Node.js `22.14.0` and pnpm `11.16.0` toolchain used by CI (including a fixed Node archive checksum), and runs `pnpm install --frozen-lockfile`. A non-zero bootstrap exit is infrastructure evidence only and blocks verification; it can never satisfy a success criterion.
 
+After the serialized edit and before any post-patch verifier, the supervisor must run the exact application-owned `evidenceforge.patch` manifest (`git diff --binary` in `/workspace/repository`). After all deterministic checks pass, it creates exactly one read-only `Independent Patch Reviewer`; EvidenceForge accepts only strict JSON bound to that patch digest with no critical blockers. GitHub calls may arrive through TrueForge's `call_tool` system envelope and are credited only when the inner MCP server, tool, and input are structurally valid.
+
 ## Approval behavior
 
 The inline agent spec configures GitHub tool approval for `@write` and `@destructive`. EvidenceForge also applies its own risk policy. The PR action must be prepared in exact form and approved before the TrueForge `user.tool_approval` resume event is submitted.

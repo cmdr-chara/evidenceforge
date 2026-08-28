@@ -130,6 +130,141 @@ test("live workflow accepts an official GitHub read and rejects synthetic incide
   assert.equal(harness.state.completionCertificate, undefined);
 });
 
+test("live workflow correlates TrueForge call_tool GitHub context with exact reproduction", () => {
+  const harness = createHarness();
+  const feed = (event: RuntimeEvent): void => {
+    harness.sequence += 1;
+    event.sequenceNumber = harness.sequence;
+    assert.equal(harness.store.recordEvent(event), true);
+    harness.projector.project(harness.state, event);
+    harness.reducer.apply(harness.state, event);
+  };
+
+  feed(turnCreated());
+  for (const [index, name] of [
+    "Repository Investigator",
+    "Failure / Log Investigator",
+    "Dependency / Configuration Investigator",
+  ].entries()) {
+    feed(threadCreated(index + 1, name));
+    feed({
+      ...event("THREAD_DONE", `thread-done-${index + 1}`, {
+        type: "thread.done",
+        threadId: `thread-${index + 1}`,
+        state: { status: "done" },
+      }),
+      threadId: `thread-${index + 1}`,
+    });
+  }
+
+  feed(metaToolCall("call-context-meta", "github", "get_commit", {
+    owner: "cmdr-chara",
+    repo: "evidenceforge",
+    sha: harness.state.task.revision,
+  }));
+  feed(toolResponse("call-context-meta", {
+    success: true,
+    response: {
+      sha: harness.state.task.revision,
+      repository: harness.state.task.repository,
+      commit: { message: "workflow failure" },
+    },
+  }));
+
+  feed(structuredCall("call-reproduce", "sandbox", "exec", {
+    intent: "evidenceforge.verify:failure-reproduced",
+    command: "node --test demo/incident-fixture/test/config.test.mjs",
+    cwd: "/workspace/repository",
+    timeoutSeconds: 180,
+  }, "main", "truefoundry-system"));
+  feed(toolResponse("call-reproduce", {
+    success: true,
+    response: { exitCode: 1, result: "CONFIG_VALIDATION_ORDER" },
+  }));
+
+  assert.equal(
+    harness.state.successCriteria.find((criterion) => criterion.id === "incident-context")?.status,
+    "PASS",
+  );
+  assert.equal(
+    harness.state.successCriteria.find((criterion) => criterion.id === "failure-reproduced")?.status,
+    "PASS",
+  );
+  assert.equal(
+    harness.state.successCriteria.find((criterion) => criterion.id === "root-cause-supported")?.status,
+    "PASS",
+  );
+  assert.equal(harness.state.hypotheses[0]?.status, "SUPPORTED");
+  assert.equal(harness.state.hypotheses[0]?.supportingEvidence.length, 2);
+  assert.equal(harness.state.phase, "PATCHING");
+});
+
+test("live workflow accepts only a digest-bound isolated reviewer result", () => {
+  const harness = createHarness();
+  const feed = (event: RuntimeEvent): void => {
+    harness.sequence += 1;
+    event.sequenceNumber = harness.sequence;
+    assert.equal(harness.store.recordEvent(event), true);
+    harness.projector.project(harness.state, event);
+    harness.reducer.apply(harness.state, event);
+  };
+  feed(turnCreated());
+  for (const [index, name] of [
+    "Repository Investigator",
+    "Failure / Log Investigator",
+    "Dependency / Configuration Investigator",
+  ].entries()) {
+    feed(threadCreated(index + 1, name));
+    feed({
+      ...event("THREAD_DONE", `review-prep-done-${index + 1}`, {
+        type: "thread.done",
+        threadId: `thread-${index + 1}`,
+        state: { status: "done" },
+      }),
+      threadId: `thread-${index + 1}`,
+    });
+  }
+  harness.state.phase = "REVIEWING";
+  harness.state.patchDigest = "a".repeat(64);
+  feed({
+    ...event("THREAD_CREATED", "review-created", {
+      type: "thread.created",
+      threadId: "review-thread",
+      agentInfo: { type: "dynamic", name: "Independent Patch Reviewer" },
+      parent: { threadId: "main", toolCallId: "review-fanout" },
+    }),
+    threadId: "review-thread",
+  });
+  // A process restart between reviewer creation and completion must preserve
+  // the application-owned reviewer identity.
+  harness.reducer = new LiveWorkflowReducer(harness.store);
+  feed({
+    ...event("THREAD_DONE", "review-done", {
+      type: "thread.done",
+      threadId: "review-thread",
+      state: {
+        status: "done",
+        output: {
+          content: JSON.stringify({
+            verdict: "PASS",
+            patchDigest: "a".repeat(64),
+            criticalBlockers: [],
+            summary: "No critical blockers.",
+          }),
+        },
+      },
+    }),
+    threadId: "review-thread",
+  });
+
+  assert.equal(harness.state.reviewerVerdict, "PASS");
+  assert.equal(
+    harness.state.successCriteria.find((criterion) => criterion.id === "independent-review")?.status,
+    "PASS",
+  );
+  assert.equal(harness.state.status, "ACTIVE");
+});
+
 test("live external publishing stores only an official PR receipt and requires a later read", () => {
   const harness = createHarness();
   harness.state.phase = "PUBLISHING";
@@ -352,6 +487,27 @@ function structuredCall(
     }),
     threadId,
   };
+}
+
+function metaToolCall(
+  callId: string,
+  serverName: string,
+  name: string,
+  args: Record<string, unknown>,
+): RuntimeEvent {
+  return event("MODEL_MESSAGE", `message-${callId}`, {
+    type: "model.message",
+    threadId: "main",
+    toolCalls: [{
+      id: callId,
+      type: "function",
+      function: {
+        name: "call_tool",
+        arguments: JSON.stringify({ mcp_server: serverName, tool_name: name, input: args }),
+      },
+      toolInfo: { type: "truefoundry-system", name: "call_tool" },
+    }],
+  });
 }
 
 function toolResponse(callId: string, content: unknown, threadId = "main"): RuntimeEvent {

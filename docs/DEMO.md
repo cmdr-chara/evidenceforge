@@ -97,6 +97,8 @@ Show the `REPRODUCTION` evidence ID and exact revision.
 
 Show the minimal diff: apply test fallback before production validation.
 
+Show the application-owned `evidenceforge.patch` capture before the first post-patch verifier. The resulting SHA-256 is the subject binding for every later verifier and review.
+
 Then show actual runtime events for:
 
 - regression verifier PASS;
@@ -114,6 +116,7 @@ Show the isolated reviewer inputs and verdict:
 ```text
 critical issues: 0
 verdict: PASS
+patch digest: <current git diff --binary SHA-256>
 ```
 
 State that reviewer PASS cannot override a deterministic FAIL.

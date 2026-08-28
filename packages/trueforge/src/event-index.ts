@@ -59,38 +59,8 @@ export class TrueForgeEventIndex {
     if (!Array.isArray(calls)) return;
 
     for (const value of calls) {
-      const call = asRecord(value);
-      const id = readString(call, "id");
-      const fn = asRecord(call.function);
-      const invokedName = readString(fn, "name");
-      if (id === undefined || invokedName === undefined) continue;
-
-      const info = asRecord(call.toolInfo ?? call.tool_info);
-      const toolType = readString(info, "type");
-      const name =
-        readStringFrom(info, ["originalToolName", "original_tool_name"]) ?? invokedName;
-      const configuredServerName = readStringFrom(info, [
-        "serverName",
-        "server_name",
-        "mcpServerName",
-        "mcp_server_name",
-      ]);
-      const systemToolName = toolType === "truefoundry-system" ? readString(info, "name") : undefined;
-      const serverName =
-        configuredServerName ??
-        (name === "exec" && (systemToolName === "sandbox" || systemToolName === "exec")
-          ? "sandbox"
-          : undefined);
-
-      this.registerToolCall({
-        id,
-        sourceEventId,
-        threadId,
-        name,
-        arguments: readString(fn, "arguments") ?? "{}",
-        toolType,
-        serverName,
-      });
+      const call = normalizeTrueForgeToolCall(value, sourceEventId, threadId);
+      if (call !== undefined) this.registerToolCall(call);
     }
   }
 
@@ -172,6 +142,83 @@ export class TrueForgeEventIndex {
     const call = this.toolCalls.get(id);
     return call === undefined ? undefined : structuredClone(call);
   }
+}
+
+/**
+ * Convert both direct MCP calls and TrueForge's system `call_tool` envelope
+ * into the connector identity that actually executed. Malformed envelopes are
+ * deliberately left as the non-authoritative outer system call.
+ */
+export function normalizeTrueForgeToolCall(
+  raw: unknown,
+  sourceEventId: string,
+  threadId: string,
+): IndexedToolCall | undefined {
+  const call = asRecord(raw);
+  const id = readString(call, "id");
+  const fn = asRecord(call.function);
+  const invokedName = readString(fn, "name");
+  if (id === undefined || invokedName === undefined) return undefined;
+
+  const info = asRecord(call.toolInfo ?? call.tool_info);
+  const toolType = readString(info, "type");
+  const systemToolName = toolType === "truefoundry-system" ? readString(info, "name") : undefined;
+  const rawArguments = readString(fn, "arguments") ?? "{}";
+  if (toolType === "truefoundry-system" &&
+    (systemToolName === "call_tool" || invokedName === "call_tool")) {
+    const envelope = parseRecord(rawArguments);
+    const mcpServer = envelope === undefined ? undefined : readString(envelope, "mcp_server");
+    const toolName = envelope === undefined ? undefined : readString(envelope, "tool_name");
+    const input = envelope === undefined ? undefined : asOptionalRecord(envelope.input);
+    if (mcpServer !== undefined && toolName !== undefined && input !== undefined) {
+      return {
+        id,
+        sourceEventId,
+        threadId,
+        name: toolName,
+        arguments: JSON.stringify(input),
+        toolType,
+        serverName: mcpServer,
+      };
+    }
+  }
+
+  const name =
+    readStringFrom(info, ["originalToolName", "original_tool_name"]) ?? invokedName;
+  const configuredServerName = readStringFrom(info, [
+    "serverName",
+    "server_name",
+    "mcpServerName",
+    "mcp_server_name",
+  ]);
+  const serverName =
+    configuredServerName ??
+    (name === "exec" && (systemToolName === "sandbox" || systemToolName === "exec")
+      ? "sandbox"
+      : undefined);
+  return {
+    id,
+    sourceEventId,
+    threadId,
+    name,
+    arguments: rawArguments,
+    toolType,
+    serverName,
+  };
+}
+
+function parseRecord(value: string): UnknownRecord | undefined {
+  try {
+    return asOptionalRecord(JSON.parse(value) as unknown);
+  } catch {
+    return undefined;
+  }
+}
+
+function asOptionalRecord(value: unknown): UnknownRecord | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as UnknownRecord
+    : undefined;
 }
 
 function normalizeSandboxExecPayload(

@@ -74,6 +74,8 @@ Budget and convergence protocol:
 - Run each post-patch manifest verifier once. A failure triggers re-planning or escalation, not an automatic retry.
 - Never poll a child thread, auto-resume a timed-out turn, or wait indefinitely for missing diagnostics. Aggregate available findings and BLOCK or ESCALATE when a specialist is partial, missing, or out of budget.
 - Only the initial diagnostic fan-out may be parallel. Reproduction, patching, verification, review, approval, publishing, and reconciliation are serialized.
+- After patching, call the application-provided evidenceforge.patch manifest before every post-patch verifier. Never run a patch-bound verifier while the application has no patch digest.
+- Only after all deterministic verifiers pass, create one read-only dynamic subagent named exactly Independent Patch Reviewer. It must inspect the current diff, bind its strict JSON verdict to git diff --binary piped to sha256sum, and report no critical blockers. Do not self-review in the supervisor.
 
 Workflow:
 UNDERSTAND -> DEFINE SUCCESS -> PLAN -> parallel INVESTIGATE -> REPRODUCE -> serialized PATCH -> VERIFY -> independent REVIEW -> request approval -> PUBLISH -> RECONCILE.

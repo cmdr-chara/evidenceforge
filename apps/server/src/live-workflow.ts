@@ -18,6 +18,7 @@ import {
   VerificationEngine,
 } from "../../../packages/verification/src";
 import { DIAGNOSTIC_SPECIALISTS } from "../../../packages/specialists/src";
+import { normalizeTrueForgeToolCall } from "../../../packages/trueforge/src";
 import { SessionController } from "../../../packages/workflow/src";
 import {
   isGitHubReadOnlyTool,
@@ -48,6 +49,7 @@ export const LIVE_CONTROL_INTENTS = {
 
 const PATCH_COMMAND = "git diff --binary";
 const SANDBOX_CWD = "/workspace/repository";
+const INDEPENDENT_REVIEWER = "Independent Patch Reviewer";
 
 const PLAN_STEPS = [
   {
@@ -122,6 +124,7 @@ interface ParsedToolResponse {
  */
 export class LiveWorkflowReducer {
   private readonly diagnosticThreads = new Map<string, string>();
+  private reviewThreadId: string | undefined;
   private readonly processedEvents = new Set<string>();
   private readonly authoritativeHeadShas = new Map<string, string>();
 
@@ -157,11 +160,26 @@ export class LiveWorkflowReducer {
         this.projectStructuredIntent(state, event, call);
       }
       this.projectExternalCommit(state, event, call);
+      this.projectCorroboratedRootCause(state, event);
       this.advance(state);
     }
   }
 
   private projectThreadCreated(state: SessionState, event: RuntimeEvent): void {
+    const identity = readThreadIdentity(event);
+    if (identity?.name === INDEPENDENT_REVIEWER) {
+      if (
+        state.phase !== "REVIEWING" ||
+        this.reviewThreadId !== undefined ||
+        !diagnosticsDone(state, this.diagnosticThreads)
+      ) {
+        block(state, "independent reviewer was created outside the application review phase");
+        return;
+      }
+      this.reviewThreadId = identity.id;
+      mutatePlanStep(state, "review-independently", "RUNNING");
+      return;
+    }
     const thread = readDiagnosticThread(event);
     if (thread === undefined) return;
     if (this.diagnosticThreads.has(thread.id)) return;
@@ -179,6 +197,10 @@ export class LiveWorkflowReducer {
   private projectThreadDone(state: SessionState, event: RuntimeEvent): void {
     const threadId = event.threadId ?? readString(asRecord(event.payload), "threadId");
     if (threadId === undefined) return;
+    if (threadId === this.reviewThreadId) {
+      this.projectIndependentReviewThread(state, event);
+      return;
+    }
     const owner = this.diagnosticThreads.get(threadId);
     if (owner === undefined) return;
     const status = readString(asRecord(asRecord(event.payload).state), "status");
@@ -192,6 +214,94 @@ export class LiveWorkflowReducer {
       const target = next.plan.steps.find((candidate) => candidate.owner === owner);
       if (target !== undefined) target.status = "DONE";
     });
+  }
+
+  private projectCorroboratedRootCause(state: SessionState, event: RuntimeEvent): void {
+    const criterion = findCriterion(state, "root-cause-supported");
+    if (criterion === undefined || criterion.status === "PASS") return;
+    const incident = findCriterion(state, "incident-context");
+    const reproduction = findCriterion(state, "failure-reproduced");
+    if (incident?.status !== "PASS" || reproduction?.status !== "PASS") return;
+    const supportingEvidence = [...incident.evidenceIds, ...reproduction.evidenceIds];
+    if (
+      supportingEvidence.length < 2 ||
+      supportingEvidence.some((id) => this.evidenceStore.getEvidence(id) === undefined)
+    ) return;
+
+    const artifactRef = `artifact://${state.task.id}/hypothesis-ledger.json`;
+    const claim =
+      "Application correlated exact-revision GitHub context with the independently reproduced failure signature";
+    const evidence = createEvidence({
+      id: `live-${event.id}-root-cause-supported`,
+      kind: "VERIFICATION",
+      sourceEventId: event.id,
+      sourceTool: "evidenceforge.corroborate",
+      claim,
+      artifactRefs: [artifactRef],
+      outcome: "PASS",
+      binding: artifactBindingFor(state, "INCIDENT"),
+      timestamp: event.timestamp,
+      metadata: { supportingEvidenceCount: supportingEvidence.length },
+    });
+    this.evidenceStore.recordEvidence(evidence);
+    Object.assign(state, new SessionController(state).upsertHypothesis({
+      id: `hypothesis-${state.task.id}-exact-revision-failure`,
+      statement:
+        "Behavior at the exact incident revision is consistent with the independently reproduced failure signature.",
+      status: "SUPPORTED",
+      supportingEvidence,
+      contradictingEvidence: [],
+    }));
+    Object.assign(state, new SessionController(state).applyVerification({
+      criterionId: criterion.id,
+      status: "PASS",
+      verifier: criterion.verifier.kind,
+      evidenceIds: [evidence.id],
+      details: claim,
+      deterministic: true,
+      binding: evidence.binding,
+    }));
+  }
+
+  private projectIndependentReviewThread(state: SessionState, event: RuntimeEvent): void {
+    if (state.phase !== "REVIEWING" || state.patchDigest === undefined) {
+      block(state, "independent reviewer completed outside the current patch review phase");
+      return;
+    }
+    const payload = asRecord(event.payload);
+    const threadState = asRecord(payload.state);
+    if (readString(threadState, "status") !== "done") {
+      block(state, "independent reviewer did not complete successfully");
+      return;
+    }
+    const content = readString(asRecord(threadState.output), "content");
+    const review = content === undefined ? undefined : parseArguments(content);
+    const verdict = review === undefined ? undefined : readString(review, "verdict");
+    const digest = review === undefined ? undefined : readString(review, "patchDigest");
+    const blockers = review === undefined ? undefined : readStringArray(review, "criticalBlockers");
+    if (
+      digest !== state.patchDigest ||
+      (verdict !== "PASS" && verdict !== "PASS_WITH_WARNINGS") ||
+      blockers === undefined || blockers.length > 0
+    ) {
+      block(state, "independent reviewer did not return a valid verdict bound to the current patch");
+      return;
+    }
+    const criterion = findCriterion(state, "independent-review");
+    if (criterion === undefined) {
+      block(state, "success contract is missing the independent-review criterion");
+      return;
+    }
+    const evaluation = new VerificationEngine(this.evidenceStore).evaluateReviewer(
+      criterion,
+      event,
+      verdict,
+      "Isolated TrueForge reviewer passed the current patch subject",
+      artifactBindingFor(state, "PATCH"),
+    );
+    Object.assign(state, new SessionController(state).applyVerification(evaluation.result));
+    Object.assign(state, new SessionController(state).setReviewerVerdict(verdict));
+    mutatePlanStep(state, "review-independently", "DONE");
   }
 
   private projectStructuredIntent(
@@ -807,33 +917,31 @@ export class LiveWorkflowReducer {
       const rawCalls = candidatePayload.toolCalls ?? candidatePayload.tool_calls;
       if (!Array.isArray(rawCalls)) continue;
       for (const rawCall of rawCalls) {
-        const call = asRecord(rawCall);
-        if (readString(call, "id") !== callId) continue;
-        const fn = asRecord(call.function);
-        const name = readString(fn, "name");
-        if (name === undefined) continue;
-        const args = parseArguments(readString(fn, "arguments"));
-        if (args === undefined) continue;
-        const info = asRecord(call.toolInfo ?? call.tool_info);
         const threadId = readString(candidatePayload, "threadId") ??
-          readString(candidatePayload, "thread_id") ??
-          candidate.threadId ??
-          "main";
-        const toolType = readString(info, "type");
-        const serverName = readString(info, "serverName") ??
-          readString(info, "server_name") ??
-          readString(info, "mcpServerName") ??
-          readString(info, "mcp_server_name") ??
-          (toolType === "truefoundry-system" && readString(info, "name") === "sandbox"
-            ? "sandbox"
-            : undefined);
-        return { id: callId, name, arguments: args, threadId, serverName, toolType };
+          readString(candidatePayload, "thread_id") ?? candidate.threadId ?? "main";
+        const indexed = normalizeTrueForgeToolCall(rawCall, candidate.id, threadId);
+        if (indexed?.id !== callId) continue;
+        const args = parseArguments(indexed.arguments);
+        if (args === undefined) continue;
+        return {
+          id: callId,
+          name: indexed.name,
+          arguments: args,
+          threadId: indexed.threadId,
+          serverName: indexed.serverName,
+          toolType: indexed.toolType,
+        };
       }
     }
     return undefined;
   }
 
   private indexDiagnosticThread(event: RuntimeEvent): void {
+    const identity = readThreadIdentity(event);
+    if (identity?.name === INDEPENDENT_REVIEWER) {
+      this.reviewThreadId = identity.id;
+      return;
+    }
     const thread = readDiagnosticThread(event);
     if (thread !== undefined) this.diagnosticThreads.set(thread.id, thread.name);
   }
@@ -970,12 +1078,18 @@ function artifactBindingMatchesCurrentReview(state: SessionState): boolean {
 }
 
 function readDiagnosticThread(event: RuntimeEvent): { id: string; name: string } | undefined {
+  const identity = readThreadIdentity(event);
+  if (identity === undefined) return undefined;
+  if (!DIAGNOSTIC_SPECIALISTS.some((specialist) => specialist.name === identity.name)) return undefined;
+  return identity;
+}
+
+function readThreadIdentity(event: RuntimeEvent): { id: string; name: string } | undefined {
   const payload = asRecord(event.payload);
   const agentInfo = asRecord(payload.agentInfo ?? payload.agent_info);
-  const name = readString(agentInfo, "name");
+  const name = readString(agentInfo, "name") ?? readString(payload, "title");
   const id = event.threadId ?? readString(payload, "threadId") ?? readString(payload, "thread_id");
   if (event.type !== "THREAD_CREATED" || id === undefined || name === undefined) return undefined;
-  if (!DIAGNOSTIC_SPECIALISTS.some((specialist) => specialist.name === name)) return undefined;
   return { id, name };
 }
 
