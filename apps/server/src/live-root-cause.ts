@@ -393,6 +393,13 @@ function diagnosticToolResultIsUsable(response: Record<string, unknown>): boolea
 
 function recordReportsToolFailure(record: Record<string, unknown>): boolean {
   if (record.success === false) return true;
+  const exitCode =
+    typeof record.exitCode === "number"
+      ? record.exitCode
+      : typeof record.exit_code === "number"
+        ? record.exit_code
+        : undefined;
+  if (exitCode !== undefined && exitCode !== 0) return true;
   return (
     typeof record.status === "string" &&
     ["ERROR", "FAILED", "FAILURE", "DENIED", "TIMEOUT"].includes(
