@@ -31,8 +31,29 @@ const TERMINAL_PHASE_STATUS = {
   FAILED: "FAILED",
 } as const;
 
+export const TASK_OBJECTIVE_MAX_LENGTH = 4_096;
+export const TASK_REPOSITORY_MAX_LENGTH = 256;
+export const TASK_REVISION_MAX_LENGTH = 128;
+export const TASK_RUN_ID_MAX_LENGTH = 128;
+export const TASK_CONSTRAINT_MAX_COUNT = 16;
+export const TASK_CONSTRAINT_MAX_LENGTH = 1_024;
+export const TASK_PROMPT_TEXT_MAX_LENGTH = 8_192;
+
 export function assertNonEmpty(value: string, field: string, issues: string[]): void {
-  if (value.trim().length === 0) issues.push(`${field} must be non-empty`);
+  if (typeof value !== "string" || value.trim().length === 0) {
+    issues.push(`${field} must be non-empty`);
+  }
+}
+
+function assertMaxLength(
+  value: unknown,
+  maximum: number,
+  field: string,
+  issues: string[],
+): void {
+  if (typeof value === "string" && value.length > maximum) {
+    issues.push(`${field} must be at most ${maximum} characters`);
+  }
 }
 
 export function assertIsoTimestamp(value: string, field: string, issues: string[]): void {
@@ -47,9 +68,46 @@ export function validateTask(task: Task): Task {
   assertNonEmpty(task.objective, "task.objective", issues);
   assertNonEmpty(task.repository, "task.repository", issues);
   assertNonEmpty(task.revision, "task.revision", issues);
+  assertMaxLength(task.objective, TASK_OBJECTIVE_MAX_LENGTH, "task.objective", issues);
+  assertMaxLength(task.repository, TASK_REPOSITORY_MAX_LENGTH, "task.repository", issues);
+  assertMaxLength(task.revision, TASK_REVISION_MAX_LENGTH, "task.revision", issues);
   assertIsoTimestamp(task.createdAt, "task.createdAt", issues);
   if (task.source.kind !== "GITHUB_ACTIONS") issues.push("task.source.kind is unsupported");
   assertNonEmpty(task.source.runId, "task.source.runId", issues);
+  assertMaxLength(task.source.runId, TASK_RUN_ID_MAX_LENGTH, "task.source.runId", issues);
+  if (!Array.isArray(task.constraints)) {
+    issues.push("task.constraints must be an array");
+  } else {
+    if (task.constraints.length > TASK_CONSTRAINT_MAX_COUNT) {
+      issues.push(`task.constraints must contain at most ${TASK_CONSTRAINT_MAX_COUNT} items`);
+    }
+    for (const [index, constraint] of task.constraints.entries()) {
+      assertNonEmpty(constraint, `task.constraints[${index}]`, issues);
+      assertMaxLength(
+        constraint,
+        TASK_CONSTRAINT_MAX_LENGTH,
+        `task.constraints[${index}]`,
+        issues,
+      );
+    }
+  }
+  const promptTextLength =
+    (typeof task.objective === "string" ? task.objective.length : 0) +
+    (typeof task.repository === "string" ? task.repository.length : 0) +
+    (typeof task.revision === "string" ? task.revision.length : 0) +
+    (typeof task.source.runId === "string" ? task.source.runId.length : 0) +
+    (Array.isArray(task.constraints)
+      ? task.constraints.reduce(
+          (total, constraint) =>
+            total + (typeof constraint === "string" ? constraint.length : 0),
+          0,
+        )
+      : 0);
+  if (promptTextLength > TASK_PROMPT_TEXT_MAX_LENGTH) {
+    issues.push(
+      `task prompt text must be at most ${TASK_PROMPT_TEXT_MAX_LENGTH} characters in aggregate`,
+    );
+  }
   if (issues.length > 0) throw new DomainValidationError(issues);
   return task;
 }

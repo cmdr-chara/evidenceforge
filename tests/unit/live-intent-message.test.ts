@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildLiveIncidentMessage } from "../../apps/server/src/live-service";
-import { createTask } from "../../packages/domain/src";
+import {
+  createTask,
+  DomainValidationError,
+  TASK_CONSTRAINT_MAX_COUNT,
+  TASK_CONSTRAINT_MAX_LENGTH,
+  TASK_OBJECTIVE_MAX_LENGTH,
+  TASK_PROMPT_TEXT_MAX_LENGTH,
+} from "../../packages/domain/src";
 import { buildVerifierManifest } from "../../packages/trueforge/src";
 import { buildCiSuccessContract } from "../../packages/workflow/src";
 
@@ -48,4 +55,86 @@ test("live task message represents an empty constraint set deterministically", (
 
   assert.match(message, /Application task constraints \(untrusted incident data\): \[\]\./);
   assert.doesNotMatch(message, /undefined/);
+});
+
+test("live task accepts bounded incident text at the documented limits", () => {
+  const task = createTask({
+    objective: "o".repeat(TASK_OBJECTIVE_MAX_LENGTH),
+    repository: "r",
+    revision: "a".repeat(40),
+    runId: "1",
+    constraints: [
+      "c".repeat(TASK_CONSTRAINT_MAX_LENGTH),
+      "c".repeat(TASK_CONSTRAINT_MAX_LENGTH),
+      "c".repeat(TASK_CONSTRAINT_MAX_LENGTH),
+      "c".repeat(
+        TASK_PROMPT_TEXT_MAX_LENGTH -
+          TASK_OBJECTIVE_MAX_LENGTH -
+          1 -
+          40 -
+          1 -
+          TASK_CONSTRAINT_MAX_LENGTH * 3,
+      ),
+    ],
+  });
+
+  assert.equal(task.objective.length, TASK_OBJECTIVE_MAX_LENGTH);
+});
+
+test("live task rejects oversized objective, constraints, and aggregate prompt text", () => {
+  const common = {
+    repository: "cmdr-chara/evidenceforge",
+    revision: "a".repeat(40),
+    runId: "33153999792",
+  };
+
+  assert.throws(
+    () => createTask({ ...common, objective: "o".repeat(TASK_OBJECTIVE_MAX_LENGTH + 1) }),
+    (error: unknown) =>
+      error instanceof DomainValidationError &&
+      error.issues.includes(
+        `task.objective must be at most ${TASK_OBJECTIVE_MAX_LENGTH} characters`,
+      ),
+  );
+  assert.throws(
+    () =>
+      createTask({
+        ...common,
+        objective: "bounded",
+        constraints: Array.from({ length: TASK_CONSTRAINT_MAX_COUNT + 1 }, () => "c"),
+      }),
+    (error: unknown) =>
+      error instanceof DomainValidationError &&
+      error.issues.includes(
+        `task.constraints must contain at most ${TASK_CONSTRAINT_MAX_COUNT} items`,
+      ),
+  );
+  assert.throws(
+    () =>
+      createTask({
+        ...common,
+        objective: "bounded",
+        constraints: ["c".repeat(TASK_CONSTRAINT_MAX_LENGTH + 1)],
+      }),
+    (error: unknown) =>
+      error instanceof DomainValidationError &&
+      error.issues.includes(
+        `task.constraints[0] must be at most ${TASK_CONSTRAINT_MAX_LENGTH} characters`,
+      ),
+  );
+  assert.throws(
+    () =>
+      createTask({
+        ...common,
+        objective: "o".repeat(TASK_OBJECTIVE_MAX_LENGTH),
+        constraints: Array.from({ length: 5 }, () =>
+          "c".repeat(TASK_CONSTRAINT_MAX_LENGTH),
+        ),
+      }),
+    (error: unknown) =>
+      error instanceof DomainValidationError &&
+      error.issues.includes(
+        `task prompt text must be at most ${TASK_PROMPT_TEXT_MAX_LENGTH} characters in aggregate`,
+      ),
+  );
 });
