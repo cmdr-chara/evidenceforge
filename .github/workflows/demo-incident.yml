@@ -1,0 +1,22 @@
+name: Demo Incident
+
+on:
+  push:
+    branches: ["demo/config-order-regression"]
+    paths: ["demo/incident-fixture/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  config-order-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+      - name: Reproduce configuration-order behavior
+        run: node --test demo/incident-fixture/test/*.test.mjs

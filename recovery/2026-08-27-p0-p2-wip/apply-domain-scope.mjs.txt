@@ -1,0 +1,91 @@
+import { readFileSync, writeFileSync } from "node:fs";
+
+const read = (path) => readFileSync(path, "utf8");
+const write = (path, content) => writeFileSync(path, content.endsWith("\n") ? content : `${content}\n`);
+function replace(path, from, to) {
+  const content = read(path);
+  if (!content.includes(from)) throw new Error(`missing replacement in ${path}: ${from.slice(0, 80)}`);
+  write(path, content.replace(from, to));
+}
+
+replace(
+  "packages/domain/src/types.ts",
+  `export type ReviewerVerdict = "PASS" | "PASS_WITH_WARNINGS" | "BLOCK";\n`,
+  `export type ReviewerVerdict = "PASS" | "PASS_WITH_WARNINGS" | "BLOCK";\n\nexport const EVIDENCE_SCOPES = ["INCIDENT", "PATCH", "EXTERNAL"] as const;\nexport type EvidenceScope = (typeof EVIDENCE_SCOPES)[number];\n\nexport interface ArtifactBinding {\n  taskId: string;\n  repository: string;\n  revision: string;\n  successContractDigest: string;\n  stateVersion: number;\n  scope: EvidenceScope;\n  patchDigest?: string;\n}\n`,
+);
+replace(
+  "packages/domain/src/types.ts",
+  `  verifier: VerifierSpec;\n  status: CriterionStatus;\n`,
+  `  verifier: VerifierSpec;\n  evidenceScope: EvidenceScope;\n  status: CriterionStatus;\n`,
+);
+replace(
+  "packages/domain/src/types.ts",
+  `  timestamp: string;\n  metadata?: Record<string, string | number | boolean | null>;\n}\n`,
+  `  timestamp: string;\n  binding?: ArtifactBinding;\n  metadata?: Record<string, string | number | boolean | null>;\n}\n`,
+);
+replace(
+  "packages/domain/src/types.ts",
+  `  details: string;\n  deterministic: boolean;\n}\n`,
+  `  details: string;\n  deterministic: boolean;\n  binding?: ArtifactBinding;\n}\n`,
+);
+replace(
+  "packages/domain/src/types.ts",
+  `  originatingOperationId: string;\n  issuedAt: string;\n`,
+  `  originatingOperationId: string;\n  binding: ArtifactBinding;\n  issuedAt: string;\n`,
+);
+replace(
+  "packages/domain/src/types.ts",
+  `export interface ExternalActionState {\n`,
+  `export interface PullRequestIdentity {\n  identifier: string;\n  repository: string;\n  base: string;\n  head: string;\n  headSha: string;\n  operationId: string;\n  idempotencyKey: string;\n}\n\nexport interface ExternalActionState {\n`,
+);
+replace(
+  "packages/domain/src/types.ts",
+  `  status: "PREPARED" | "APPROVED" | "DENIED" | "COMMITTED" | "RECONCILED";\n  identifier?: string;\n  evidenceId?: string;\n}\n`,
+  `  binding: ArtifactBinding;\n  status: "PREPARED" | "APPROVED" | "DENIED" | "COMMITTED" | "RECONCILED";\n  identifier?: string;\n  evidenceId?: string;\n  reconciledIdentity?: PullRequestIdentity;\n}\n`,
+);
+replace(
+  "packages/domain/src/types.ts",
+  `  reviewerVerdict?: ReviewerVerdict;\n  patchDigest?: string;\n`,
+  `  reviewerVerdict?: ReviewerVerdict;\n  reviewBinding?: ArtifactBinding;\n  patchDigest?: string;\n`,
+);
+replace(
+  "packages/domain/src/types.ts",
+  `  lastSequenceNumber?: number;\n  externalAction?: ExternalActionState;\n`,
+  `  lastSequenceNumber?: number;\n  terminalSequenceNumber?: number;\n  externalAction?: ExternalActionState;\n`,
+);
+replace(
+  "packages/domain/src/types.ts",
+  `export interface CompletionCertificateData {\n  taskId: string;\n`,
+  `export interface CompletionCertificateData {\n  certificateVersion: 1;\n  taskId: string;\n  repository: string;\n  revision: string;\n  stateVersion: number;\n  successContractDigest: string;\n  stateDigest: string;\n`,
+);
+replace(
+  "packages/domain/src/types.ts",
+  `  externalAction?: {\n    type: "pull_request";\n    identifier: string;\n    evidenceId: string;\n  };\n  subjectDigest: string;\n  traceId: string;\n`,
+  `  externalAction?: PullRequestIdentity & {\n    type: "pull_request";\n    evidenceId: string;\n  };\n  subjectDigest: string;\n  payloadDigest: string;\n  traceId: string;\n`,
+);
+
+replace(
+  "packages/domain/src/factories.ts",
+  `export function pendingCriterion(\n  id: string,\n  description: string,\n  verifier: SuccessCriterion["verifier"],\n  required = true,\n): SuccessCriterion {\n  return {\n    id,\n    description,\n    required,\n    verifier,\n    status: "PENDING",\n    evidenceIds: [],\n  };\n}\n`,
+  `export function pendingCriterion(\n  id: string,\n  description: string,\n  verifier: SuccessCriterion["verifier"],\n  required = true,\n  evidenceScope: SuccessCriterion["evidenceScope"] = inferEvidenceScope(verifier),\n): SuccessCriterion {\n  return { id, description, required, verifier, evidenceScope, status: "PENDING", evidenceIds: [] };\n}\n\nfunction inferEvidenceScope(verifier: SuccessCriterion["verifier"]): SuccessCriterion["evidenceScope"] {\n  if (verifier.kind === "FAILURE_SIGNATURE" || (verifier.kind === "COMMAND" && verifier.purpose === "REPRODUCTION")) return "INCIDENT";\n  return verifier.kind === "EXTERNAL_STATE" ? "EXTERNAL" : "PATCH";\n}\n`,
+);
+replace(
+  "packages/domain/src/validation.ts",
+  `  CriterionStatus,\n`,
+  `  CriterionStatus,\n  EVIDENCE_SCOPES,\n`,
+);
+replace(
+  "packages/domain/src/validation.ts",
+  `  if (!CRITERION_STATUSES.includes(criterion.status)) issues.push("criterion.status is invalid");\n`,
+  `  if (!CRITERION_STATUSES.includes(criterion.status)) issues.push("criterion.status is invalid");\n  if (!EVIDENCE_SCOPES.includes(criterion.evidenceScope)) issues.push("criterion.evidenceScope is invalid");\n`,
+);
+replace(
+  "packages/workflow/src/success-contract.ts",
+  `    pendingCriterion("incident-context", "Authoritative incident context retrieved", {\n      kind: "SCHEMA_FILE",\n      artifactRef: \`artifact://\${task.id}/incident-context.json\`,\n      schemaName: "IncidentContext",\n    }),`,
+  `    pendingCriterion(\n      "incident-context",\n      "Authoritative incident context retrieved",\n      {\n        kind: "SCHEMA_FILE",\n        artifactRef: \`artifact://\${task.id}/incident-context.json\`,\n        schemaName: "IncidentContext",\n      },\n      true,\n      "INCIDENT",\n    ),`,
+);
+replace(
+  "packages/workflow/src/success-contract.ts",
+  `    pendingCriterion("root-cause-supported", "Root-cause hypothesis supported by evidence", {\n      kind: "SCHEMA_FILE",\n      artifactRef: \`artifact://\${task.id}/hypothesis-ledger.json\`,\n      schemaName: "HypothesisLedger",\n    }),`,
+  `    pendingCriterion(\n      "root-cause-supported",\n      "Root-cause hypothesis supported by evidence",\n      {\n        kind: "SCHEMA_FILE",\n        artifactRef: \`artifact://\${task.id}/hypothesis-ledger.json\`,\n        schemaName: "HypothesisLedger",\n      },\n      true,\n      "INCIDENT",\n    ),`,
+);

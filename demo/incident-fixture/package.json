@@ -1,0 +1,10 @@
+{
+  "name": "@evidenceforge/demo-incident-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "seed": "node scripts/seed-incident.mjs",
+    "reset": "node scripts/reset-fixture.mjs"
+  }
+}
