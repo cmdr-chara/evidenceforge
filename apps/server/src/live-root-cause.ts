@@ -126,10 +126,6 @@ export function projectSupportedRootCause(
   }
 
   const candidate = [...state.hypotheses]
-    .filter(
-      (hypothesis) =>
-        hypothesis.status === "SUPPORTED" || hypothesis.status === "CONFIRMED",
-    )
     .sort((left, right) => left.id.localeCompare(right.id))
     .map((hypothesis) => ({
       hypothesis,
@@ -189,6 +185,7 @@ export function projectSupportedRootCause(
     state,
     new SessionController(state).upsertHypothesis({
       ...candidate.hypothesis,
+      status: "SUPPORTED",
       supportingEvidence,
     }),
   );
@@ -233,20 +230,20 @@ function buildDiagnosticProjection(
         ...claim.affectedLocations,
         ...claim.evidenceReferences,
       ])],
-      outcome: "PASS",
       binding: artifactBindingFor(state, "INCIDENT"),
       timestamp: event.timestamp,
       metadata: {
         schemaVersion: DIAGNOSTIC_OUTPUT_SCHEMA_VERSION,
         specialist: specialistName,
         hypothesisId: claim.id,
+        reportedStatus: claim.status,
         causeDigest,
       },
     }),
     hypothesis: {
       id: `diagnostic-${state.task.id}-${specialistId}-${claim.id}-${event.id}`,
       statement,
-      status: claim.status,
+      status: "OPEN",
       supportingEvidence: [evidenceId],
       contradictingEvidence: [],
     },
@@ -273,10 +270,12 @@ function isCurrentDiagnosticEvidence(
   return (
     state.evidenceIds.includes(evidence.id) &&
     evidence.kind === "OBSERVATION" &&
-    evidence.outcome === "PASS" &&
+    evidence.outcome === undefined &&
     sourceEvent?.type === "THREAD_DONE" &&
     evidence.sourceTool.startsWith("trueforge.dynamic-subagent.") &&
     evidence.metadata?.schemaVersion === DIAGNOSTIC_OUTPUT_SCHEMA_VERSION &&
+    (evidence.metadata?.reportedStatus === "SUPPORTED" ||
+      evidence.metadata?.reportedStatus === "CONFIRMED") &&
     typeof evidence.metadata?.causeDigest === "string" &&
     evidence.artifactRefs.length > 0 &&
     artifactBindingMatchesState(evidence.binding, state, "INCIDENT")
