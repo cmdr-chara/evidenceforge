@@ -4,6 +4,7 @@ import {
   buildEvidenceForgeAgentSpec,
   TRUEFORGE_LLM_ITERATION_LIMIT,
   TRUEFORGE_MAX_OUTPUT_TOKENS,
+  TRUEFORGE_REASONING_EFFORT,
   TRUEFORGE_SPECIALIST_TOOL_BUDGET,
 } from "../../packages/trueforge/src";
 
@@ -33,8 +34,10 @@ test("TrueForge agent spec bounds per-thread work and requires convergence", () 
   assert.equal(spec.config.iteration_limit, TRUEFORGE_LLM_ITERATION_LIMIT);
   assert.equal(TRUEFORGE_LLM_ITERATION_LIMIT, 36);
   assert.equal(spec.model.params.max_tokens, TRUEFORGE_MAX_OUTPUT_TOKENS);
-  assert.equal(TRUEFORGE_MAX_OUTPUT_TOKENS, 8_192);
+  assert.equal(TRUEFORGE_MAX_OUTPUT_TOKENS, 4_096);
   assert.equal(spec.model.params.parallel_tool_calls, true);
+  assert.equal(spec.model.params.reasoning_effort, TRUEFORGE_REASONING_EFFORT);
+  assert.equal(TRUEFORGE_REASONING_EFFORT, "none");
   assert.match(
     spec.instructions,
     new RegExp(`at most ${TRUEFORGE_SPECIALIST_TOOL_BUDGET} tool calls`),

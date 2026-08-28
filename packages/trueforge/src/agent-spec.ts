@@ -1,7 +1,8 @@
 import { TrueForgeRuntimeConfig } from "./config";
 
 export const TRUEFORGE_LLM_ITERATION_LIMIT = 36;
-export const TRUEFORGE_MAX_OUTPUT_TOKENS = 8_192;
+export const TRUEFORGE_MAX_OUTPUT_TOKENS = 4_096;
+export const TRUEFORGE_REASONING_EFFORT = "none";
 export const TRUEFORGE_SPECIALIST_TOOL_BUDGET = 8;
 
 export interface TrueForgeAgentSpec {
@@ -35,6 +36,7 @@ export function buildEvidenceForgeAgentSpec(config: TrueForgeRuntimeConfig): Tru
         temperature: 0.1,
         max_tokens: TRUEFORGE_MAX_OUTPUT_TOKENS,
         parallel_tool_calls: true,
+        reasoning_effort: TRUEFORGE_REASONING_EFFORT,
       },
     },
     instructions: `You are the TrueForge supervisor for EvidenceForge, an evidence-gated CI incident resolution system.
