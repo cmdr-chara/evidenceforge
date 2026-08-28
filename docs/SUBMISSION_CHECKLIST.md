@@ -1,6 +1,6 @@
 # Submission checklist
 
-**Last synchronized:** 2026-08-27
+**Last synchronized:** 2026-08-28
 
 ## Sponsor usage
 
@@ -18,6 +18,8 @@
 - [ ] Real Daytona reproduction observed.
 - [x] Daytona provider connectivity and a successful command execution observed separately; this is not the failing-revision reproduction.
 - [x] Real skill materialization/use observed in a credentialed TrueForge session.
+- [x] Exactly three specialists created and completed in live task `task-2a0444d3…`.
+- [ ] Completed live sponsor vertical slice — latest attempt is **BLOCKED by model-provider HTTP 402 insufficient balance**.
 - [ ] Real approval pause/resume observed.
 
 ## Domain/control plane
@@ -64,13 +66,14 @@
 
 ## Quality
 
-Latest verified implementation SHA: `c57c5e424054af04c999bd2c144e09b8d54d0622`, GitHub Actions runs `33101668750` and `33101672505`, **202/202 tests**.
+Latest technical implementation SHA: `aed84feb7205d7b66a13804fc2fb8f4184f2324f`,
+GitHub Actions runs `33155806482` and `33155815342`, **204/204 tests**.
 
 - [x] `pnpm install --frozen-lockfile`.
 - [x] `pnpm format:check`.
 - [x] `pnpm lint`.
 - [x] `pnpm typecheck`.
-- [x] `pnpm test` — **202/202 passed** on exact-SHA push and PR CI.
+- [x] `pnpm test` — **204/204 passed** on exact-SHA push and PR CI.
 - [x] `pnpm eval:smoke`.
 - [x] `pnpm demo:fixture`.
 - [x] `pnpm build`.
@@ -128,6 +131,7 @@ Latest verified implementation SHA: `c57c5e424054af04c999bd2c144e09b8d54d0622`, 
 - [x] `.evidenceforge/` ignored and preserved.
 - [x] No force push used in this reconstruction.
 - [x] No merge performed.
+- [x] Jury merge strategy documented: preserve PR history, then human `Squash and merge` into one professional `determination` commit.
 - [ ] Final secret/diff review before human merge.
 
 ## Submission

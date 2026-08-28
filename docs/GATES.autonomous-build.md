@@ -1,12 +1,15 @@
 # Autonomous build gate ledger
 
-**Last synchronized:** 2026-08-27
+**Last synchronized:** 2026-08-28
 
 Status values: `PASS`, `BLOCKED`, `PENDING_REVIEW`, `MANUAL`.
 
 ## Verified implementation baseline
 
-Latest implementation SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` passed GitHub Actions runs `33101668750` and `33101672505`, including 202/202 tests. Qodo's aggregate for that exact SHA leaves only the SDK-blocked boundary open.
+Latest technical implementation SHA `aed84feb7205d7b66a13804fc2fb8f4184f2324f`
+passed GitHub Actions runs `33155806482` and `33155815342`, including 204/204
+tests. The latest observed Qodo aggregate is through `3e3a06e…`; exact-head review
+is intentionally left open until the final documentation commit exists.
 
 | Gate | Status | Evidence / blocker |
 |---|---|---|
@@ -17,7 +20,7 @@ Latest implementation SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` passed GitH
 | Format | PASS | exact-SHA CI |
 | Lint | PASS | exact-SHA CI |
 | Typecheck | PASS | exact-SHA CI |
-| Test suite | PASS | 202/202 on exact-SHA push and PR CI |
+| Test suite | PASS | 204/204 on exact-SHA push and PR CI |
 | Eval smoke | PASS | exact-SHA CI |
 | Demo fixture | PASS | exact-SHA CI; fixture is not live sponsor evidence |
 | Build | PASS | exact-SHA CI |
@@ -48,11 +51,13 @@ Latest implementation SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` passed GitH
 | Credentialed TrueForge live session | PASS | session `01m11zp6dfp08dq520eqsp9cdx`; model turn `01m11zp6dyt1xq08qwdkzdns1h.local` observed |
 | Live GitHub MCP read | PASS | official `get_commit` returned exact SHA `7555f0f0…` in the observed TrueForge turn |
 | Live Daytona connectivity/exec | PASS | provider connection and successful command execution observed separately; not a reproduction claim |
-| Live Daytona failing-revision reproduction | BLOCKED | exact failing revision/signature has not been reproduced through the full EvidenceForge path |
+| Real failing GitHub Actions incident | PASS | run `33153999792` failed at exact revision `18668095…` with the stable configuration-order regression |
+| Three live TrueForge specialists | PASS | task `task-2a0444d3…`; raw TrueForge events contain exactly three `thread.created` and three `thread.done` events |
+| Live Daytona failing-revision reproduction | BLOCKED | the full turn ended with provider HTTP 402 `Insufficient Balance` before admissible reproduction evidence committed |
 | Live skill materialization | PASS | four configured skills were observed in a credentialed TrueForge session |
 | Live human approval pause/resume | BLOCKED | requires live runtime event |
 | Real PR created by EvidenceForge | BLOCKED | requires live TrueForge/MCP and human authorization |
-| Latest Qodo re-review | PASS | exact-SHA update https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5443260617; aggregate leaves only the SDK-blocked boundary open |
+| Latest Qodo re-review | PENDING_REVIEW | latest observed update is through `3e3a06e…`; request again after the final documentation commit |
 | Human merge | BLOCKED | PR #2 must remain unmerged until human decision |
 | Demo video/publication/submission | BLOCKED | requires live sponsor evidence and human account actions |
 
@@ -64,4 +69,10 @@ Qodo updated its aggregate through SHA `c57c5e4…` and marks initial-turn curso
 
 ## Release decision
 
-The repository candidate is **CONDITIONAL**, not fully complete for hackathon submission. TrueForge/model, GitHub MCP read, and Daytona connectivity have genuine observations, but they are not one completed vertical slice. Remaining conditions include exact-head CI/Qodo for this candidate, the SDK-blocked read-only boundary, exact 200% zoom, Daytona failing-revision reproduction, live approval/PR/reconciliation, demo/publication, human merge, and submission.
+The repository candidate is **CONDITIONAL**, not fully complete for hackathon
+submission. TrueForge/model, GitHub MCP, Daytona, and exactly three live specialists
+have genuine observations, but model-provider balance blocked the completed vertical
+slice. Remaining conditions include exact-head CI/Qodo after the documentation
+commit, the SDK-blocked read-only boundary, exact 200% zoom, failing-revision
+reproduction, live approval/PR/reconciliation, demo/publication, human merge, and
+submission.

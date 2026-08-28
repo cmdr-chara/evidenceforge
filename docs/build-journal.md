@@ -119,15 +119,39 @@ The next exact-SHA Qodo pass marked both of those Highs resolved and exposed two
 
 The published `29290cb…` candidate passed both push and PR workflows. Qodo marked those cursor/path findings resolved and exposed three further transaction boundaries: drain itself could hang, an approved effect could remain `EFFECT_STARTED` after drain/final-persistence failure, and checkpoint projection preceded journal durability. The `be60a91…` candidate addressed those three, after which Qodo exposed two final durability edges: an unconfirmed terminal save could be returned as BLOCKED, and a failed cancellation was suppressed forever. Implementation SHA `c57c5e4…` returns a stable durability error unless terminal persistence is confirmed and separates in-flight from completed cancellations so failed attempts can retry. Both exact-SHA workflows passed **202/202**; Qodo leaves only the SDK-blocked boundary open.
 
+### 2026-08-28 — Real incident fixture and bounded live attempt
+
+A real GitHub Actions failure now exists on `demo/config-order-regression`: run
+`33153999792` at failing revision
+`18668095b22046c8dd0e015d531a24de06fbf211`. The independently published repair
+candidate `06b40e76b469d9c5d7ee577d6189ea4ba1d5ffd6` passed CI run `33154478229` on
+`demo/fix-config-order-regression`. The repair branch was prepared manually; it is
+not represented as a TrueForge-produced patch.
+
+The first full TrueForge attempt correctly failed closed at its 600-second
+deadline. Trace evidence showed the configured reasoning mode dominated the turn.
+The agent specification now explicitly uses DeepSeek's advertised `none` reasoning
+effort and a 4,096-token output cap. A credentialed smoke session
+`01m13qx077ejj0kr35zst9rn3j` then completed in approximately 25 seconds with those
+exact model parameters.
+
+A second full attempt, task `task-2a0444d3-76e2-475d-abe4-3b1c253babe5`, created
+and completed all three TrueForge diagnostic specialists and initialized GitHub MCP
+and Daytona. The model provider then ended the turn with HTTP 402 `Insufficient
+Balance` after 442,617 total tokens and zero reasoning tokens. EvidenceForge
+terminalized the task as `BLOCKED`; no approval was requested and no PR was
+created. This is genuine sponsor-runtime evidence, but it is not a completed
+vertical slice.
+
 ## Latest verified branch baseline
 
-Final branch SHA:
+Latest technical implementation SHA before this evidence-only synchronization:
 
-`c57c5e424054af04c999bd2c144e09b8d54d0622`
+`aed84feb7205d7b66a13804fc2fb8f4184f2324f`
 
 GitHub Actions run:
 
-`33101668750` and `33101672505`
+`33155806482` and `33155815342`
 
 Observed green steps:
 
@@ -135,19 +159,22 @@ Observed green steps:
 - `pnpm format:check`;
 - `pnpm lint`;
 - `pnpm typecheck`;
-- `pnpm test` — **202 / 202 passed**;
+- `pnpm test` — **204 / 204 passed**;
 - `pnpm eval:smoke`;
 - `pnpm demo:fixture`;
 - `pnpm build`;
 - `pnpm doctor`;
 - `git diff --check`.
 
-Both workflows passed on that exact implementation SHA. Qodo then updated its aggregate review against the same SHA, resolving all three latest implementable runtime findings. The SDK-blocked read-only High remains separate and visible.
+Both workflows passed on that exact implementation SHA. The latest observed Qodo
+aggregate is still through `3e3a06e…`; an exact-head re-review remains required
+after this final documentation synchronization. The SDK-blocked read-only High
+remains separate and visible.
 
 ## Remaining external/human gates
 
 - P0.4 pre-execution specialist isolation capability in TrueForge (SDK-blocked today);
-- one credentialed TrueForge + model + GitHub MCP + Daytona vertical slice (individual component observations now exist);
+- completed credentialed TrueForge + model + GitHub MCP + Daytona vertical slice (the latest attempt is blocked by model-provider balance);
 - exact 200% browser zoom observation; the 320/375/768/1024/1440 viewport matrix is observed clean;
 - real approval pause, real PR write, and exact reconciliation from the live path;
 - approximately three-minute demo/publication;

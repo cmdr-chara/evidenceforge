@@ -1,6 +1,10 @@
 # The Agent Said It Was Fixed. The Tests Disagreed: Building an Evidence-Gated Agent with TrueForge
 
-> Draft status — 2026-08-27: implementation-backed sections retain the last exact-SHA GitHub Actions/Qodo baseline. Genuine TrueForge/model and GitHub MCP read observations now exist, plus separate Daytona connectivity/exec evidence. The newer candidate's exact-head CI, end-to-end Daytona reproduction, live approval/PR, and demo remain explicitly open.
+> Draft status — 2026-08-28: exact-head GitHub Actions is green on the latest
+> technical implementation. A real failing workflow, TrueForge/model, GitHub MCP,
+> Daytona, and exactly three live specialists are observed. The completed vertical
+> slice remains blocked by model-provider HTTP 402 insufficient balance; live
+> approval/PR, final exact-head Qodo, and the demo remain explicitly open.
 
 ## 1. Why “agent says done” is not a completion criterion
 
@@ -139,20 +143,27 @@ Qodo updated its aggregate review through implementation SHA `c57c5e4…`. The c
 
 ## 13. Verified repository result
 
-Latest verified implementation SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` passed GitHub Actions runs `33101668750` and `33101672505` with:
+Latest technical implementation SHA
+`aed84feb7205d7b66a13804fc2fb8f4184f2324f` passed GitHub Actions runs
+`33155806482` and `33155815342` with:
 
 - frozen-lockfile install;
 - format;
 - lint;
 - strict typecheck;
-- **202/202 tests**;
+- **204/204 tests**;
 - evaluation smoke;
 - healthy demo fixture;
 - build;
 - doctor;
 - `git diff --check`.
 
-These results prove the last externally verified repository baseline only. A later credentialed TrueForge/model turn (`01m11zp6dfp08dq520eqsp9cdx` / `01m11zp6dyt1xq08qwdkzdns1h.local`) used the official GitHub MCP `get_commit` tool and returned the exact repository SHA; Daytona connectivity and command execution were observed separately. Those component observations do not prove the end-to-end incident-resolution path or hackathon sponsor acceptance.
+These results prove the externally verified repository baseline only. The real
+incident run `33153999792` and repair candidate `06b40e76…` are separately public.
+Live task `task-2a0444d3…` created/completed the three required specialists and
+initialized GitHub MCP and Daytona, but the provider ended with HTTP 402 after
+442,617 tokens. EvidenceForge stayed `BLOCKED` and created no PR. Those observations
+do not prove the end-to-end incident-resolution path or hackathon sponsor acceptance.
 
 ## 14. Demo vertical slice still required
 
