@@ -436,6 +436,15 @@ export class DurableTrueForgeRuntime {
       }
     }
 
+    // Text/tool-call streaming deltas can arrive thousands of times in one
+    // turn. They are journaled and projected above so correlation remains
+    // exact, but rewriting the complete state+evidence checkpoint for every
+    // fragment is quadratic in the stream length. A later non-delta event or
+    // the final stream cursor persists the accumulated state atomically. If
+    // the process stops first, the older durable cursor causes TrueForge to
+    // replay these harmless fragments on resume.
+    if (isDeferrableModelDelta(event)) return;
+
     // Promise.race cannot cancel a callback that is already in this pipeline.
     // If the generation closes while one of these operations is pending, the
     // in-flight operation is drained (up to the bounded abort deadline) and
@@ -528,6 +537,10 @@ export class DurableTrueForgeRuntime {
       new Error(`TrueForge checkpoint did not settle within ${this.drainTimeoutMs}ms`),
     );
   }
+}
+
+export function isDeferrableModelDelta(event: RuntimeEvent): boolean {
+  return event.type === "MODEL_MESSAGE" && event.source === "trueforge:model.message.delta";
 }
 
 function applyStreamCursor(state: SessionState, result: StreamResult): void {

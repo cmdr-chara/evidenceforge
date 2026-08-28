@@ -3,9 +3,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { RuntimeEvent } from "../../packages/domain/src";
+import { RuntimeEvent, SessionState } from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
-import { JsonSessionStore } from "../../packages/persistence/src";
+import { JsonSessionStore, RuntimeCheckpointStore } from "../../packages/persistence/src";
 import { EventJournal } from "../../packages/telemetry/src";
 import {
   DurableTrueForgeRuntime,
@@ -52,6 +52,99 @@ class ContractAdapter implements TrueForgeRuntimeAdapter {
     throw new Error("not used");
   }
 }
+
+class DeltaAdapter implements TrueForgeRuntimeAdapter {
+  public async createSession(): Promise<string> {
+    return "tf-delta-session";
+  }
+
+  public async cancelSession(): Promise<void> {}
+
+  public async runTurn(input: RunTurnInput): Promise<StreamResult> {
+    const events: RuntimeEvent[] = [{
+      id: "turn-delta",
+      type: "TURN_CREATED",
+      source: "trueforge:turn.created",
+      timestamp: "2026-08-28T13:00:00.000Z",
+      sequenceNumber: 1,
+      payload: { type: "turn.created", turnId: "turn-delta" },
+    }, ...Array.from({ length: 1_000 }, (_, index): RuntimeEvent => ({
+      id: "message-delta",
+      type: "MODEL_MESSAGE",
+      source: "trueforge:model.message.delta",
+      threadId: "main",
+      timestamp: "2026-08-28T13:00:00.000Z",
+      sequenceNumber: index + 2,
+      payload: {
+        type: "model.message.delta",
+        id: "message-delta",
+        content: String(index),
+        threadId: "main",
+      },
+    }))];
+    for (const event of events) await input.onEvent?.(event);
+    return {
+      sessionId: input.sessionId,
+      turnId: "turn-delta",
+      lastSequenceNumber: events.length,
+      events,
+      paused: false,
+      requiredActions: [],
+    };
+  }
+
+  public async submitApprovals(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+
+  public async resumeTurn(): Promise<StreamResult> {
+    throw new Error("not used");
+  }
+}
+
+class CountingCheckpointStore implements RuntimeCheckpointStore {
+  public saves = 0;
+
+  public async save(): Promise<void> {
+    this.saves += 1;
+  }
+
+  public async load(): Promise<SessionState | undefined> {
+    return undefined;
+  }
+
+  public async saveCheckpoint(): Promise<void> {
+    this.saves += 1;
+  }
+
+  public async loadCheckpoint(): Promise<undefined> {
+    return undefined;
+  }
+}
+
+test("runtime checkpoints streamed model deltas at turn boundaries instead of per fragment", async () => {
+  const root = await mkdtemp(join(tmpdir(), "evidenceforge-delta-checkpoint-"));
+  try {
+    const sessions = new CountingCheckpointStore();
+    const evidence = new EvidenceStore();
+    const state = buildState();
+    const runtime = new DurableTrueForgeRuntime(
+      new DeltaAdapter(),
+      sessions,
+      evidence,
+      new EventJournal(join(root, "events.jsonl")),
+    );
+
+    await runtime.start(state, "stream deltas");
+
+    assert.equal(state.status, "ACTIVE", state.blockedReason);
+    assert.equal(sessions.saves, 3);
+    assert.equal(evidence.listEvents().length, 1_001);
+    assert.equal(state.lastSequenceNumber, 1_001);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("runtime blocks and cancels once when TrueForge starts a second fan-out", async () => {
   const root = await mkdtemp(join(tmpdir(), "evidenceforge-contract-"));
