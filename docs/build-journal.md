@@ -24,6 +24,8 @@ The branch was reconstructed and hardened without rewriting published history. T
 The TrueForge path added:
 
 - exactly three named diagnostics in one fan-out;
+- bounded structured causal output shared by specialists and supervisor;
+- non-authoritative diagnostic observations plus application-owned root-cause promotion;
 - Daytona-only repository execution;
 - exact incident and head `get_commit` binding;
 - application-owned bootstrap, patch-capture, and verifier manifests;
@@ -38,11 +40,13 @@ The historical incident bootstrap was aligned with its authoritative CI: the old
 
 ## 3. Qodo-driven reliability work
 
-Repeated Agentic Review passes found and verified fixes for stale approvals/certificates, reconciliation identity, cursor durability, timeout races, event-journal ordering, terminal persistence, cancellation retry, and GitHub response binding.
+Repeated Agentic Review passes found and verified fixes for stale approvals/certificates, reconciliation identity, cursor durability, timeout races, event-journal ordering, terminal persistence, cancellation retry, GitHub response binding, serialized prompt expansion, and fabricated root-cause promotion.
 
-The finalization pass fixed one additional Medium: raw task text could fit the nominal prompt cap while JSON escaping expanded it beyond the cap. Validation now measures serialized prompt text and includes a control-character regression.
+The final causal change rejects the unsafe equivalence between symptom reproduction and diagnosis. Exact context plus exact reproduction remains pending. A named specialist must supply a bounded cause, causal mechanism, affected location, and evidence references; the application then performs exact-evidence correlation before PASS.
 
 One High remains intentionally open: TrueForge SDK `0.1.3` lacks a per-dynamic-subagent pre-execution tool policy. EvidenceForge documents the boundary rather than pretending post-event rejection prevents execution.
+
+The final documentation review also corrected the demo reset command and separated executable-candidate CI from the external exact-final-head check.
 
 ## 4. UI and accessibility
 
@@ -54,14 +58,14 @@ The 320/375/768/1024/1440 geometry had already been browser-observed. No later c
 
 ## 5. Verification result
 
-The executable candidate passes the complete frozen GitHub Actions matrix:
+The exact executable code head passes the complete frozen GitHub Actions matrix:
 
 ```text
 pnpm install --frozen-lockfile
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test                  220/220
+pnpm test                  226/226
 pnpm eval:smoke
 pnpm demo:fixture
 pnpm build
@@ -70,6 +74,8 @@ git diff --check
 ```
 
 The deterministic evaluation remains 0% false success for EvidenceForge versus 57.14% for the unenforced baseline.
+
+The commit containing this journal must run the same matrix after publication; that self-referential exact-head result is recorded externally in PR #2 rather than predeclared here.
 
 ## 6. Live evidence result
 
@@ -81,11 +87,11 @@ The deterministic fixture completes 10/10 and issues a CompletionGate certificat
 
 ## 7. Final release boundary
 
-Repository code, tests, CI, Qodo remediation, and documentation are finalized on the feature branch. Remaining work requires external credentials or human authority:
+Repository code, tests, executable CI, Qodo remediation, and documentation are finalized on the feature branch. Remaining work requires external observation, credentials, or human authority:
 
+- exact final-head CI and Qodo after this commit;
 - exact 200% zoom;
 - stable live approval/write/reconciliation/certificate path;
 - demo video;
-- final Qodo inspection after the documentation commit;
 - human squash merge;
 - official submission.

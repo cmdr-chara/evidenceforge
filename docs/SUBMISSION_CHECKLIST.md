@@ -24,6 +24,10 @@
 - [x] Application-owned bootstrap before verification.
 - [x] Exactly three named diagnostic specialists in one fan-out.
 - [x] Bounded specialist tool budgets; violations block.
+- [x] Bounded structured causal-output contract for each specialist.
+- [x] Specialist causal claims stored as non-authoritative OPEN observations.
+- [x] Root-cause PASS requires exact incident, exact reproduction, and current causal evidence.
+- [x] Context plus reproduction alone leaves root cause PENDING.
 - [x] Repository execution constrained to Daytona in live workflows.
 - [x] Exact failure reproduction and root-cause subject binding.
 - [x] Patch capture before post-patch verification.
@@ -39,20 +43,20 @@
 
 ## Verification
 
-The executable candidate contains 220 tests. The exact final SHA and CI URL are recorded in PR #2 after the documentation commit.
+The exact executable code head contains 226 tests and passed the complete frozen matrix. Because this checklist changes repository state, verification of the commit containing this checklist is deliberately a separate external gate recorded in PR #2.
 
-- [x] `pnpm install --frozen-lockfile`.
-- [x] `pnpm format:check`.
-- [x] `pnpm lint`.
-- [x] `pnpm typecheck`.
-- [x] `pnpm test` — 220/220.
-- [x] `pnpm eval:smoke`.
-- [x] `pnpm demo:fixture`.
-- [x] `pnpm build`.
-- [x] `pnpm doctor`.
-- [x] `git diff --check`.
-- [x] Push and pull-request exact-head workflows green on the executable candidate.
-- [ ] Confirm the same matrix on the final documentation head and record it in PR #2.
+- [x] `pnpm install --frozen-lockfile` on the executable code head.
+- [x] `pnpm format:check` on the executable code head.
+- [x] `pnpm lint` on the executable code head.
+- [x] `pnpm typecheck` on the executable code head.
+- [x] `pnpm test` — 226/226 on the executable code head.
+- [x] `pnpm eval:smoke` on the executable code head.
+- [x] `pnpm demo:fixture` on the executable code head.
+- [x] `pnpm build` on the executable code head.
+- [x] `pnpm doctor` on the executable code head.
+- [x] `git diff --check` on the executable code head.
+- [x] Push and pull-request workflows green on the executable code head.
+- [ ] Confirm the same matrix on the commit containing this checklist and record it in PR #2.
 
 ## Live evidence
 
@@ -87,9 +91,12 @@ The executable candidate contains 220 tests. The exact final SHA and CI URL are 
 ## Qodo
 
 - [x] Genuine Agentic Review aggregate: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
-- [x] Every implementable Critical/High finding on the code candidate fixed or resolved.
+- [x] Every implementable Critical/High finding on the executable code head fixed or resolved.
 - [x] JSON serialization prompt-cap finding fixed with deterministic regression.
+- [x] Fabricated root-cause finding fixed with negative and positive exact-evidence regressions.
 - [x] SDK-limited read-only boundary retained as BLOCKED, not falsely resolved.
+- [x] Demo reset command added.
+- [x] Final-documentation-head verification represented as an external gate, not a premature PASS.
 - [ ] Record the post-documentation exact-SHA `/agentic_review` request and result in PR #2.
 
 ## Documentation and demo
@@ -100,6 +107,7 @@ The executable candidate contains 220 tests. The exact final SHA and CI URL are 
 - [x] Gate ledger and checklist synchronized.
 - [x] Build journal and field report synchronized.
 - [x] Qodo review log synchronized.
+- [x] Demo script runs `pnpm demo:reset` before fixture validation.
 - [x] Demo script separates credentialed 9/10 evidence from deterministic certificate footage.
 - [ ] Add public demo video URL.
 - [ ] Perform final secret/diff review before human merge.

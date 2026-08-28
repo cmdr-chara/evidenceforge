@@ -18,11 +18,14 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm eval:smoke
+pnpm demo:reset
 pnpm demo:fixture
 pnpm build
 pnpm doctor
 pnpm dev
 ```
+
+`pnpm demo:reset` restores the known healthy fixture before validation or recording. `pnpm demo:fixture` tests that restored state; it does not reset files itself.
 
 ## 0:00–0:20 — the promise
 
@@ -48,15 +51,16 @@ Show, as actually observed:
 1. exact GitHub `get_commit` incident context;
 2. Daytona bootstrap of the exact historical revision;
 3. exactly three named diagnostic specialists;
-4. failure reproduction;
-5. supported root cause;
-6. serialized patch and patch digest;
-7. deterministic regression/tests/typecheck/lint/diff checks;
-8. independent reviewer bound to the current patch.
+4. bounded structured causal claims from diagnostics;
+5. failure reproduction;
+6. application correlation of exact incident, reproduction, and causal evidence;
+7. serialized patch and patch digest;
+8. deterministic regression/tests/typecheck/lint/diff checks;
+9. independent reviewer bound to the current patch.
 
 The strongest existing live evidence reaches 9/10. When `external-pr` is not genuinely completed, stop and label the result **LIVE — 9/10 — NOT CERTIFIED**.
 
-Show one fail-closed behavior if useful: wrong `base: main`, missing head `get_commit`, or specialist budget violation. Make clear that no write occurred.
+Show one fail-closed behavior if useful: wrong `base: main`, missing head `get_commit`, symptom-only root cause, or specialist budget violation. Make clear that no write occurred.
 
 ## 1:45–2:20 — approval boundary
 

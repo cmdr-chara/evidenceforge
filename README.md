@@ -4,7 +4,7 @@
 
 EvidenceForge is an evidence-gated CI incident control plane built on TrueForge. It binds a failed GitHub Actions incident to an exact repository revision, reproduces it in Daytona, captures and verifies a patch, obtains an independent patch review, pauses before any external write, reconciles the resulting pull request, and permits completion only through an application-issued certificate.
 
-> **Release status — 2026-08-28:** [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) is the authoritative record for the exact final SHA, exact-head GitHub Actions run, Qodo status, and remaining human actions. The executable candidate passes the frozen CI matrix with **220/220 tests**. The PR remains open and unmerged, with `feat/foundation-control-plane` targeting `determination`.
+> **Release status — 2026-08-28:** [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) is the authoritative record for the exact final SHA, exact-head GitHub Actions run, Qodo status, and remaining human actions. The executable candidate passes the frozen CI matrix with **226/226 tests**. The PR remains open and unmerged, with `feat/foundation-control-plane` targeting `determination`.
 
 ## Evidence boundary
 
@@ -12,7 +12,7 @@ EvidenceForge deliberately separates three kinds of evidence:
 
 | Evidence | Observed result | What it proves |
 |---|---|---|
-| Repository CI | frozen install, format, lint, typecheck, 220 tests, evaluation, fixture, build, doctor, diff check | the published candidate is reproducible and internally consistent |
+| Repository CI | frozen install, format, lint, typecheck, 226 tests, evaluation, fixture, build, doctor, diff check | the published executable candidate is reproducible and internally consistent |
 | Credentialed live TrueForge workflow | strongest run reached 9/10 application gates | real TrueForge, GitHub MCP, Daytona, three specialists, deterministic verification, and independent review worked together |
 | Deterministic fixture | complete approval, reconciliation, and CompletionGate certificate path | control-plane semantics, not live sponsor integration |
 
@@ -30,7 +30,9 @@ The console exposes application state and evidence rather than a model transcrip
 
 - a versioned success contract;
 - exactly three named diagnostic specialists in one read-only fan-out;
-- a hypothesis ledger with supported and refuted claims;
+- a bounded structured causal-output contract for each specialist;
+- a hypothesis ledger whose specialist claims begin as non-authoritative `OPEN` observations;
+- application-owned promotion to `SUPPORTED` only after exact incident, reproduction, and causal evidence correlate;
 - Daytona-only repository execution in live mode;
 - application-owned bootstrap, patch-capture, and verifier manifests;
 - patch-digest-bound independent review;
@@ -138,7 +140,11 @@ The 320, 375, 768, 1024, and 1440px layouts were browser-observed without page-l
 
 ## Qodo and release workflow
 
-Qodo Agentic Review is active on PR #2. The canonical aggregate is [this review comment](https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502); detailed disposition is in [docs/qodo-review-log.md](docs/qodo-review-log.md). The final post-commit exact-SHA request and status are recorded in the PR body because a repository document cannot truthfully contain the SHA of the commit that contains itself.
+Qodo Agentic Review is active on PR #2. The canonical aggregate is [this review comment](https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502); detailed disposition is in [docs/qodo-review-log.md](docs/qodo-review-log.md).
+
+The finalization passes resolved both serialized prompt expansion and the fabricated-root-cause path. Exact context plus exact reproduction alone now leaves `root-cause-supported` pending. Specialist causal claims are bounded, structured, stored as non-authoritative observations, and promoted only by application-owned correlation.
+
+The final post-commit exact-SHA request and status are recorded in the PR body because a repository document cannot truthfully contain the SHA of the commit that contains itself.
 
 The required release flow remains:
 
@@ -154,7 +160,7 @@ feat: add EvidenceForge evidence-gated incident control plane
 
 ## Submission status
 
-Repository implementation and CI are release-ready. Remaining external/manual work is explicitly tracked in [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md): exact 200% zoom, a stable credentialed live `external-pr` path, public demo video, human merge, and official hackathon submission.
+Repository implementation and executable CI are release-ready. Remaining external/manual work is explicitly tracked in [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md): exact final-head CI after this documentation commit, exact 200% zoom, a stable credentialed live `external-pr` path, public demo video, human merge, and official hackathon submission.
 
 ## AI-assistance disclosure
 

@@ -36,7 +36,7 @@ This file records the requirements that materially affect EvidenceForge. Officia
 - GitHub MCP, Daytona, four skills, approvals, compaction, exactly three dynamic specialists, bounded iterations, and durable session recovery are integrated.
 - `CompletionGate` is the only application path to `COMPLETED`.
 - Exact PR identity, approval provenance, stale evidence/certificate rejection, repatch invalidation, crash recovery, terminal cutoffs, and collision-safe persistence are implemented and tested.
-- Exact-head CI runs the frozen verification matrix and currently contains 220 passing tests.
+- Exact code-head CI runs the frozen verification matrix with 226 passing tests.
 - The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for the unenforced baseline.
 
 ### Live sponsor evidence
@@ -68,9 +68,13 @@ Required workflow:
 
 Canonical aggregate: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 
-The final code-candidate review contains one remaining bug: the per-dynamic-subagent read-only pre-execution boundary. It remains **BLOCKED by TrueForge SDK 0.1.3**, which exposes no per-dynamic-subagent interceptor/allowlist. The serialization/prompt-cap finding was fixed by validating actual JSON-serialized prompt length and adding a control-character expansion regression.
+The exact code-head review marks the fabricated-root-cause High resolved. Context plus reproduction alone now leaves the criterion pending; a specialist causal claim is stored as a non-authoritative observation, and the application promotes it only after exact-evidence correlation.
 
-The post-documentation exact-SHA review request and status are recorded in PR #2, avoiding a self-referential repository document.
+One High remains **BLOCKED by TrueForge SDK 0.1.3**: per-dynamic-subagent read-only pre-execution enforcement. The SDK exposes no per-dynamic-subagent interceptor/allowlist, so post-event rejection is not represented as prevention.
+
+The same review identified two implementable Medium documentation findings. This synchronization adds the required `pnpm demo:reset` command and represents the self-referential final-documentation-head CI check as an external PR gate rather than an in-repository PASS.
+
+The post-documentation exact-SHA review request and status are recorded in PR #2.
 
 ## UI evidence boundary
 
@@ -80,6 +84,7 @@ Exact 200% browser zoom remains a manual check. A width-equivalent reflow must n
 
 ## Remaining external/human actions
 
+- observe and record exact final-head CI after this documentation commit;
 - reproduce a stable credentialed live path through `external-pr`, approval, write, reconciliation, and certificate, or present the live result as 9/10 without embellishment;
 - perform exact 200% browser zoom review;
 - record and publish the demo video;

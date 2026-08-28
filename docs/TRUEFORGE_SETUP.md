@@ -97,19 +97,21 @@ The live workflow is intentionally narrow:
    - Repository Investigator;
    - Failure / Log Investigator;
    - Dependency / Configuration Investigator.
-4. Reproduce the original failure using the application-owned manifest.
-5. Admit only exact-subject, application-correlated root-cause evidence.
-6. Serialize patching.
-7. Capture `git diff --binary` before any post-patch verifier.
-8. Run every deterministic verifier from the exact manifest.
-9. Run one isolated independent reviewer bound to the current patch digest.
-10. Read the authoritative current branch head with `get_commit`.
-11. Prepare one exact PR action targeting `feat/foundation-control-plane` → `determination`.
-12. Pause before `create_pull_request` for human approval.
-13. After an approved write, reconcile through `pull_request_read`.
-14. Allow only `CompletionGate` to issue completion.
+4. Require each specialist to return one bounded JSON object containing observations, causal hypotheses, affected locations, and evidence references.
+5. Store specialist causal claims as non-authoritative `OPEN` observations.
+6. Promote `root-cause-supported` only when the application correlates a current causal observation with admissible exact-incident and exact-reproduction evidence.
+7. Reproduce the original failure using the application-owned manifest.
+8. Serialize patching.
+9. Capture `git diff --binary` before any post-patch verifier.
+10. Run every deterministic verifier from the exact manifest.
+11. Run one isolated independent reviewer bound to the current patch digest.
+12. Read the authoritative current branch head with `get_commit`.
+13. Prepare one exact PR action targeting `feat/foundation-control-plane` → `determination`.
+14. Pause before `create_pull_request` for human approval.
+15. After an approved write, reconcile through `pull_request_read`.
+16. Allow only `CompletionGate` to issue completion.
 
-A wrong base such as `main`, a missing head read, an unbound patch, a specialist budget violation, or a resumed terminal task blocks before external effects.
+Context plus reproduction is not a root cause. A missing causal mechanism, an empty evidence reference set, a wrong base such as `main`, a missing head read, an unbound patch, a specialist budget violation, or a resumed terminal task blocks or remains pending before external effects.
 
 ## GitHub MCP surface
 
@@ -172,6 +174,7 @@ The deterministic fixture can complete the approval/reconciliation/certificate p
 | repository install rejects lockfile drift | keep normal CI frozen; inspect the committed lockfile |
 | historical live bootstrap reports no lockfile | use the profile's `--no-frozen-lockfile` manifest; do not change normal CI |
 | verifier stops near 60 seconds | set Daytona provider command timeout to at least `300000` ms |
+| specialist returns prose or symptom-only “cause” | reject/block; require the bounded causal JSON contract |
 | model proposes `base: main` | block; the exact base is `determination` |
 | model skips head `get_commit` | block before any write |
 | specialist exceeds tool budget | block; do not silently continue |

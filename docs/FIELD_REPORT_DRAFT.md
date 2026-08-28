@@ -4,7 +4,7 @@
 
 EvidenceForge is a TrueForge-based CI incident control plane designed to prevent false completion. Models diagnose and propose; application-owned evidence, deterministic verifiers, approval policy, external-state reconciliation, and CompletionGate decide.
 
-The final repository candidate passes the frozen verification matrix with 220 tests. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached 9/10 application gates; `external-pr` remains the unverified live gate. The deterministic fixture completes the full approval/reconciliation/certificate path and is labeled accordingly.
+The exact executable code head passes the frozen verification matrix with 226 tests. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached 9/10 application gates; `external-pr` remains the unverified live gate. The deterministic fixture completes the full approval/reconciliation/certificate path and is labeled accordingly.
 
 ## Problem
 
@@ -17,6 +17,8 @@ Agentic repair systems often collapse four different statements into one:
 
 EvidenceForge treats these as separate states. Completion requires all of them to be proven with current, correctly bound evidence.
 
+Symptom reproduction is also distinct from root-cause diagnosis. A failing exact command does not identify the defect that caused it.
+
 ## Design
 
 ### Application-owned success contract
@@ -26,6 +28,10 @@ The required criteria are created before work begins and cannot be removed by mo
 ### Exact subject binding
 
 Evidence is bound to task, repository, revision, patch digest, and scope. Repatching preserves incident facts but invalidates patch verification, review, approvals, actions, and operations.
+
+### Causal diagnostic gate
+
+Each named specialist must return a bounded structured object with a cause, causal mechanism, affected locations, and evidence references. EvidenceForge stores that claim as a non-authoritative `OPEN` observation. Only application-owned correlation with exact incident and reproduction evidence may promote the hypothesis to `SUPPORTED` and pass `root-cause-supported`.
 
 ### TrueForge orchestration
 
@@ -53,9 +59,9 @@ EvidenceForge blocked every unsafe deviation. No invalid PR was created.
 
 ## Qodo impact
 
-Qodo Agentic Review materially improved certificate immutability, repatch invalidation, approval races, PR identity, cursor recovery, stream timeout fencing, event-journal order, terminal durability, cancellation retry, and response binding.
+Qodo Agentic Review materially improved certificate immutability, repatch invalidation, approval races, PR identity, cursor recovery, stream timeout fencing, event-journal order, terminal durability, cancellation retry, response binding, prompt bounds, and causal root-cause verification.
 
-The finalization pass resolved Qodo's prompt-cap serialization finding by measuring actual JSON-serialized text and adding a hostile control-character regression.
+The fabricated-root-cause High is resolved: exact context plus exact reproduction alone remains pending, while structured specialist causality is accepted only after application correlation.
 
 Qodo's remaining High is valid but SDK-blocked: TrueForge SDK `0.1.3` has no per-dynamic-subagent pre-execution tool interceptor/allowlist. EvidenceForge does not mislabel post-event rejection as prevention.
 
@@ -75,17 +81,20 @@ Responsive browser observations cover 320, 375, 768, 1024, and 1440px. The final
 ## Measured result
 
 ```text
-Repository CI:               complete frozen matrix, 220/220 tests
+Executable repository CI:    complete frozen matrix, 226/226 tests
 Deterministic fixture:       10/10 + CompletionGate certificate
 Credentialed live workflow:  9/10; external-pr not completed
 False-success evaluation:    EvidenceForge 0%; baseline 57.14%
 PR state:                     open, unmerged, base determination
 ```
 
+The exact final-head CI result for the commit containing this report is recorded externally in PR #2 after publication.
+
 ## Remaining risks and actions
 
 - per-dynamic-subagent pre-execution capability isolation requires a future TrueForge SDK surface or a TrueForge-compatible read-only proxy;
 - live external PR approval/write/reconciliation has not been stably reproduced;
+- exact final-head CI/Qodo must be observed after this report commit;
 - exact 200% zoom remains manual;
 - video, human merge, and submission require human/external account actions.
 
