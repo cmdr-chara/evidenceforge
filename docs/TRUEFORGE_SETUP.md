@@ -77,6 +77,8 @@ Set the Daytona provider's default command timeout to at least `300000` ms. True
 
 The live supervisor is restricted to EvidenceForge's GitHub operation allowlist: `get_commit`, `get_file_contents`, `issue_read`, `list_issues`, `list_pull_requests`, `search_issues`, `search_pull_requests`, and read-only `pull_request_read`; `create_pull_request` becomes admissible only after application approval. Any other operation, including `search_commits`, blocks the run.
 
+The public incident profile is narrower than the control-plane allowlist: its initial incident context uses exactly one `get_commit` call at the failing SHA. Repository diagnostics then use the bootstrapped Daytona checkout. Broad GitHub searches are deliberately omitted because a query that is not bound to the exact revision is inadmissible evidence and blocks the task.
+
 ## Approval behavior
 
 The inline agent spec configures GitHub tool approval for `@write` and `@destructive`. EvidenceForge also applies its own risk policy. The PR action must be prepared in exact form and approved before the TrueForge `user.tool_approval` resume event is submitted.
