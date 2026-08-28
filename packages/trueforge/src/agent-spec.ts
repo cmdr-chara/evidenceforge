@@ -2,7 +2,7 @@ import { TrueForgeRuntimeConfig } from "./config";
 
 export const TRUEFORGE_LLM_ITERATION_LIMIT = 36;
 export const TRUEFORGE_MAX_OUTPUT_TOKENS = 4_096;
-export const TRUEFORGE_REASONING_EFFORT = "none";
+export const TRUEFORGE_REASONING_EFFORT = "high";
 // Live TrueForge specialists spend one call discovering the preloaded MCP
 // surface before they can perform incident reads. Keep enough headroom for
 // that protocol overhead while retaining a strict, application-owned bound.
