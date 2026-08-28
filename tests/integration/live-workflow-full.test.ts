@@ -308,14 +308,18 @@ test("live workflow rejects references found only in a deeply nested failed tool
   assert.equal(harness.state.completionCertificate, undefined);
 });
 
-for (const exitCodeField of ["exitCode", "exit_code"] as const) {
-  test(`live workflow rejects references from a nonzero ${exitCodeField} tool result`, () => {
+for (const [exitCodeDescription, exitCodeFields] of [
+  ["exitCode", { exitCode: 1 }],
+  ["exit_code", { exit_code: 1 }],
+  ["conflicting exit-code fields", { exitCode: 0, exit_code: 1 }],
+] as const) {
+  test(`live workflow rejects references from nonzero ${exitCodeDescription} tool results`, () => {
     const harness = createHarness();
     const feed = createFeed(harness);
 
     feed(turnCreated());
     feed(threadCreated(1, "Repository Investigator"));
-    const callId = `call-${exitCodeField}-diagnostic-evidence`;
+    const callId = `call-${exitCodeDescription.replaceAll(" ", "-")}-diagnostic-evidence`;
     feed(structuredCall(
       callId,
       "repository",
@@ -328,7 +332,7 @@ for (const exitCodeField of ["exitCode", "exit_code"] as const) {
       success: true,
       response: {
         result: {
-          [exitCodeField]: 1,
+          ...exitCodeFields,
           result:
             "runtime.ts:projectToolResult and CONFIG_VALIDATION_ORDER came from a failed command",
         },

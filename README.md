@@ -12,7 +12,7 @@ EvidenceForge deliberately separates three kinds of evidence:
 
 | Evidence | Observed result | What it proves |
 |---|---|---|
-| Repository verification | frozen install, format, lint, typecheck, 235 tests, evaluation, fixture, build, doctor, diff check | the executable candidate is reproducible and internally consistent; the follow-up exact-head CI remains an external publication gate |
+| Repository verification | frozen install, format, lint, typecheck, 236 tests, evaluation, fixture, build, doctor, diff check | the executable candidate is reproducible and internally consistent; the follow-up exact-head CI remains an external publication gate |
 | Credentialed live TrueForge workflow | strongest run reached 9/10 application gates | real TrueForge, GitHub MCP, Daytona, three specialists, deterministic verification, and independent review worked together |
 | Deterministic fixture | complete approval, reconciliation, and CompletionGate certificate path | control-plane semantics, not live sponsor integration |
 
