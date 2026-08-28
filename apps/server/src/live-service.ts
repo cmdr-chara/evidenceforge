@@ -30,7 +30,10 @@ import {
   artifactBindingFor,
   artifactBindingMatchesState,
 } from "../../../packages/verification/src";
-import { buildCiSuccessContract, SessionController } from "../../../packages/workflow/src";
+import {
+  buildEvidenceForgeLiveCiSuccessContract,
+  SessionController,
+} from "../../../packages/workflow/src";
 import { SseBroker } from "./sse-broker";
 import { LiveWorkflowReducer, markLiveExternalApproval } from "./live-workflow";
 import { officialArgumentsForPreparedPullRequest } from "./github-mcp-adapter";
@@ -214,7 +217,7 @@ export class LiveIncidentService {
       runId: input.runId,
       constraints: input.constraints,
     });
-    const state = createSessionState(task, buildCiSuccessContract(task));
+    const state = createSessionState(task, buildEvidenceForgeLiveCiSuccessContract(task));
     const evidenceStore = new EvidenceStore();
     const verifierManifest = buildVerifierManifest(state.successCriteria);
     await this.checkpoints.saveCheckpoint(state, evidenceStore);

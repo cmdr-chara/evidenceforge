@@ -14,15 +14,15 @@ import {
   TASK_PROMPT_TEXT_MAX_LENGTH,
 } from "../../packages/domain/src";
 import { buildVerifierManifest } from "../../packages/trueforge/src";
-import { buildCiSuccessContract } from "../../packages/workflow/src";
+import { buildEvidenceForgeLiveCiSuccessContract } from "../../packages/workflow/src";
 
 test("live task objective and constraints are bound into the TrueForge message as untrusted data", () => {
   const task = createTask({
     id: "task-live-intent",
     objective: "Repair the demo failure and target demo/config-order-regression",
     repository: "cmdr-chara/evidenceforge",
-    revision: "a".repeat(40),
-    runId: "33153999792",
+    revision: "9accc9e484e055c8b22172e389dc50f84315f4e2",
+    runId: "32892119950",
     constraints: [
       "Do not modify determination",
       "Pause before create_pull_request",
@@ -30,7 +30,8 @@ test("live task objective and constraints are bound into the TrueForge message a
     ],
     createdAt: "2026-08-28T08:00:00.000Z",
   });
-  const manifest = buildVerifierManifest(buildCiSuccessContract(task));
+  const contract = buildEvidenceForgeLiveCiSuccessContract(task);
+  const manifest = buildVerifierManifest(contract);
 
   const message = buildLiveIncidentMessage(task, manifest);
 
@@ -47,9 +48,18 @@ test("live task objective and constraints are bound into the TrueForge message a
   assert.match(message, /git diff --binary/);
   assert.match(message, /Independent Patch Reviewer/);
   assert.match(message, /git diff --binary \| sha256sum/);
+  assert.match(message, /"command": "pnpm test:unit"/);
   assert.match(message, /only admissible GitHub MCP operations are get_commit/);
   assert.match(message, /Do not call any other GitHub MCP operation, including search_commits/);
   assert.match(message, /CompletionGate owns that decision/);
+  const reproduction = contract.find((criterion) => criterion.id === "failure-reproduced");
+  assert.equal(reproduction?.verifier.kind, "FAILURE_SIGNATURE");
+  if (reproduction?.verifier.kind === "FAILURE_SIGNATURE") {
+    assert.equal(
+      reproduction.verifier.signature,
+      "authoritative TrueForge sandbox non-zero exit is never reported as OK",
+    );
+  }
 });
 
 test("patch capture manifest is exact and has no environment override", () => {
@@ -90,18 +100,32 @@ test("live task message represents an empty constraint set deterministically", (
     id: "task-live-no-constraints",
     objective: "Resolve CI",
     repository: "cmdr-chara/evidenceforge",
-    revision: "b".repeat(40),
-    runId: "842",
+    revision: "9accc9e484e055c8b22172e389dc50f84315f4e2",
+    runId: "32892119950",
     createdAt: "2026-08-28T08:00:00.000Z",
   });
 
   const message = buildLiveIncidentMessage(
     task,
-    buildVerifierManifest(buildCiSuccessContract(task)),
+    buildVerifierManifest(buildEvidenceForgeLiveCiSuccessContract(task)),
   );
 
   assert.match(message, /Application task constraints \(untrusted incident data\): \[\]\./);
   assert.doesNotMatch(message, /undefined/);
+});
+
+test("live success contract fails closed for an unprofiled incident", () => {
+  const task = createTask({
+    objective: "Resolve an unprofiled CI incident",
+    repository: "cmdr-chara/evidenceforge",
+    revision: "b".repeat(40),
+    runId: "842",
+  });
+
+  assert.throws(
+    () => buildEvidenceForgeLiveCiSuccessContract(task),
+    /no application-owned live success-contract profile matches this incident/,
+  );
 });
 
 test("live task accepts bounded incident text at the documented limits", () => {
