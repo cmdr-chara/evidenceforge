@@ -171,6 +171,9 @@ test("live workflow requires structured diagnostic causal evidence before root c
   ];
   for (const [index, name] of specialists.entries()) {
     feed(threadCreated(index + 1, name));
+    if (name === "Failure / Log Investigator") {
+      feedDiagnosticEvidence(feed, index + 1);
+    }
     feed(
       diagnosticThreadDone(
         index + 1,
@@ -194,12 +197,108 @@ test("live workflow requires structured diagnostic causal evidence before root c
   assert.equal(harness.state.hypotheses.length, 1);
   assert.equal(harness.state.hypotheses[0]?.status, "SUPPORTED");
   assert.equal(harness.state.hypotheses[0]?.supportingEvidence.length, 3);
+  const diagnosticEvidence = harness.state.hypotheses[0]?.supportingEvidence
+    .map((id) => harness.store.getEvidence(id))
+    .find((evidence) => evidence?.kind === "OBSERVATION");
+  assert.deepEqual(
+    diagnosticEvidence?.artifactRefs.map((reference) => reference.startsWith("runtime-event://")),
+    [true],
+  );
+  assert.equal(diagnosticEvidence?.artifactRefs.includes("CONFIG_VALIDATION_ORDER"), false);
   assert.match(
     harness.state.hypotheses[0]?.statement ?? "",
     /Causal mechanism:/,
   );
   assert.equal(harness.state.phase, "PATCHING");
   assert.equal(harness.state.status, "ACTIVE");
+  assert.equal(harness.state.completionCertificate, undefined);
+});
+
+test("live workflow blocks model-authored diagnostic references without recorded evidence", () => {
+  const harness = createHarness();
+  const feed = createFeed(harness);
+
+  feed(turnCreated());
+  feed(threadCreated(1, "Repository Investigator"));
+  feed(diagnosticThreadDone(1, causalDiagnosticOutput()));
+
+  assert.equal(harness.state.status, "BLOCKED");
+  assert.match(harness.state.blockedReason ?? "", /not observed in its specialist thread/);
+  assert.equal(harness.state.hypotheses.length, 0);
+  assert.equal(harness.store.listEvidence().length, 0);
+  assert.equal(harness.state.completionCertificate, undefined);
+});
+
+test("live workflow rejects diagnostic evidence recorded by a different specialist", () => {
+  const harness = createHarness();
+  const feed = createFeed(harness);
+
+  feed(turnCreated());
+  feed(threadCreated(1, "Repository Investigator"));
+  feed(threadCreated(2, "Failure / Log Investigator"));
+  feedDiagnosticEvidence(feed, 2);
+  feed(diagnosticThreadDone(1, causalDiagnosticOutput()));
+
+  assert.equal(harness.state.status, "BLOCKED");
+  assert.match(harness.state.blockedReason ?? "", /not observed in its specialist thread/);
+  assert.equal(harness.state.hypotheses.length, 0);
+  assert.equal(harness.state.completionCertificate, undefined);
+});
+
+test("live workflow rejects references found only in a failed diagnostic tool result", () => {
+  const harness = createHarness();
+  const feed = createFeed(harness);
+
+  feed(turnCreated());
+  feed(threadCreated(1, "Repository Investigator"));
+  const callId = "call-failed-diagnostic-evidence";
+  feed(structuredCall(
+    callId,
+    "repository",
+    "read",
+    { path: "packages/trueforge/src/runtime.ts" },
+    "thread-1",
+    "truefoundry-system",
+  ));
+  feed(toolResponse(callId, {
+    success: false,
+    response: {
+      result:
+        "runtime.ts:projectToolResult and CONFIG_VALIDATION_ORDER were not actually inspected",
+    },
+  }, "thread-1"));
+  feed(diagnosticThreadDone(1, causalDiagnosticOutput()));
+
+  assert.equal(harness.state.status, "BLOCKED");
+  assert.match(harness.state.blockedReason ?? "", /not observed in its specialist thread/);
+  assert.equal(harness.state.hypotheses.length, 0);
+  assert.equal(harness.state.completionCertificate, undefined);
+});
+
+test("live workflow does not resolve diagnostic references from transport keys", () => {
+  const harness = createHarness();
+  const feed = createFeed(harness);
+
+  feed(turnCreated());
+  feed(threadCreated(1, "Repository Investigator"));
+  const callId = "call-generic-diagnostic-evidence";
+  feed(structuredCall(
+    callId,
+    "repository",
+    "read",
+    { path: "packages/trueforge/src/runtime.ts" },
+    "thread-1",
+    "truefoundry-system",
+  ));
+  feed(toolResponse(callId, {
+    success: true,
+    response: { result: "bounded output without the claimed reference" },
+  }, "thread-1"));
+  feed(diagnosticThreadDone(1, causalDiagnosticOutput(["response"])));
+
+  assert.equal(harness.state.status, "BLOCKED");
+  assert.match(harness.state.blockedReason ?? "", /not observed in its specialist thread/);
+  assert.equal(harness.state.hypotheses.length, 0);
   assert.equal(harness.state.completionCertificate, undefined);
 });
 
@@ -517,7 +616,9 @@ function feedExactReproduction(
   }));
 }
 
-function causalDiagnosticOutput(): Record<string, unknown> {
+function causalDiagnosticOutput(
+  evidenceReferences = ["CONFIG_VALIDATION_ORDER", "runtime.ts:projectToolResult"],
+): Record<string, unknown> {
   return {
     schemaVersion: 1,
     findings: [
@@ -530,11 +631,34 @@ function causalDiagnosticOutput(): Record<string, unknown> {
       causalMechanism:
         "The workflow observes a successful transport envelope and classifies the failed command as OK before checking its exit code.",
       affectedLocations: ["packages/trueforge/src/runtime.ts:projectToolResult"],
-      evidenceReferences: ["CONFIG_VALIDATION_ORDER", "runtime.ts:projectToolResult"],
+      evidenceReferences,
       status: "SUPPORTED",
     }],
     unresolvedQuestions: [],
   };
+}
+
+function feedDiagnosticEvidence(
+  feed: (event: RuntimeEvent) => void,
+  specialistIndex: number,
+): void {
+  const callId = `call-diagnostic-evidence-${specialistIndex}`;
+  const threadId = `thread-${specialistIndex}`;
+  feed(structuredCall(
+    callId,
+    "repository",
+    "read",
+    { path: "packages/trueforge/src/runtime.ts" },
+    threadId,
+    "truefoundry-system",
+  ));
+  feed(toolResponse(callId, {
+    success: true,
+    response: {
+      result:
+        "runtime.ts:projectToolResult checks transport status before process exit; CONFIG_VALIDATION_ORDER reproduces the failure",
+    },
+  }, threadId));
 }
 
 function turnCreated(): RuntimeEvent {

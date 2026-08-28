@@ -68,7 +68,7 @@ Required workflow:
 
 Canonical aggregate: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 
-The exact code-head review marks the fabricated-root-cause High resolved. Context plus reproduction alone now leaves the criterion pending; a specialist causal claim is stored as a non-authoritative observation, and the application promotes it only after exact-evidence correlation.
+The candidate fixes the fabricated-root-cause and unresolved-reference paths. Context plus reproduction alone leaves the criterion pending; a specialist causal claim becomes a non-authoritative observation only after each reference resolves to an earlier successful same-thread tool result, and the application promotes it only after exact-evidence correlation. Exact-SHA Qodo confirmation remains external.
 
 One High remains **BLOCKED by TrueForge SDK 0.1.3**: per-dynamic-subagent read-only pre-execution enforcement. The SDK exposes no per-dynamic-subagent interceptor/allowlist, so post-event rejection is not represented as prevention.
 

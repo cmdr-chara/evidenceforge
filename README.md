@@ -4,7 +4,7 @@
 
 EvidenceForge is an evidence-gated CI incident control plane built on TrueForge. It binds a failed GitHub Actions incident to an exact repository revision, reproduces it in Daytona, captures and verifies a patch, obtains an independent patch review, pauses before any external write, reconciles the resulting pull request, and permits completion only through an application-issued certificate.
 
-> **Release status — 2026-08-28:** [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) is the authoritative record for the exact final SHA, exact-head GitHub Actions run, Qodo status, and remaining human actions. The executable candidate passes the frozen CI matrix with **226/226 tests**. The PR remains open and unmerged, with `feat/foundation-control-plane` targeting `determination`.
+> **Release status — 2026-08-28:** [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) is the authoritative record for the exact final SHA, exact-head GitHub Actions run, Qodo status, and remaining human actions. The executable candidate passes the frozen local matrix with **231/231 tests**; exact-head CI is recorded externally after publication. The PR remains open and unmerged, with `feat/foundation-control-plane` targeting `determination`.
 
 ## Evidence boundary
 
@@ -12,7 +12,7 @@ EvidenceForge deliberately separates three kinds of evidence:
 
 | Evidence | Observed result | What it proves |
 |---|---|---|
-| Repository CI | frozen install, format, lint, typecheck, 226 tests, evaluation, fixture, build, doctor, diff check | the published executable candidate is reproducible and internally consistent |
+| Repository verification | frozen install, format, lint, typecheck, 231 tests, evaluation, fixture, build, doctor, diff check | the executable candidate is reproducible and internally consistent; exact-head CI remains an external publication gate |
 | Credentialed live TrueForge workflow | strongest run reached 9/10 application gates | real TrueForge, GitHub MCP, Daytona, three specialists, deterministic verification, and independent review worked together |
 | Deterministic fixture | complete approval, reconciliation, and CompletionGate certificate path | control-plane semantics, not live sponsor integration |
 
@@ -126,7 +126,7 @@ The supervisor preloads only `get_commit`, `create_pull_request`, and `pull_requ
 
 ### SDK limitation
 
-TrueForge SDK `0.1.3` does not expose a per-dynamic-subagent pre-execution tool interceptor or allowlist. The supervisor MCP surface is restricted, tool budgets are enforced, and any specialist contract violation fails closed; however, post-event rejection is not represented as equivalent to pre-execution prevention. Qodo's remaining High finding is therefore documented as **BLOCKED by the SDK surface**, not falsely marked fixed.
+TrueForge SDK `0.1.3` does not expose a per-dynamic-subagent pre-execution tool interceptor or allowlist. The supervisor MCP surface is restricted, tool budgets are enforced, and any specialist contract violation fails closed; however, post-event rejection is not represented as equivalent to pre-execution prevention. That boundary remains **BLOCKED by the SDK surface**, not falsely marked fixed.
 
 ## Evaluation
 
@@ -142,7 +142,7 @@ The 320, 375, 768, 1024, and 1440px layouts were browser-observed without page-l
 
 Qodo Agentic Review is active on PR #2. The canonical aggregate is [this review comment](https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502); detailed disposition is in [docs/qodo-review-log.md](docs/qodo-review-log.md).
 
-The finalization passes resolved both serialized prompt expansion and the fabricated-root-cause path. Exact context plus exact reproduction alone now leaves `root-cause-supported` pending. Specialist causal claims are bounded, structured, stored as non-authoritative observations, and promoted only by application-owned correlation.
+The finalization passes resolved serialized prompt expansion, the fabricated-root-cause path, and promotion of unresolved model-authored references. Exact context plus exact reproduction alone leaves `root-cause-supported` pending. Specialist causal claims are bounded and structured; every cited reference must resolve to a successful, earlier tool result from the same specialist thread. Only those event-backed observations can enter application-owned correlation.
 
 The final post-commit exact-SHA request and status are recorded in the PR body because a repository document cannot truthfully contain the SHA of the commit that contains itself.
 

@@ -25,7 +25,7 @@ The TrueForge path added:
 
 - exactly three named diagnostics in one fan-out;
 - bounded structured causal output shared by specialists and supervisor;
-- non-authoritative diagnostic observations plus application-owned root-cause promotion;
+- non-authoritative diagnostic observations grounded in same-thread tool results plus application-owned root-cause promotion;
 - Daytona-only repository execution;
 - exact incident and head `get_commit` binding;
 - application-owned bootstrap, patch-capture, and verifier manifests;
@@ -42,7 +42,7 @@ The historical incident bootstrap was aligned with its authoritative CI: the old
 
 Repeated Agentic Review passes found and verified fixes for stale approvals/certificates, reconciliation identity, cursor durability, timeout races, event-journal ordering, terminal persistence, cancellation retry, GitHub response binding, serialized prompt expansion, and fabricated root-cause promotion.
 
-The final causal change rejects the unsafe equivalence between symptom reproduction and diagnosis. Exact context plus exact reproduction remains pending. A named specialist must supply a bounded cause, causal mechanism, affected location, and evidence references; the application then performs exact-evidence correlation before PASS.
+The final causal changes reject both the unsafe equivalence between symptom reproduction and diagnosis and promotion of unresolved model-authored references. Exact context plus exact reproduction remains pending. A named specialist must supply a bounded cause and causal mechanism whose references resolve to earlier successful tool results in that specialist thread; the application then performs exact-evidence correlation before PASS.
 
 One High remains intentionally open: TrueForge SDK `0.1.3` lacks a per-dynamic-subagent pre-execution tool policy. EvidenceForge documents the boundary rather than pretending post-event rejection prevents execution.
 
@@ -65,7 +65,7 @@ pnpm install --frozen-lockfile
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test                  226/226
+pnpm test                  231/231
 pnpm eval:smoke
 pnpm demo:fixture
 pnpm build

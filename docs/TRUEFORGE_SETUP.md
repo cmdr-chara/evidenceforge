@@ -97,19 +97,20 @@ The live workflow is intentionally narrow:
    - Repository Investigator;
    - Failure / Log Investigator;
    - Dependency / Configuration Investigator.
-4. Require each specialist to return one bounded JSON object containing observations, causal hypotheses, affected locations, and evidence references.
+4. Require each specialist to return one bounded JSON object containing observations, causal hypotheses, affected locations, and exact strings observed in that specialist's completed tool results.
 5. Store specialist causal claims as non-authoritative `OPEN` observations.
-6. Promote `root-cause-supported` only when the application correlates a current causal observation with admissible exact-incident and exact-reproduction evidence.
-7. Reproduce the original failure using the application-owned manifest.
-8. Serialize patching.
-9. Capture `git diff --binary` before any post-patch verifier.
-10. Run every deterministic verifier from the exact manifest.
-11. Run one isolated independent reviewer bound to the current patch digest.
-12. Read the authoritative current branch head with `get_commit`.
-13. Prepare one exact PR action targeting `feat/foundation-control-plane` → `determination`.
-14. Pause before `create_pull_request` for human approval.
-15. After an approved write, reconcile through `pull_request_read`.
-16. Allow only `CompletionGate` to issue completion.
+6. Resolve every causal reference to an earlier successful `TOOL_RESULT` from the same specialist thread; model-authored locations and reference strings never become artifact references directly.
+7. Promote `root-cause-supported` only when the application correlates the resulting event-backed observation with admissible exact-incident and exact-reproduction evidence.
+8. Reproduce the original failure using the application-owned manifest.
+9. Serialize patching.
+10. Capture `git diff --binary` before any post-patch verifier.
+11. Run every deterministic verifier from the exact manifest.
+12. Run one isolated independent reviewer bound to the current patch digest.
+13. Read the authoritative current branch head with `get_commit`.
+14. Prepare one exact PR action targeting `feat/foundation-control-plane` → `determination`.
+15. Pause before `create_pull_request` for human approval.
+16. After an approved write, reconcile through `pull_request_read`.
+17. Allow only `CompletionGate` to issue completion.
 
 Context plus reproduction is not a root cause. A missing causal mechanism, an empty evidence reference set, a wrong base such as `main`, a missing head read, an unbound patch, a specialist budget violation, or a resumed terminal task blocks or remains pending before external effects.
 

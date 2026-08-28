@@ -18,6 +18,9 @@ import {
 } from "../../../packages/verification/src";
 import { SessionController } from "../../../packages/workflow/src";
 
+const RUNTIME_EVENT_ARTIFACT_PREFIX = "runtime-event://";
+const DIAGNOSTIC_EVIDENCE_EVENT_MAX_CHARACTERS = 32_768;
+
 export class DiagnosticOutputError extends Error {
   public constructor(message: string) {
     super(message);
@@ -58,9 +61,22 @@ export function projectDiagnosticRootCauseClaims(
   }
   if (output.rootCauseHypotheses.length === 0) return 0;
 
-  const projections = output.rootCauseHypotheses.map((claim, index) =>
-    buildDiagnosticProjection(state, event, specialist.id, specialist.name, claim, index),
-  );
+  const projections = output.rootCauseHypotheses.map((claim, index) => {
+    const resolvedEventIds = resolveDiagnosticEvidenceEventIds(
+      evidenceStore,
+      event,
+      claim.evidenceReferences,
+    );
+    return buildDiagnosticProjection(
+      state,
+      event,
+      specialist.id,
+      specialist.name,
+      claim,
+      resolvedEventIds,
+      index,
+    );
+  });
   for (const projection of projections) {
     const existing = evidenceStore.getEvidence(projection.evidence.id);
     if (
@@ -211,6 +227,7 @@ function buildDiagnosticProjection(
   specialistId: string,
   specialistName: string,
   claim: DiagnosticRootCauseClaim,
+  resolvedEventIds: string[],
   index: number,
 ): {
   evidence: Evidence;
@@ -226,10 +243,7 @@ function buildDiagnosticProjection(
       sourceEventId: event.id,
       sourceTool: `trueforge.dynamic-subagent.${specialistId}`,
       claim: `${specialistName} reported: ${statement}`,
-      artifactRefs: [...new Set([
-        ...claim.affectedLocations,
-        ...claim.evidenceReferences,
-      ])],
+      artifactRefs: resolvedEventIds.map(runtimeEventArtifactRef),
       binding: artifactBindingFor(state, "INCIDENT"),
       timestamp: event.timestamp,
       metadata: {
@@ -238,6 +252,12 @@ function buildDiagnosticProjection(
         hypothesisId: claim.id,
         reportedStatus: claim.status,
         causeDigest,
+        specialistThreadId: event.threadId ?? "",
+        resolvedEvidenceCount: resolvedEventIds.length,
+        resolvedEvidenceDigest: digestCanonical({
+          references: claim.evidenceReferences,
+          eventIds: resolvedEventIds,
+        }),
       },
     }),
     hypothesis: {
@@ -267,6 +287,9 @@ function isCurrentDiagnosticEvidence(
   evidenceStore: EvidenceStore,
 ): boolean {
   const sourceEvent = evidenceStore.getEvent(evidence.sourceEventId);
+  const resolvedEvents = evidence.artifactRefs.map((artifactRef) =>
+    readResolvedDiagnosticEvent(artifactRef, evidenceStore),
+  );
   return (
     state.evidenceIds.includes(evidence.id) &&
     evidence.kind === "OBSERVATION" &&
@@ -277,9 +300,133 @@ function isCurrentDiagnosticEvidence(
     (evidence.metadata?.reportedStatus === "SUPPORTED" ||
       evidence.metadata?.reportedStatus === "CONFIRMED") &&
     typeof evidence.metadata?.causeDigest === "string" &&
-    evidence.artifactRefs.length > 0 &&
+    typeof evidence.metadata?.resolvedEvidenceDigest === "string" &&
+    evidence.metadata?.resolvedEvidenceCount === evidence.artifactRefs.length &&
+    evidence.metadata?.specialistThreadId === sourceEvent.threadId &&
+    resolvedEvents.length > 0 &&
+    resolvedEvents.every(
+      (resolved): resolved is RuntimeEvent =>
+        resolved !== undefined &&
+        resolved.type === "TOOL_RESULT" &&
+        resolved.threadId === sourceEvent.threadId &&
+        eventPrecedes(resolved, sourceEvent),
+    ) &&
     artifactBindingMatchesState(evidence.binding, state, "INCIDENT")
   );
+}
+
+function resolveDiagnosticEvidenceEventIds(
+  evidenceStore: EvidenceStore,
+  diagnosticEvent: RuntimeEvent,
+  references: string[],
+): string[] {
+  if (diagnosticEvent.threadId === undefined) {
+    throw new DiagnosticOutputError("diagnostic output was not bound to a specialist thread");
+  }
+  const candidates = evidenceStore.listEvents().filter(
+    (candidate) =>
+      candidate.type === "TOOL_RESULT" &&
+      candidate.threadId === diagnosticEvent.threadId &&
+      eventPrecedes(candidate, diagnosticEvent),
+  );
+  const resolvedEventIds: string[] = [];
+  for (const reference of references) {
+    const resolved = [...candidates].reverse().find((candidate) =>
+      eventPayloadContainsReference(candidate, reference),
+    );
+    if (resolved === undefined) {
+      throw new DiagnosticOutputError(
+        "diagnostic cause cited evidence that was not observed in its specialist thread",
+      );
+    }
+    if (!resolvedEventIds.includes(resolved.id)) resolvedEventIds.push(resolved.id);
+  }
+  if (resolvedEventIds.length === 0) {
+    throw new DiagnosticOutputError("diagnostic cause did not resolve any recorded tool evidence");
+  }
+  return resolvedEventIds;
+}
+
+function eventPayloadContainsReference(event: RuntimeEvent, reference: string): boolean {
+  const serialized = JSON.stringify(event.payload);
+  if (serialized.length > DIAGNOSTIC_EVIDENCE_EVENT_MAX_CHARACTERS) return false;
+  const payload = asRecord(event.payload);
+  const content = payload.content;
+  if (typeof content !== "string") return false;
+  try {
+    const response = asRecord(JSON.parse(content) as unknown);
+    if (!diagnosticToolResultIsUsable(response)) return false;
+    return collectToolResultStrings(response).some((text) => text.includes(reference));
+  } catch {
+    return false;
+  }
+}
+
+function diagnosticToolResultIsUsable(response: Record<string, unknown>): boolean {
+  const records = [
+    response,
+    asRecord(response.result),
+    asRecord(response.response),
+    asRecord(response.output),
+  ];
+  if (records.some((record) => record.success === false)) return false;
+  return !records.some((record) =>
+    typeof record.status === "string" &&
+    ["ERROR", "FAILED", "FAILURE", "DENIED", "TIMEOUT"].includes(
+      record.status.toUpperCase(),
+    )
+  );
+}
+
+function collectToolResultStrings(response: Record<string, unknown>): string[] {
+  const strings: string[] = [];
+  const pending: Array<{ value: unknown; depth: number }> = [{ value: response, depth: 0 }];
+  let visited = 0;
+  while (pending.length > 0 && visited < 512) {
+    const current = pending.pop();
+    if (current === undefined) break;
+    visited += 1;
+    if (typeof current.value === "string") {
+      strings.push(current.value);
+      continue;
+    }
+    if (current.depth >= 8 || current.value === null || typeof current.value !== "object") {
+      continue;
+    }
+    const children = Array.isArray(current.value)
+      ? current.value
+      : Object.values(current.value as Record<string, unknown>);
+    for (const child of children) {
+      pending.push({ value: child, depth: current.depth + 1 });
+    }
+  }
+  return strings;
+}
+
+function eventPrecedes(candidate: RuntimeEvent, boundary: RuntimeEvent): boolean {
+  return (
+    typeof candidate.sequenceNumber === "number" &&
+    typeof boundary.sequenceNumber === "number" &&
+    candidate.sequenceNumber < boundary.sequenceNumber
+  );
+}
+
+function runtimeEventArtifactRef(eventId: string): string {
+  return `${RUNTIME_EVENT_ARTIFACT_PREFIX}${encodeURIComponent(eventId)}`;
+}
+
+function readResolvedDiagnosticEvent(
+  artifactRef: string,
+  evidenceStore: EvidenceStore,
+): RuntimeEvent | undefined {
+  if (!artifactRef.startsWith(RUNTIME_EVENT_ARTIFACT_PREFIX)) return undefined;
+  const encodedEventId = artifactRef.slice(RUNTIME_EVENT_ARTIFACT_PREFIX.length);
+  if (encodedEventId.length === 0) return undefined;
+  try {
+    return evidenceStore.getEvent(decodeURIComponent(encodedEventId));
+  } catch {
+    return undefined;
+  }
 }
 
 function readDiagnosticContent(event: RuntimeEvent): string | undefined {

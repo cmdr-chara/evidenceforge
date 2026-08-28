@@ -25,7 +25,8 @@ export const DIAGNOSTIC_OUTPUT_PROTOCOL = [
   "Return only one JSON object with no prose or code fence.",
   "It must use schemaVersion 1 and exactly these fields:",
   '{"schemaVersion":1,"findings":["<bounded observation>"],"rootCauseHypotheses":[{"id":"<stable-id>","cause":"<specific defect or configuration condition>","causalMechanism":"<how that cause produces the observed failure>","affectedLocations":["<path:symbol or configuration key>"],"evidenceReferences":["<bounded file, symbol, log signature, or artifact reference>"],"status":"SUPPORTED"}],"unresolvedQuestions":[]}.',
-  "Use SUPPORTED or CONFIRMED only for a causal claim backed by the listed evidence references; otherwise return an empty rootCauseHypotheses array rather than guessing.",
+  "Every evidenceReferences entry must be an exact bounded string observed in a completed tool result from this specialist thread; EvidenceForge rejects unresolved or cross-thread references.",
+  "Use SUPPORTED or CONFIRMED only for a causal claim backed by those recorded tool results; otherwise return an empty rootCauseHypotheses array rather than guessing.",
 ].join(" ");
 
 export function parseDiagnosticSpecialistOutput(
@@ -79,6 +80,7 @@ function parseRootCauseClaim(value: unknown): DiagnosticRootCauseClaim | undefin
     value.evidenceReferences,
     1,
     DIAGNOSTIC_REFERENCE_MAX_COUNT,
+    8,
   );
   const status = value.status;
   if (
@@ -107,13 +109,18 @@ function readBoundedStringArray(
   value: unknown,
   minimumCount: number,
   maximumCount: number,
+  minimumLength = 1,
 ): string[] | undefined {
   if (!Array.isArray(value) || value.length < minimumCount || value.length > maximumCount) {
     return undefined;
   }
   const parsed: string[] = [];
   for (const item of value) {
-    const text = readBoundedString(item, 1, DIAGNOSTIC_REFERENCE_MAX_CHARACTERS);
+    const text = readBoundedString(
+      item,
+      minimumLength,
+      DIAGNOSTIC_REFERENCE_MAX_CHARACTERS,
+    );
     if (text === undefined || parsed.includes(text)) return undefined;
     parsed.push(text);
   }

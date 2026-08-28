@@ -13,7 +13,7 @@ The exact final SHA, exact-head CI URL, and post-commit Qodo request are maintai
 | Published history preserved | PASS | no force push, rebase, or merge performed in finalization |
 | Runtime state excluded | PASS | `.data/` and `.evidenceforge/` remain ignored and untracked |
 | Executable candidate frozen install | PASS | exact code-head CI ran `pnpm install --frozen-lockfile` |
-| Executable candidate verification matrix | PASS | exact code-head CI passed format, lint, typecheck, 226/226 tests, eval, fixture, build, doctor, and diff check |
+| Executable candidate verification matrix | PASS | local candidate passed format, lint, typecheck, 231/231 tests, eval, fixture, build, doctor, and diff check |
 | Final documentation-head CI | MANUAL | must run after this file is committed and be recorded externally in PR #2 |
 | CompletionGate-only completion | PASS | direct/model/tool/reviewer completion paths are rejected |
 | Certificate identity and integrity | PASS | task/repository/revision/patch/state/contract/subject/payload digests validated |
@@ -26,7 +26,7 @@ The exact final SHA, exact-head CI URL, and post-commit Qodo request are maintai
 | Exactly three diagnostics | PASS | named one-fan-out topology and regression coverage |
 | Bounded specialist budgets | PASS | violation blocks the task |
 | Structured causal diagnostic output | PASS | bounded cause/mechanism/location/reference schema shared by specialists and supervisor |
-| Application-owned root-cause promotion | PASS | specialist claim begins OPEN; exact incident + reproduction + causal observation required for PASS |
+| Application-owned root-cause promotion | PASS | specialist claim begins OPEN; each reference resolves to an earlier successful same-thread tool result before exact incident + reproduction + causal observation can produce PASS |
 | Daytona-only repository execution | PASS | live manifests and policy require sandbox execution |
 | Bootstrap before verification | PASS | application-owned manifest and sequencing tests |
 | Patch capture before post-patch verification | PASS | exact `git diff --binary` manifest and binding |
@@ -43,7 +43,7 @@ The exact final SHA, exact-head CI URL, and post-commit Qodo request are maintai
 | Exact viewport matrix | PASS | 320/375/768/1024/1440 observed; later changes do not alter geometry |
 | Small-text contrast | PASS | accessible muted color + deterministic >=4.5:1 test on both dark surfaces |
 | Exact 200% zoom | MANUAL | unavailable through current connector/browser surface; not inferred |
-| Qodo implementable High findings | PASS | fabricated root cause and all prior implementable High findings resolved on exact code head |
+| Qodo implementable High findings | PASS | fabricated root cause and unresolved-reference promotion are fixed in the candidate; exact-SHA Qodo confirmation remains external |
 | Qodo documentation Medium findings | PASS | fixture reset command and external final-head gate representation corrected in this commit |
 | Qodo SDK boundary | BLOCKED | retained as genuine High limitation |
 | Final post-commit Qodo exact-SHA record | MANUAL | external result linked in PR body/aggregate after this commit |

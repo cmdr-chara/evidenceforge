@@ -11,9 +11,9 @@ Record only genuine Qodo findings and observed follow-up evidence.
 
 ## Current disposition
 
-The exact code-head aggregate marks **Root cause is fabricated** resolved. Exact incident context plus exact reproduction no longer produces a synthetic hypothesis or PASS. The reducer consumes only a bounded causal JSON object from a named completed diagnostic thread, stores the claim as a non-authoritative `OPEN` observation, and lets the application promote it to `SUPPORTED` only after exact incident and reproduction evidence are admissible.
+The prior exact code-head aggregate marks **Root cause is fabricated** resolved and reports a newer implementable High, **Unresolved references become evidence**. The current candidate addresses that newer finding: exact incident context plus exact reproduction no longer produces a synthetic hypothesis or PASS, and a causal claim becomes a non-authoritative `OPEN` observation only after every cited string resolves to an earlier successful tool result from the same named specialist thread. Model-authored locations, unresolved strings, failed outputs, transport keys, and cross-thread results are not promoted to artifact references. Exact-SHA Qodo confirmation remains external.
 
-The remaining High is **Read-only boundary is unenforced**. It is valid but blocked by the public TrueForge SDK `0.1.3` surface. The SDK enables dynamic subagents but exposes no per-dynamic-subagent pre-execution tool allowlist, interceptor, or separate capability set.
+The standing SDK-boundary High is **Read-only boundary is unenforced**. It is valid but blocked by the public TrueForge SDK `0.1.3` surface. The SDK enables dynamic subagents but exposes no per-dynamic-subagent pre-execution tool allowlist, interceptor, or separate capability set.
 
 EvidenceForge does not label prompt instructions or post-event rejection as equivalent to prevention. The supervisor GitHub MCP surface is restricted and preloaded, specialist roles and budgets are enforced, mutation is serialized, and violations fail closed; the unavailable pre-execution specialist boundary remains explicit.
 
@@ -22,6 +22,7 @@ EvidenceForge does not label prompt instructions or post-event rejection as equi
 | Severity | Finding | Disposition | Evidence |
 |---|---|---|---|
 | High | Root cause is fabricated | RESOLVED | context + reproduction alone remains PENDING; structured causal observation + exact evidence is required for application PASS |
+| High | Unresolved references become evidence | FIXED — PENDING EXACT-SHA QODO | cited strings resolve to earlier successful same-thread tool events; missing, failed, transport-key, and cross-thread regressions |
 | Medium | Serialization bypasses prompt cap | RESOLVED | task validation measures actual JSON-serialized objective/constraints; hostile control-character regression |
 | Medium | Fixture reset command omitted | RESOLVED IN THIS COMMIT | demo preparation invokes `pnpm demo:reset` before fixture validation |
 | Medium | Unverified head marked passing | RESOLVED IN THIS COMMIT | executable candidate PASS and self-referential final-documentation-head CI are separate gates |

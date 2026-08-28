@@ -26,6 +26,7 @@
 - [x] Bounded specialist tool budgets; violations block.
 - [x] Bounded structured causal-output contract for each specialist.
 - [x] Specialist causal claims stored as non-authoritative OPEN observations.
+- [x] Every causal reference resolves to an earlier successful tool result from the same specialist thread.
 - [x] Root-cause PASS requires exact incident, exact reproduction, and current causal evidence.
 - [x] Context plus reproduction alone leaves root cause PENDING.
 - [x] Repository execution constrained to Daytona in live workflows.
@@ -43,13 +44,13 @@
 
 ## Verification
 
-The exact executable code head contains 226 tests and passed the complete frozen matrix. Because this checklist changes repository state, verification of the commit containing this checklist is deliberately a separate external gate recorded in PR #2.
+The current executable candidate contains 231 tests and passed the complete local matrix. Because this checklist changes repository state, exact-head CI for the commit containing it is deliberately a separate external gate recorded in PR #2.
 
 - [x] `pnpm install --frozen-lockfile` on the executable code head.
 - [x] `pnpm format:check` on the executable code head.
 - [x] `pnpm lint` on the executable code head.
 - [x] `pnpm typecheck` on the executable code head.
-- [x] `pnpm test` — 226/226 on the executable code head.
+- [x] `pnpm test` — 231/231 on the executable candidate.
 - [x] `pnpm eval:smoke` on the executable code head.
 - [x] `pnpm demo:fixture` on the executable code head.
 - [x] `pnpm build` on the executable code head.
@@ -94,6 +95,7 @@ The exact executable code head contains 226 tests and passed the complete frozen
 - [x] Every implementable Critical/High finding on the executable code head fixed or resolved.
 - [x] JSON serialization prompt-cap finding fixed with deterministic regression.
 - [x] Fabricated root-cause finding fixed with negative and positive exact-evidence regressions.
+- [x] Unresolved diagnostic references rejected with missing, failed-result, transport-key, and cross-thread regressions.
 - [x] SDK-limited read-only boundary retained as BLOCKED, not falsely resolved.
 - [x] Demo reset command added.
 - [x] Final-documentation-head verification represented as an external gate, not a premature PASS.

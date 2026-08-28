@@ -4,7 +4,7 @@
 
 EvidenceForge is a TrueForge-based CI incident control plane designed to prevent false completion. Models diagnose and propose; application-owned evidence, deterministic verifiers, approval policy, external-state reconciliation, and CompletionGate decide.
 
-The exact executable code head passes the frozen verification matrix with 226 tests. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached 9/10 application gates; `external-pr` remains the unverified live gate. The deterministic fixture completes the full approval/reconciliation/certificate path and is labeled accordingly.
+The executable candidate passes the local verification matrix with 231 tests; exact-head CI is recorded externally after publication. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached 9/10 application gates; `external-pr` remains the unverified live gate. The deterministic fixture completes the full approval/reconciliation/certificate path and is labeled accordingly.
 
 ## Problem
 
@@ -31,7 +31,7 @@ Evidence is bound to task, repository, revision, patch digest, and scope. Repatc
 
 ### Causal diagnostic gate
 
-Each named specialist must return a bounded structured object with a cause, causal mechanism, affected locations, and evidence references. EvidenceForge stores that claim as a non-authoritative `OPEN` observation. Only application-owned correlation with exact incident and reproduction evidence may promote the hypothesis to `SUPPORTED` and pass `root-cause-supported`.
+Each named specialist must return a bounded structured object with a cause, causal mechanism, affected locations, and evidence references. Every reference must resolve to content from an earlier successful tool result in the same specialist thread; arbitrary strings and transport keys are rejected. EvidenceForge stores only the resolved event links as a non-authoritative `OPEN` observation. Only application-owned correlation with exact incident and reproduction evidence may promote the hypothesis to `SUPPORTED` and pass `root-cause-supported`.
 
 ### TrueForge orchestration
 
@@ -61,9 +61,9 @@ EvidenceForge blocked every unsafe deviation. No invalid PR was created.
 
 Qodo Agentic Review materially improved certificate immutability, repatch invalidation, approval races, PR identity, cursor recovery, stream timeout fencing, event-journal order, terminal durability, cancellation retry, response binding, prompt bounds, and causal root-cause verification.
 
-The fabricated-root-cause High is resolved: exact context plus exact reproduction alone remains pending, while structured specialist causality is accepted only after application correlation.
+The fabricated-root-cause and unresolved-reference High paths are fixed in the candidate: exact context plus exact reproduction alone remains pending, and structured specialist causality is accepted only after same-thread tool-result resolution and application correlation. Exact-SHA Qodo confirmation remains an external gate.
 
-Qodo's remaining High is valid but SDK-blocked: TrueForge SDK `0.1.3` has no per-dynamic-subagent pre-execution tool interceptor/allowlist. EvidenceForge does not mislabel post-event rejection as prevention.
+Qodo's standing SDK-boundary High is valid but blocked: TrueForge SDK `0.1.3` has no per-dynamic-subagent pre-execution tool interceptor/allowlist. EvidenceForge does not mislabel post-event rejection as prevention.
 
 ## UI and judge-visible behavior
 
@@ -81,7 +81,7 @@ Responsive browser observations cover 320, 375, 768, 1024, and 1440px. The final
 ## Measured result
 
 ```text
-Executable repository CI:    complete frozen matrix, 226/226 tests
+Executable local candidate:  complete matrix, 231/231 tests
 Deterministic fixture:       10/10 + CompletionGate certificate
 Credentialed live workflow:  9/10; external-pr not completed
 False-success evaluation:    EvidenceForge 0%; baseline 57.14%
