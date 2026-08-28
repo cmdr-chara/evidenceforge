@@ -12,26 +12,38 @@ body {
 .status-pill {
   min-height: 30px;
   padding: 6px 10px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   line-height: 1.25;
 }
 
 .metric,
 .permission-label {
   color: #b7bab2;
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   line-height: 1.45;
 }
 
 .activity-meta {
   color: #a0a49b;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   line-height: 1.45;
 }
 
 .certificate-grid strong {
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   line-height: 1.4;
+}
+
+.masthead-label,
+.hero-kicker,
+.visual-readout,
+dt,
+.section-index,
+.eyebrow,
+.timeline li,
+.verifier,
+.evidence-kind {
+  font-size: 0.75rem;
 }
 
 .certificate-grid span,

@@ -56,7 +56,7 @@ html {
   background: #0d0f0c;
 }
 body {
-  min-width: 320px;
+  min-width: 0;
   min-height: 100vh;
   margin: 0;
   background:
@@ -86,6 +86,9 @@ button:focus-visible, input:focus-visible, pre:focus-visible, a:focus-visible {
   top: 10px;
   left: 10px;
   z-index: 100;
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
   padding: 10px 14px;
   color: var(--ink);
   background: var(--signal);
@@ -109,6 +112,7 @@ button:focus-visible, input:focus-visible, pre:focus-visible, a:focus-visible {
 
 .wordmark {
   display: inline-flex;
+  min-height: 44px;
   align-items: center;
   justify-self: start;
   gap: 12px;
@@ -193,7 +197,7 @@ main { width: min(1540px, calc(100% - clamp(28px, 6vw, 104px))); margin: 0 auto;
   background: linear-gradient(90deg, var(--ink), transparent 35%), linear-gradient(0deg, rgb(9 10 8 / 0.45), transparent 50%);
   content: "";
 }
-.hero-visual img { width: 100%; height: 100%; object-fit: cover; object-position: 61% center; filter: saturate(0.85) contrast(1.08); }
+.hero-visual img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 61% center; filter: saturate(0.85) contrast(1.08); }
 .visual-readout {
   position: absolute;
   right: 26px;
@@ -205,7 +209,7 @@ main { width: min(1540px, calc(100% - clamp(28px, 6vw, 104px))); margin: 0 auto;
   padding: 12px 0;
   border-top: 1px solid rgb(189 255 85 / 0.7);
   color: var(--paper-dim);
-  font: 0.7rem/1.2 var(--mono);
+  font: 0.7rem/1.4 var(--mono);
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
