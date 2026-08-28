@@ -1,198 +1,94 @@
-# The Agent Said It Was Fixed. The Tests Disagreed: Building an Evidence-Gated Agent with TrueForge
+# EvidenceForge field report
 
-> Draft status — 2026-08-28: exact-head GitHub Actions is green on the latest
-> technical implementation. A real failing workflow, TrueForge/model, GitHub MCP,
-> Daytona, and exactly three live specialists are observed. The completed vertical
-> slice remains blocked by model-provider HTTP 402 insufficient balance; live
-> approval/PR, final exact-head Qodo, and the demo remain explicitly open.
+## Executive summary
 
-## 1. Why “agent says done” is not a completion criterion
+EvidenceForge is a TrueForge-based CI incident control plane designed to prevent false completion. Models diagnose and propose; application-owned evidence, deterministic verifiers, approval policy, external-state reconciliation, and CompletionGate decide.
 
-Agent systems often use the same model to make a change and assess whether the change worked. That creates a circular authority problem: confidence, plausibility, or a reviewer-style summary can become a substitute for an oracle.
+The final repository candidate passes the frozen verification matrix with 220 tests. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached 9/10 application gates; `external-pr` remains the unverified live gate. The deterministic fixture completes the full approval/reconciliation/certificate path and is labeled accordingly.
 
-EvidenceForge separates execution from completion. The model investigates, proposes hypotheses, edits code, and requests tools. A deterministic application layer owns the success contract, evidence admissibility, verifier results, risk policy, and final state transition.
+## Problem
 
-> The model can propose success. It cannot issue the completion certificate.
+Agentic repair systems often collapse four different statements into one:
 
-## 2. TrueForge is the runtime; EvidenceForge is the control plane
+1. the model believes the task is fixed;
+2. a tool returned something that looks successful;
+3. deterministic checks passed on the current patch;
+4. the external system now contains the intended result.
 
-TrueForge owns the agent execution loop, model integration, MCP, sandbox, dynamic subagents, sessions, streamed events, context management, and human tool approval. EvidenceForge does not replace TrueForge with another orchestration framework.
+EvidenceForge treats these as separate states. Completion requires all of them to be proven with current, correctly bound evidence.
 
-EvidenceForge adds CI-incident-specific control:
+## Design
 
-- versioned success contracts;
-- evidence provenance and subject binding;
-- deterministic verifier correlation;
-- patch/review/approval invalidation;
-- external-action identity and reconciliation;
-- recovery semantics;
-- terminal cutoff;
-- CompletionGate certificate issuance;
-- an incident console designed around state/evidence rather than chat.
+### Application-owned success contract
 
-## 3. Completion integrity
+The required criteria are created before work begins and cannot be removed by model prose. Each PASS must be supported by admissible evidence and a deterministic verifier result.
 
-The certificate accepted by the state machine is bound to:
+### Exact subject binding
 
-- task ID;
-- repository;
-- failing revision;
-- patch digest;
-- state version;
-- success-contract digest;
-- canonical state digest;
-- canonical subject digest;
-- trace ID;
-- exact reconciled PR identity when publishing is required.
+Evidence is bound to task, repository, revision, patch digest, and scope. Repatching preserves incident facts but invalidates patch verification, review, approvals, actions, and operations.
 
-The certificate payload itself has a canonical digest. The object and all nested arrays/objects are deeply frozen. The state machine revalidates issuance identity, payload digest, and current subject before `COMPLETED` is allowed.
+### TrueForge orchestration
 
-Changing the patch preserves incident-context/root-cause/reproduction evidence, but invalidates patch verification, independent review, round evaluation, old external approval/action, and the related external operation.
+TrueForge remains the primary runtime. The supervisor uses exactly three named diagnostic specialists, Daytona for repository execution, a restricted/preloaded GitHub MCP surface, persistent sessions, streamed events, skills, and approval pauses.
 
-## 4. Evidence provenance
+### Serialized mutation and external effects
 
-Evidence is classified as observation, reproduction, verification, review, or external result. Current verification evidence carries a binding to the task/repository/revision/success contract and an explicit scope:
+Diagnostics are read-only by contract. Patching is serialized. External PR creation requires an exact prepared action, a human approval bound to that action, and later authoritative reconciliation.
 
-- `INCIDENT` — remains valid across repatches when the incident itself did not change;
-- `PATCH` — must match the current patch;
-- `EXTERNAL` — must match the current patch and publishing subject.
+### Completion certificate
 
-Model prose remains inadmissible as deterministic PASS evidence.
+Only CompletionGate may issue the deeply immutable certificate accepted by the state machine. It binds the complete certified subject and includes canonical payload and subject digests.
 
-## 5. Approval and exact PR identity
+## Reliability lessons from live operation
 
-Pull-request creation is an external reversible action. Approval provenance binds the action digest, repository, revision, risk, originating operation, current external subject, issue time, expiry, and one-shot consumption.
+The live workflow exposed failures that fixture-only development would not have found:
 
-The live server serializes the complete per-task decision path. A regression test submits two concurrent decisions and proves only one reaches the simulated external-submission section.
+- full checkpoint rewrites for thousands of model deltas caused timeout pressure;
+- the historical failing revision lacked a lockfile and required its authoritative no-frozen install mode;
+- the model proposed the wrong PR base and skipped the authoritative head read;
+- tool discovery had to be removed from the supervisor surface;
+- specialist tool budgets had to remain bounded and fail closed.
 
-Reconciliation validates the exact prepared identity: repository, base branch, head branch, head SHA, operation ID, and idempotency key. A PR at the same commit but a different target is rejected.
+EvidenceForge blocked every unsafe deviation. No invalid PR was created.
 
-## 6. Durable restart behavior
+## Qodo impact
 
-A normal TrueForge model message may arrive as a base event plus same-ID deltas that construct a tool call before a later `tool.response`. EvidenceForge now persists those deltas individually rather than deduplicating solely by event ID.
+Qodo Agentic Review materially improved certificate immutability, repatch invalidation, approval races, PR identity, cursor recovery, stream timeout fencing, event-journal order, terminal durability, cancellation retry, and response binding.
 
-After restart, the projector rebuilds its event index from persisted raw event payloads. An integration test stops after the streamed tool-call construction, recreates the projector, then correlates the later response and produces the deterministic verifier result.
+The finalization pass resolved Qodo's prompt-cap serialization finding by measuring actual JSON-serialized text and adding a hostile control-character regression.
 
-Completed-turn resume also skips history at or before the durable cursor and persists the maximum sequence number actually observed, preventing endless reprocessing of already completed turns.
+Qodo's remaining High is valid but SDK-blocked: TrueForge SDK `0.1.3` has no per-dynamic-subagent pre-execution tool interceptor/allowlist. EvidenceForge does not mislabel post-event rejection as prevention.
 
-## 7. Terminal correctness
+## UI and judge-visible behavior
 
-Once a session is `BLOCKED`, `FAILED`, `ESCALATED`, or `COMPLETED`, late runtime events cannot mutate actionable state. The terminal event records a durable sequence cutoff; later buffered events are neither projected into actionable state nor included in the persisted checkpoint.
+The console distinguishes:
 
-The live console reconstructs activity only through that cutoff. Terminal states are visually distinct from successful activity.
+- model activity;
+- authoritative tool evidence;
+- application-owned PASS;
+- pending human approval;
+- BLOCKED/FAILED/ESCALATED;
+- certified COMPLETED.
 
-Malformed tool responses, explicit failures, and non-zero exits render as `ERROR`, not green success.
+Responsive browser observations cover 320, 375, 768, 1024, and 1440px. The final pass also raises muted small-text contrast and locks it with a deterministic >=4.5:1 test. Exact 200% browser zoom remains manual.
 
-## 8. Persistence reliability
+## Measured result
 
-Session and checkpoint filenames are keyed by a SHA-256 digest of the full task ID, eliminating collisions such as `a/b` versus `a_b`. Writes use unique UUID temporary files and per-task serialization. The embedded task ID is validated on read.
+```text
+Repository CI:               complete frozen matrix, 220/220 tests
+Deterministic fixture:       10/10 + CompletionGate certificate
+Credentialed live workflow:  9/10; external-pr not completed
+False-success evaluation:    EvidenceForge 0%; baseline 57.14%
+PR state:                     open, unmerged, base determination
+```
 
-Legacy sanitized filenames remain readable as a fallback. No destructive migration is performed.
+## Remaining risks and actions
 
-## 9. Parallel diagnostics and the TrueForge SDK limitation
+- per-dynamic-subagent pre-execution capability isolation requires a future TrueForge SDK surface or a TrueForge-compatible read-only proxy;
+- live external PR approval/write/reconciliation has not been stably reproduced;
+- exact 200% zoom remains manual;
+- video, human merge, and submission require human/external account actions.
 
-EvidenceForge's intended diagnostic topology is exactly three specialists:
+## Submission position
 
-1. Repository Investigator
-2. Failure / Log Investigator
-3. Dependency / Configuration Investigator
-
-The critical limitation is now documented precisely. TrueForge SDK `0.1.3` exposes dynamic-subagent enablement, but the inspected API does **not** expose a per-dynamic-subagent pre-execution tool allowlist or interceptor. Because subagents share the parent runtime capabilities, EvidenceForge cannot truthfully claim hard prevention of a specialist mutating the shared sandbox before execution.
-
-Prompt constraints and post-event detection are not equivalent to prevention. This remains an SDK-blocked Qodo High finding.
-
-The minimum safe evolution is either a future TrueForge per-subagent tool policy or a narrow read-only proxy/tool surface supplied to diagnostic subagents, while mutation remains serialized in the TrueForge parent flow. No second orchestrator is introduced.
-
-## 10. Evaluation correctness
-
-The deterministic comparison uses one recovery-success definition for both the unenforced baseline and EvidenceForge. A recovery attempt succeeds only when the terminal state is genuinely `COMPLETED` and the replay/reconciliation policy was satisfied. `BLOCKED` and `ESCALATED` cannot inflate recovery-success metrics.
-
-The existing 15-case comparison remains fixture control-policy evidence, not a claim about general model performance or live sponsor reliability.
-
-## 11. Live activity and UI
-
-The browser consumes a task-scoped SSE channel and receives a fresh persisted snapshot on reconnect. Browser-side task filtering is defense in depth.
-
-The UI also includes:
-
-- INFO / SUCCESS / WARNING / ERROR / BLOCKED activity semantics;
-- visible focus and skip navigation;
-- accessible log/live regions;
-- full title/ARIA values for long revision/trace/digest fields;
-- >=44px primary controls;
-- reduced-motion handling;
-- narrow responsive layouts down to 320px-class CSS rules.
-
-The exact 320 / 375 / 768 / 1024 / 1440 px and 200% zoom matrix has **not** been visually exercised in the available browser environment, so it remains a manual presentation gate.
-
-## 12. Qodo findings that changed the code
-
-Qodo Agentic Review is genuine and public:
-
-- PR #2: https://github.com/cmdr-chara/evidenceforge/pull/2
-- aggregate review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
-- earlier follow-up request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
-- final exact-SHA request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
-- Qodo exact-SHA update: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440921739
-
-The reconstructed batch addresses the implementable open High/Medium findings with code and regression tests, including certificate mutability, stale approvals after repatch, incident-evidence preservation, approval race, completed cursor, exact PR reconciliation, persistence collisions/tempfiles, SSE cross-talk, recovery metrics, streamed restart correlation, failed-tool activity, and initial activity recovery.
-
-The read-only pre-execution specialist boundary remains **BLOCKED by TrueForge SDK 0.1.3**, with rationale recorded in `docs/qodo-review-log.md`.
-
-Qodo updated its aggregate review through implementation SHA `c57c5e4…`. The cursor/path, runtime transaction, terminal-durability, and cancellation-retry findings are resolved. The disclosed SDK-blocked read-only boundary remains open separately.
-
-## 13. Verified repository result
-
-Latest technical implementation SHA
-`aed84feb7205d7b66a13804fc2fb8f4184f2324f` passed GitHub Actions runs
-`33155806482` and `33155815342` with:
-
-- frozen-lockfile install;
-- format;
-- lint;
-- strict typecheck;
-- **204/204 tests**;
-- evaluation smoke;
-- healthy demo fixture;
-- build;
-- doctor;
-- `git diff --check`.
-
-These results prove the externally verified repository baseline only. The real
-incident run `33153999792` and repair candidate `06b40e76…` are separately public.
-Live task `task-2a0444d3…` created/completed the three required specialists and
-initialized GitHub MCP and Daytona, but the provider ended with HTTP 402 after
-442,617 tokens. EvidenceForge stayed `BLOCKED` and created no PR. Those observations
-do not prove the end-to-end incident-resolution path or hackathon sponsor acceptance.
-
-## 14. Demo vertical slice still required
-
-The approximately three-minute live demo should show:
-
-1. a real failed GitHub Actions run and exact revision;
-2. a credentialed TrueForge EvidenceForge session;
-3. GitHub MCP retrieving authoritative context;
-4. the three diagnostic specialists;
-5. Daytona reproducing the failure at the exact revision;
-6. serialized patch creation and patch digest;
-7. deterministic verification and independent review;
-8. a real `tool.approval_required` pause showing exact PR arguments;
-9. human approval;
-10. the real PR and exact reconciliation;
-11. CompletionGate issuing the completion certificate;
-12. browser reconnect restoring the task-scoped snapshot.
-
-The specialist read-only pre-execution limitation should be described accurately rather than hidden.
-
-## 15. Limitations
-
-- Credentialed sponsor infrastructure has not yet been executed in the current environment.
-- TrueForge SDK `0.1.3` cannot enforce the desired per-dynamic-subagent read-only tool policy before execution.
-- Persistence is single-node JSON with application serialization, not a distributed transactional database.
-- The evaluation corpus is deterministic and too small for generalization claims.
-- Exact 320/375/768/1024/1440 viewport validation is observed clean; exact 200% browser zoom remains manual because the browser-control surface does not expose zoom.
-- The P0 policy deliberately does not merge, deploy, delete, or perform privileged actions.
-
-## 16. Production roadmap
-
-A production version would add transactional multi-writer persistence, multi-tenant authorization, signed artifact provenance, stronger sandbox/network capability boundaries, repository-specific contract templates, larger live evaluation corpora, cost/latency telemetry, and incident-system integrations—without relaxing the certificate-only completion invariant.
+EvidenceForge should be presented as a production-quality, fail-closed control plane with substantial credentialed live evidence and a transparent 9/10 boundary—not as a falsely completed end-to-end live run. The fixture may demonstrate the certificate path only when visibly labeled deterministic.

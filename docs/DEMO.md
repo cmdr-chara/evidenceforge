@@ -1,178 +1,98 @@
 # Demo script
 
-Target length: 3–5 minutes.
+Target: approximately three minutes. The demo must distinguish credentialed live evidence from deterministic fixture evidence at all times.
 
 ## Before recording
 
-1. Run all checks.
-2. Reset the healthy fixture.
-3. Prepare and push the dedicated failing demo branch only after approving that external write.
-4. Confirm the GitHub Actions run is red and record its immutable run ID and commit SHA.
-5. Confirm TrueForge, GitHub MCP, Daytona, skills, model, and Qodo connections.
-6. Open the EvidenceForge console and clear stale local session data only when a fresh demo is intended.
+1. Confirm PR #2 is open, unmerged, and targets `determination`.
+2. Confirm the exact final SHA and CI run in the PR body.
+3. Confirm TrueForge, model, GitHub MCP, Daytona, and skills are available.
+4. Run the repository checks.
+5. Reset the deterministic fixture.
+6. Decide whether the live section will stop at 9/10 or proceed to a genuine human-approved external write. Never approve automatically.
 
 ```bash
-pnpm demo:reset
+pnpm install --frozen-lockfile
+pnpm format:check
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm eval:smoke
 pnpm demo:fixture
+pnpm build
+pnpm doctor
 pnpm dev
 ```
 
-## Deterministic rehearsal
+## 0:00–0:20 — the promise
 
-The default console is labeled `DETERMINISTIC FIXTURE`. It exercises the real EvidenceForge state machine, evidence store, policy, and CompletionGate without claiming live sponsor calls.
+Show the EvidenceForge console and state:
 
-Use **Advance evidence** eight times to reach approval. Reject once during rehearsal to show safe blocking; reset, then repeat and approve to show certificate issuance.
+> The model can propose that a task is fixed. Only the application can certify completion.
 
-## Live demo
+Point out the visible distinction between model activity, authoritative tool evidence, application PASS, approval, BLOCKED, and certified COMPLETED.
 
-### 0:00–0:25 — real failure
+## 0:20–1:45 — credentialed live path
 
-Show the red GitHub Actions run on `demo/config-order-regression`.
-
-Point out:
-
-- repository and workflow;
-- failing revision;
-- failed job;
-- stable `CONFIG_VALIDATION_ORDER` signature.
-
-Start EvidenceForge with the actual repository, run ID, and commit SHA.
-
-### 0:25–0:50 — success contract
-
-Show the locked criteria:
+Use the profiled incident:
 
 ```text
-○ authoritative incident context
-○ original failure reproduced
-○ supported root cause
-○ regression verifier
-○ targeted tests
-○ typecheck
-○ lint
-○ diff integrity
-○ independent review
-○ reconciled pull request
+repository: cmdr-chara/evidenceforge
+run:        32892119950
+revision:   9accc9e484e055c8b22172e389dc50f84315f4e2
+failure:    authoritative TrueForge sandbox non-zero exit is never reported as OK
 ```
 
-State that the model cannot remove a criterion after a failed check.
+Show, as actually observed:
 
-### 0:50–1:30 — parallel diagnostics
+1. exact GitHub `get_commit` incident context;
+2. Daytona bootstrap of the exact historical revision;
+3. exactly three named diagnostic specialists;
+4. failure reproduction;
+5. supported root cause;
+6. serialized patch and patch digest;
+7. deterministic regression/tests/typecheck/lint/diff checks;
+8. independent reviewer bound to the current patch.
 
-Show TrueForge spawning exactly:
+The strongest existing live evidence reaches 9/10. When `external-pr` is not genuinely completed, stop and label the result **LIVE — 9/10 — NOT CERTIFIED**.
+
+Show one fail-closed behavior if useful: wrong `base: main`, missing head `get_commit`, or specialist budget violation. Make clear that no write occurred.
+
+## 1:45–2:20 — approval boundary
+
+Show the approval card or prepared action. It must display the exact repository, `head: feat/foundation-control-plane`, `base: determination`, expected head SHA, risk, and reversible status.
+
+Do not click Approve unless the exact external write is intended and a human has reviewed it. A pending approval is a valid demonstration of control; it is not completion.
+
+## 2:20–2:55 — deterministic certificate path
+
+Reset to the visibly labeled deterministic fixture. Advance through approval simulation, exact reconciliation, and CompletionGate certificate issuance.
+
+State explicitly:
+
+> This fixture proves the application control plane. It is not credentialed TrueForge, GitHub MCP, or Daytona evidence.
+
+Show the certificate's task, criteria, patch digest, reviewer, external identity, trace, and payload/subject binding.
+
+## 2:55–3:00 — close
+
+Show PR #2 and the deterministic evaluation:
 
 ```text
-Repository Investigator
-Failure / Log Investigator
-Dependency / Configuration Investigator
+EvidenceForge false success: 0%
+Unenforced baseline:          57.14%
 ```
 
-Show the read-only badges and the hypothesis ledger:
+Close with:
 
-```text
-H1 missing CI secret          REFUTED
-H2 dependency regression      REFUTED
-H3 validation-order regression SUPPORTED
-```
+> EvidenceForge does not ask whether the agent sounds confident. It asks whether the evidence is admissible.
 
-Explain that the subagents share the sandbox, so mutation is forbidden during fan-out.
+## Recording checklist
 
-### 1:30–2:00 — Daytona reproduction
-
-Show the sandbox command event:
-
-```text
-node --test demo/incident-fixture/test/config.test.mjs
-exit 1
-CONFIG_VALIDATION_ORDER matched
-```
-
-Show the `REPRODUCTION` evidence ID and exact revision.
-
-### 2:00–2:40 — patch and deterministic verification
-
-Show the minimal diff: apply test fallback before production validation.
-
-Show the application-owned `evidenceforge.patch` capture before the first post-patch verifier. The resulting SHA-256 is the subject binding for every later verifier and review.
-
-Then show actual runtime events for:
-
-- regression verifier PASS;
-- targeted suite PASS;
-- typecheck PASS;
-- lint PASS;
-- `git diff --check` PASS.
-
-A sentence such as “tests passed” is not evidence; the Daytona command events are.
-
-### 2:40–3:05 — independent review
-
-Show the isolated reviewer inputs and verdict:
-
-```text
-critical issues: 0
-verdict: PASS
-patch digest: <current git diff --binary SHA-256>
-```
-
-State that reviewer PASS cannot override a deterministic FAIL.
-
-### 3:05–3:35 — human approval
-
-Show TrueForge paused before the GitHub write.
-
-The approval card must display:
-
-- repository;
-- base and head branches;
-- title and body;
-- expected head SHA;
-- risk `EXTERNAL_REVERSIBLE`;
-- reversibility;
-- Reject and Approve.
-
-Approve the exact action.
-
-### 3:35–4:00 — proof
-
-Show:
-
-1. the real GitHub pull request;
-2. reconciliation confirming the expected head SHA;
-3. `EXTERNAL_RESULT` evidence;
-4. the completion certificate with task, criteria, patch digest, reviewer, PR, and trace ID.
-
-## Persistence moment
-
-Refresh the browser after reproduction or while approval is pending. The UI should reload the same task and TrueForge cursor rather than restarting investigation.
-
-## Reset/reseed
-
-Restore the healthy default-branch fixture:
-
-```bash
-pnpm demo:reset
-pnpm demo:fixture
-```
-
-Prepare a local failure branch:
-
-```bash
-node demo/incident-fixture/scripts/reseed-demo-branch.mjs
-```
-
-Pushing is an external write and is not automatic:
-
-```bash
-node demo/incident-fixture/scripts/reseed-demo-branch.mjs --push
-```
-
-Review the exact branch and command before using `--push`.
-
-## Fallback evidence
-
-When allowed by the rules, retain a pre-recorded run only as a fallback. Do not present a fixture or recording as a live sponsor run. Preserve run IDs, commit SHAs, PR links, and TrueForge trace IDs in the submission notes.
+- [ ] No API keys, tokens, or private headers visible.
+- [ ] Fixture and live modes visibly labeled.
+- [ ] No unobserved sponsor result claimed.
+- [ ] No automatic approval or merge.
+- [ ] Exact SHA/CI/Qodo links included in submission notes.
+- [ ] SDK read-only specialist limitation disclosed.
+- [ ] Video URL added to the submission checklist after publication.

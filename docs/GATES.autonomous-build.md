@@ -2,77 +2,60 @@
 
 **Last synchronized:** 2026-08-28
 
-Status values: `PASS`, `BLOCKED`, `PENDING_REVIEW`, `MANUAL`.
+Status values: `PASS`, `PARTIAL`, `BLOCKED`, `MANUAL`.
 
-## Verified implementation baseline
-
-Latest technical implementation SHA `aed84feb7205d7b66a13804fc2fb8f4184f2324f`
-passed GitHub Actions runs `33155806482` and `33155815342`, including 204/204
-tests. The latest observed Qodo aggregate is through `3e3a06e…`; exact-head review
-is intentionally left open until the final documentation commit exists.
+The exact final SHA, exact-head CI URL, and post-commit Qodo request are maintained in [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2). A file inside the repository cannot truthfully embed the SHA of the commit that contains itself.
 
 | Gate | Status | Evidence / blocker |
 |---|---|---|
-| Existing feature branch only | PASS | `feat/foundation-control-plane`; no alternate branch created |
-| Default branch untouched directly | PASS | PR #2 continues to target `determination` |
-| `.evidenceforge/` preserved/ignored | PASS | ignore rule retained; format/lint also exclude it; no migration/deletion committed |
-| Frozen dependency install | PASS | `pnpm install --frozen-lockfile` in exact-SHA CI |
-| Format | PASS | exact-SHA CI |
-| Lint | PASS | exact-SHA CI |
-| Typecheck | PASS | exact-SHA CI |
-| Test suite | PASS | 204/204 on exact-SHA push and PR CI |
-| Eval smoke | PASS | exact-SHA CI |
-| Demo fixture | PASS | exact-SHA CI; fixture is not live sponsor evidence |
-| Build | PASS | exact-SHA CI |
-| Doctor | PASS | exact-SHA CI |
-| Diff integrity | PASS | `git diff --check` in exact-SHA CI |
-| Certificate-only completion | PASS | state machine rejects direct completion; CompletionGate certificate required |
-| Certificate subject identity | PASS | task/repository/revision/patch/version/contract/state/subject digests checked |
-| Certificate payload integrity | PASS | canonical payload digest + deep immutability + mutation regression test |
-| Repatch invalidation | PASS | patch/review/external evidence and stale external approval/action/operation invalidated; INCIDENT evidence retained |
-| Approval decision serialization | PASS | per-task serialized decision path + concurrent-decision regression |
-| Approval provenance | PASS | exact arguments/repository/revision/risk/operation/current EXTERNAL binding |
-| Official GitHub MCP contract | PASS | official create/read fields only; application metadata never sent to MCP; create yields receipt, not completion evidence |
-| Exact PR reconciliation | PASS | later authoritative read checks repository/base/head/head SHA/operation/idempotency; wrong-target regression |
-| Completed resume cursor | PASS | skips persisted history and advances maximum observed sequence |
-| Streamed tool-call restart | PASS | checkpointed message/deltas rehydrate correlation before later `tool.response` |
-| Terminal cutoff | PASS | actionable late events ignored and omitted from persisted checkpoint after cutoff |
-| Tool failure observability | PASS | malformed/nonzero/error responses render ERROR rather than SUCCESS |
-| Initial activity recovery | PASS | `Incident accepted` deterministically reconstructed after restart |
-| Persistence collisions | PASS | SHA-256 keyed filenames; `a/b` vs `a_b` regression |
-| Unique tempfiles / write serialization | PASS | UUID tempfiles and per-task write chains |
-| Legacy persistence read fallback | PASS | old sanitized filename remains readable without destructive migration |
-| Recovery metric semantics | PASS | baseline and EvidenceForge both require real `COMPLETED`; BLOCKED/ESCALATED not success |
-| SSE task isolation | PASS | server channel scoped by task; reconnect reloads task snapshot; browser filters mismatches |
-| UI semantic/a11y hardening | PASS | code + CI: focus, skip link, live/log semantics, tone distinction, reduced motion, long-value labels, >=44px primary controls |
-| Exact viewport visual matrix | PASS | 320/375/768/1024/1440 observed in the in-app browser; no page-level horizontal overflow; 768 section boundaries inspected without overlap |
-| Exact 200% browser zoom | MANUAL | browser automation does not expose a zoom control; 640px equivalent reflow had no page-level overflow but is not represented as an exact zoom observation |
-| TrueForge dynamic-subagent read-only prevention | BLOCKED | SDK 0.1.3 exposes no per-subagent pre-execution tool allowlist/interceptor |
-| Credentialed TrueForge live session | PASS | session `01m11zp6dfp08dq520eqsp9cdx`; model turn `01m11zp6dyt1xq08qwdkzdns1h.local` observed |
-| Live GitHub MCP read | PASS | official `get_commit` returned exact SHA `7555f0f0…` in the observed TrueForge turn |
-| Live Daytona connectivity/exec | PASS | provider connection and successful command execution observed separately; not a reproduction claim |
-| Real failing GitHub Actions incident | PASS | run `33153999792` failed at exact revision `18668095…` with the stable configuration-order regression |
-| Three live TrueForge specialists | PASS | task `task-2a0444d3…`; raw TrueForge events contain exactly three `thread.created` and three `thread.done` events |
-| Live Daytona failing-revision reproduction | BLOCKED | the full turn ended with provider HTTP 402 `Insufficient Balance` before admissible reproduction evidence committed |
-| Live skill materialization | PASS | four configured skills were observed in a credentialed TrueForge session |
-| Live human approval pause/resume | BLOCKED | requires live runtime event |
-| Real PR created by EvidenceForge | BLOCKED | requires live TrueForge/MCP and human authorization |
-| Latest Qodo re-review | PENDING_REVIEW | latest observed update is through `3e3a06e…`; request again after the final documentation commit |
-| Human merge | BLOCKED | PR #2 must remain unmerged until human decision |
-| Demo video/publication/submission | BLOCKED | requires live sponsor evidence and human account actions |
-
-## Qodo finding gate
-
-Observed aggregate review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
-
-Qodo updated its aggregate through SHA `c57c5e4…` and marks initial-turn cursor durability, exact file-path binding, bounded generation drain, explicit terminal-durability failure, cancellation retry, approval uncertainty, and journal-first admission resolved. The read-only pre-execution specialist boundary remains **BLOCKED** for the SDK reason documented in `docs/qodo-review-log.md`.
+| Feature branch only | PASS | work remains on `feat/foundation-control-plane` |
+| Default branch untouched directly | PASS | PR #2 targets `determination` |
+| Published history preserved | PASS | no force push, rebase, or merge performed in finalization |
+| Runtime state excluded | PASS | `.data/` and `.evidenceforge/` remain ignored and untracked |
+| Normal frozen install | PASS | exact-head CI runs `pnpm install --frozen-lockfile` |
+| Format | PASS | exact-head CI |
+| Lint | PASS | exact-head CI |
+| Typecheck | PASS | exact-head CI |
+| Test suite | PASS | 220/220 on executable candidate; final docs head reruns the same matrix |
+| Evaluation smoke | PASS | exact-head CI; fixture/control-policy evidence only |
+| Demo fixture | PASS | exact-head CI; deterministic 10/10 certificate path |
+| Build | PASS | exact-head CI |
+| Doctor | PASS | exact-head CI placeholder/live-configuration validation |
+| Diff integrity | PASS | `git diff --check` in exact-head CI |
+| CompletionGate-only completion | PASS | direct/model/tool/reviewer completion paths are rejected |
+| Certificate identity and integrity | PASS | task/repository/revision/patch/state/contract/subject/payload digests validated |
+| Stale evidence/certificate rejection | PASS | exact-subject and current-state checks |
+| Repatch invalidation | PASS | patch, verification, review, approval, action, and operation state invalidated |
+| Approval provenance | PASS | exact arguments, operation, repository, revision, patch, expiry, one-time use |
+| Approval race serialization | PASS | per-task serialized decision path |
+| Durable operation settlement | PASS | intent/effect/settlement plus `EFFECT_UNCERTAIN` fail-closed handling |
+| Exact PR reconciliation | PASS | repository/base/head/head SHA/operation/idempotency matched after authoritative read |
+| Exactly three diagnostics | PASS | named one-fan-out topology and regression coverage |
+| Bounded specialist budgets | PASS | violation blocks the task |
+| Daytona-only repository execution | PASS | live manifests and policy require sandbox execution |
+| Bootstrap before verification | PASS | application-owned manifest and sequencing tests |
+| Patch capture before post-patch verification | PASS | exact `git diff --binary` manifest and binding |
+| Patch-bound independent reviewer | PASS | isolated reviewer runs after deterministic verification |
+| Streamed delta checkpoint policy | PASS | deltas journal/project without per-fragment full checkpoint; semantic boundaries persist |
+| Continuation safety | PASS | latest durable `TURN_DONE`; terminal/stale/approval/action states rejected |
+| Terminal durability | PASS | terminal save failure surfaces; stale ACTIVE checkpoint is not represented as durable BLOCKED |
+| Supervisor GitHub MCP surface | PASS | only `get_commit`, `create_pull_request`, `pull_request_read`, preloaded |
+| Dynamic-subagent pre-execution read-only enforcement | BLOCKED | SDK 0.1.3 exposes no per-subagent interceptor/allowlist |
+| Deterministic fixture vertical slice | PASS | all gates, approval simulation, reconciliation, certificate |
+| Credentialed live internal gates | PARTIAL | strongest run reached 9/10; all internal gates passed |
+| Credentialed live `external-pr` | BLOCKED | no approved/reconciled live write observed |
+| Wrong PR prevention | PASS | wrong base and missing head read blocked before write |
+| Exact viewport matrix | PASS | 320/375/768/1024/1440 observed; later changes do not alter geometry |
+| Small-text contrast | PASS | accessible muted color + deterministic >=4.5:1 test on both dark surfaces |
+| Exact 200% zoom | MANUAL | unavailable through current connector/browser surface; not inferred |
+| Qodo implementable findings | PASS | serialization expansion fixed; no open implementable Critical/High on code candidate |
+| Qodo SDK boundary | BLOCKED | retained as genuine High limitation |
+| Final post-commit Qodo exact-SHA record | MANUAL | external result linked in PR body/aggregate after this commit |
+| Human merge | BLOCKED | PR #2 intentionally remains open/unmerged |
+| Demo video and submission | BLOCKED | human/external account actions remain |
 
 ## Release decision
 
-The repository candidate is **CONDITIONAL**, not fully complete for hackathon
-submission. TrueForge/model, GitHub MCP, Daytona, and exactly three live specialists
-have genuine observations, but model-provider balance blocked the completed vertical
-slice. Remaining conditions include exact-head CI/Qodo after the documentation
-commit, the SDK-blocked read-only boundary, exact 200% zoom, failing-revision
-reproduction, live approval/PR/reconciliation, demo/publication, human merge, and
-submission.
+The repository candidate is **release-ready but not application-certified as a live completed incident**.
+
+Repository CI, deterministic fixture, fail-closed control-plane behavior, documentation, and Qodo remediation can be finalized independently. Live `external-pr`, exact 200% zoom, video, human merge, and submission remain separate observed-evidence gates.

@@ -1,140 +1,90 @@
 # Agent Harness Hackathon requirements
 
-**Last synchronized with repository evidence:** 2026-08-27
+**Last synchronized:** 2026-08-28
 
-This document records requirements that affect EvidenceForge. Official live sources override the original build prompt when they differ.
+This file records the requirements that materially affect EvidenceForge. Official event pages remain authoritative.
 
 ## Official sources
 
-- Hackathon page: https://www.wemakedevs.org/hackathons/trueforge
+- Hackathon: https://www.wemakedevs.org/hackathons/trueforge
 - Kick-off and rules: https://www.wemakedevs.org/blogs/agent-harness-hackathon-kick-off
-- TrueForge repository: https://github.com/truefoundry/trueforge
+- TrueForge: https://github.com/truefoundry/trueforge
 - TrueForge documentation: https://trueforge.dev
-- TrueForge SDK: https://trueforge.dev/api/overview
 - Qodo documentation: https://docs.qodo.ai/
-- Model Context Protocol specification: https://modelcontextprotocol.io/specification/2026-07-28
 - Daytona documentation: https://www.daytona.io/docs/
 
-## Deadline and event window
+## Event window
 
 - Event window: August 24–30, 2026.
-- Official closing time observed: **August 30, 2026 at 20:00 Europe/London**, equivalent to **21:00 Europe/Rome** on that date.
-- Submission policy: freeze features and preserve a buffer before the closing time.
+- Observed closing time: August 30, 2026 at 20:00 Europe/London, equivalent to 21:00 Europe/Rome.
+- Release policy: freeze feature scope before the deadline and preserve time for a truthful demo, human review, merge, and submission.
 
-## Mandatory product requirements
+## Mandatory submission work
 
-1. The submitted agent must run on TrueForge, and TrueForge must visibly perform real work.
-2. The repository must be public and include reproducible setup instructions.
-3. The submission needs a short demo video, approximately three minutes, plus a concise project write-up.
-4. Sponsor usage must be demonstrable rather than asserted.
+1. TrueForge must be the primary orchestration runtime and must visibly perform real work.
+2. The repository must be public and reproducible.
+3. The submission needs a concise write-up and a short demo video.
+4. Sponsor usage must be demonstrated, not asserted.
 5. AI coding assistance must be disclosed.
+6. Qodo Agentic Review must be used on the substantive pull request before human merge.
 
-### Current implementation status
+## Current implementation status
 
-- `@truefoundry/trueforge-sdk` `0.1.3` is the live integration boundary.
-- GitHub MCP, Daytona sandboxing, skills, approvals, compaction, dynamic subagents, and bounded iterations are configured in the TrueForge agent specification.
-- The UI clearly separates deterministic fixture mode from live sponsor-infrastructure mode.
-- Deterministic/live-missing checks fail closed; fixture evidence is never substituted for sponsor evidence.
-- Credentialed TrueForge/model and GitHub MCP read observations now exist, as do separate Daytona connectivity/exec observations. A single end-to-end failing-revision → approval → PR → reconciliation run remains an external gate.
+### Repository and control plane
 
-## Qodo code-quality requirements
+- TrueForge SDK `0.1.3` is the runtime boundary; no second agent framework is introduced.
+- GitHub MCP, Daytona, four skills, approvals, compaction, exactly three dynamic specialists, bounded iterations, and durable session recovery are integrated.
+- `CompletionGate` is the only application path to `COMPLETED`.
+- Exact PR identity, approval provenance, stale evidence/certificate rejection, repatch invalidation, crash recovery, terminal cutoffs, and collision-safe persistence are implemented and tested.
+- Exact-head CI runs the frozen verification matrix and currently contains 220 passing tests.
+- The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for the unenforced baseline.
 
-Observed rules require:
+### Live sponsor evidence
 
-1. substantive work through a GitHub pull request;
-2. Qodo Agentic Review before merge;
-3. `/agentic_review` when automatic review is absent;
-4. every valid High finding fixed, or an explicit rationale when genuinely blocked/disputed;
-5. Qodo re-run after corrective changes;
-6. a human merge;
-7. public Qodo evidence linked from submission documentation.
+The strongest credentialed run reached 9/10 gates and demonstrated:
 
-### Current Qodo status
+- exact GitHub incident context;
+- exactly three TrueForge specialists;
+- Daytona bootstrap and failure reproduction;
+- supported root cause;
+- patch capture;
+- deterministic regression/tests/typecheck/lint/diff verification;
+- independent patch review.
 
-Qodo Agentic Review is genuinely observed on PR #2:
+`external-pr` remains the unverified live gate. One invalid PR target was blocked before write; a later run was blocked when a specialist exceeded its tool budget. No wrong PR, automatic approval, or merge occurred.
 
-- aggregate review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
-- earlier follow-up request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
-- final exact-SHA request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
-- current finding triage: `docs/qodo-review-log.md`
+The deterministic fixture completes all ten criteria and issues a certificate. It is control-plane evidence, not live sponsor evidence.
 
-Qodo's aggregate for SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` marks the deeper runtime transaction and terminal-durability findings resolved. The pre-execution read-only boundary remains separately blocked because TrueForge SDK `0.1.3` cannot enforce it per dynamic subagent.
+## Qodo requirements and status
 
-## TrueForge SDK 0.1.3 specialist-isolation limitation
+Required workflow:
 
-The installed SDK declarations were inspected directly. Relevant facts:
+1. substantive PR;
+2. `/agentic_review` when needed;
+3. fix every valid implementable Critical/High finding;
+4. rerun Qodo after changes;
+5. document genuinely blocked findings;
+6. human merge only after review.
 
-- `RuntimeConfig.dynamicSubAgents` accepts `DynamicSubAgentsConfig`;
-- `DynamicSubAgentsConfig` exposes enablement only;
-- dynamic `AgentInfo` exposes input/model/name/type metadata;
-- the agent spec exposes the parent tool/MCP/sandbox configuration;
-- no per-dynamic-subagent pre-execution tool allowlist or interceptor is exposed.
+Canonical aggregate: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 
-Therefore EvidenceForge cannot truthfully enforce a read-only tool capability boundary **before execution** for individual dynamic subagents using SDK `0.1.3`. Prompt instructions and post-event rejection are not equivalent to prevention. P0.4 is recorded as **BLOCKED by the SDK surface**.
+The final code-candidate review contains one remaining bug: the per-dynamic-subagent read-only pre-execution boundary. It remains **BLOCKED by TrueForge SDK 0.1.3**, which exposes no per-dynamic-subagent interceptor/allowlist. The serialization/prompt-cap finding was fixed by validating actual JSON-serialized prompt length and adding a control-character expansion regression.
 
-The minimum safe architecture is a TrueForge-supported future per-subagent tool policy, or a narrow read-only proxy/tool surface made available to specialists while mutation remains parent-owned and serialized. EvidenceForge does not introduce another orchestration framework.
-
-## Current TrueForge interface facts
-
-- TypeScript SDK: `@truefoundry/trueforge-sdk`, version `0.1.3` in this repository.
-- Required Node version: `>=22.14.0`.
-- Human tool pauses emit `tool.approval_required`; resume uses `user.tool_approval`.
-- Durable reconnect uses session ID, turn ID, sequence number, `getTurn`, `subscribeToTurn`, and `listTurnEvents`.
-- Skills are git-backed `SKILL.md` packs and require sandboxing.
-- Daytona is the currently configured/documented sandbox provider.
-- Dynamic subagents share the parent's available runtime capabilities; one-level fan-out is used.
-- Context compaction and large-result handling are part of the agent specification.
-
-## MCP security facts
-
-Tool annotations are useful metadata, not an authorization oracle. EvidenceForge retains its own trusted risk registry and does not let repository/issue/log/tool content downgrade action risk.
-
-## Verified repository evidence
-
-Latest technical implementation SHA
-`aed84feb7205d7b66a13804fc2fb8f4184f2324f` passed GitHub Actions runs
-`33155806482` and `33155815342` with:
-
-- `pnpm install --frozen-lockfile`;
-- format check;
-- lint;
-- TypeScript typecheck;
-- 204/204 tests;
-- evaluation smoke;
-- demo fixture;
-- build;
-- doctor;
-- `git diff --check`.
-
-The subsequent evidence-synchronization commit `7458388…` also passed both exact-head
-workflows. These results prove the published repository candidate, not a completed
-sponsor-infrastructure vertical slice.
-
-Observed live component evidence:
-
-- TrueForge session `01m11zp6dfp08dq520eqsp9cdx` and model turn `01m11zp6dyt1xq08qwdkzdns1h.local`;
-- official GitHub MCP `get_commit` returned exact SHA `7555f0f0…` inside that turn;
-- Daytona connectivity and a successful command execution were observed separately;
-- the configured skills and dynamic-subagent/approval surfaces were observed in a credentialed session.
-
-A later live task created and completed exactly three TrueForge specialists and
-initialized GitHub MCP and Daytona, but the model provider ended with HTTP 402
-`Insufficient Balance`. EvidenceForge remained `BLOCKED` and created no PR. The
-failing-revision reproduction, live approval/PR write, reconciliation, and
-CompletionGate path therefore remain open.
+The post-documentation exact-SHA review request and status are recorded in PR #2, avoiding a self-referential repository document.
 
 ## UI evidence boundary
 
-Responsive/a11y code supports small viewports, reduced motion, task-scoped SSE, accessible logs/live regions, focus visibility, long-value labels, and >=44px primary controls. The exact **320 / 375 / 768 / 1024 / 1440 px** widths were observed without page-level horizontal overflow; the narrow phase rail remains intentionally scrollable. Exact browser **200% zoom** remains manual because the available browser-control surface does not expose zoom. A 640px equivalent reflow was clean but is not represented as exact zoom evidence.
+The 320, 375, 768, 1024, and 1440px layouts were browser-observed without page-level horizontal overflow. Changes after that observation do not alter layout geometry. The final accessibility pass raises muted small-text contrast and adds a deterministic contrast test.
 
-## External/human prerequisites still open
+Exact 200% browser zoom remains a manual check. A width-equivalent reflow must not be represented as exact zoom evidence.
 
-- exact failing-run/revision selection and a reproducible signature;
-- a single durable run through GitHub context, Daytona reproduction, verification, and approval;
-- real `tool.approval_required` pause/resume;
-- EvidenceForge-created real PR + exact reconciliation;
-- exact 200% browser zoom check;
-- demo video/publication;
-- human merge and official submission.
+## Remaining external/human actions
 
-No sponsor result, Qodo closure, merge, or submission is represented as complete without observed evidence.
+- reproduce a stable credentialed live path through `external-pr`, approval, write, reconciliation, and certificate, or present the live result as 9/10 without embellishment;
+- perform exact 200% browser zoom review;
+- record and publish the demo video;
+- inspect the final exact-SHA Qodo aggregate;
+- human `Squash and merge` PR #2 into `determination`;
+- complete the official submission before the observed deadline.
+
+No live completion, Qodo closure, merge, video, or submission is represented as complete without observed evidence.

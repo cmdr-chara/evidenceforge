@@ -1,107 +1,181 @@
 # TrueForge setup
 
-## Requirements
+This guide separates normal repository verification from the exact historical live-incident profile.
 
-- Node.js `>=22.14.0`
-- A current TrueForge deployment
-- A configured model provider
-- GitHub personal access token suitable for the GitHub MCP server
-- Daytona credentials
+## Supported profile
 
-## Start TrueForge locally
+- TrueForge server observed: `0.1.4`
+- SDK dependency: `@truefoundry/trueforge-sdk` `0.1.3`
+- TrueForge URL: `http://localhost:8790`
+- EvidenceForge live console: normally `http://127.0.0.1:4174`
+- Model used in the profiled environment: `sub2api-codex/gpt-5-6-luna`
+- Context: provider default `256k`
+- Reasoning effort: `high`
+- Maximum output: `4096`
+- Live timeout: `1200` seconds
+- Daytona provider command timeout: `300000` ms
+- GitHub MCP server name: `github`
 
-Follow the official quickstart. The current documented command is:
+Keep credentials in TrueForge or local environment configuration. Never put API keys in repository files, prompts, logs, screenshots, or sandbox commands.
+
+## Normal repository installation
+
+The current repository contains a lockfile. Normal development and CI must remain frozen:
 
 ```bash
-npx @truefoundry/trueforge@latest
+corepack enable
+pnpm install --frozen-lockfile
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm eval:smoke
+pnpm demo:fixture
+pnpm build
+pnpm doctor
 ```
 
-Keep local mode on localhost. For shared deployments, use TrueForge's hosted mode.
+## TrueForge resources
 
-## Configure resources
+Configure:
 
-In TrueForge settings:
+1. the model provider;
+2. the shipped `github` MCP server;
+3. a Daytona sandbox provider;
+4. the four git-backed skills:
+   - `incident-triage`;
+   - `ci-reproduction`;
+   - `verified-remediation`;
+   - `patch-review`.
 
-1. Add a model and note its fully qualified name.
-2. Add the shipped `github` MCP preset and provide the authorization header inside TrueForge.
-3. Configure the Daytona sandbox provider.
-4. Add each git-backed skill from this repository:
-   - `incident-triage`
-   - `ci-reproduction`
-   - `verified-remediation`
-   - `patch-review`
-
-Do not put credentials in the agent instructions or repository.
-
-## EvidenceForge environment
+Example environment:
 
 ```bash
-cp .env.example .env
 export TRUEFORGE_BASE_URL=http://localhost:8790
-export TRUEFORGE_MODEL=openai/gpt-5.2
+export TRUEFORGE_MODEL=sub2api-codex/gpt-5-6-luna
 export TRUEFORGE_GITHUB_MCP_NAME=github
+export TRUEFORGE_TIMEOUT_SECONDS=1200
+export EVIDENCEFORGE_PORT=4174
 export EVIDENCEFORGE_DATA_DIR=.data
-# export TRUEFORGE_TOKEN=...  # only when OIDC is enabled
 ```
 
-`EVIDENCEFORGE_DATA_DIR` controls the durable checkpoint and runtime-event directory. Blank or unset values default to `.data/`.
+`.data/` and `.evidenceforge/` are runtime state and must remain ignored and untracked.
 
-## Validate
+## Profiled live incident
+
+EvidenceForge currently accepts the public profiled tuple:
+
+```text
+repository: cmdr-chara/evidenceforge
+run:        32892119950
+revision:   9accc9e484e055c8b22172e389dc50f84315f4e2
+baseline:   pnpm test:unit
+failure:    authoritative TrueForge sandbox non-zero exit is never reported as OK
+```
+
+An unprofiled repository/run/revision tuple is rejected before TrueForge starts.
+
+### Historical bootstrap exception
+
+The profiled historical revision does **not** contain `pnpm-lock.yaml`. Its authoritative CI installed dependencies with:
+
+```bash
+pnpm install --no-frozen-lockfile
+```
+
+The application-owned live bootstrap mirrors that install mode while pinning Node `22.14.0` and pnpm `11.16.0`. Do not restore `--frozen-lockfile` inside this historical profile unless truthful revision-bound lockfile evidence is also supplied. This exception does not apply to normal repository CI.
+
+The bootstrap must finish successfully before any verifier. A bootstrap failure is infrastructure evidence and can never satisfy `failure-reproduced`.
+
+## Application-owned sequencing
+
+The live workflow is intentionally narrow:
+
+1. Read the exact incident revision with one authoritative GitHub `get_commit` call.
+2. Bootstrap the exact revision in Daytona.
+3. Run exactly three named read-only diagnostics in one fan-out:
+   - Repository Investigator;
+   - Failure / Log Investigator;
+   - Dependency / Configuration Investigator.
+4. Reproduce the original failure using the application-owned manifest.
+5. Admit only exact-subject, application-correlated root-cause evidence.
+6. Serialize patching.
+7. Capture `git diff --binary` before any post-patch verifier.
+8. Run every deterministic verifier from the exact manifest.
+9. Run one isolated independent reviewer bound to the current patch digest.
+10. Read the authoritative current branch head with `get_commit`.
+11. Prepare one exact PR action targeting `feat/foundation-control-plane` → `determination`.
+12. Pause before `create_pull_request` for human approval.
+13. After an approved write, reconcile through `pull_request_read`.
+14. Allow only `CompletionGate` to issue completion.
+
+A wrong base such as `main`, a missing head read, an unbound patch, a specialist budget violation, or a resumed terminal task blocks before external effects.
+
+## GitHub MCP surface
+
+The supervisor preloads exactly:
+
+- `get_commit`;
+- `create_pull_request`;
+- `pull_request_read`.
+
+Tool discovery and unrelated GitHub operations are not exposed to the supervisor. `create_pull_request` remains approval-paused. EvidenceForge validates official MCP fields separately from application-owned operation identity, approval provenance, expected head SHA, and patch binding.
+
+## Human approval and reconciliation
+
+Approval is not a prompt instruction. It is durable application state bound to:
+
+- exact normalized arguments;
+- operation and idempotency identity;
+- repository and revision;
+- current patch/external subject;
+- risk classification;
+- expiry;
+- one-time consumption.
+
+No write occurs before approval. A create response is only a receipt; it does not satisfy `external-pr`. The application must perform an authoritative PR read and match repository, base, head, head SHA, operation, and idempotency identity.
+
+## Continuation
+
+A completed TrueForge turn may continue in the same session for one new turn only when the latest durable event is `TURN_DONE`, every non-external criterion and the current reviewer are PASS, `external-pr` remains PENDING, and there is no terminal state, pending approval, or prepared action.
+
+A BLOCKED, FAILED, ESCALATED, stale, or already-prepared task must never be resumed as ACTIVE.
+
+## Stream durability
+
+Model deltas are journaled and projected for correlation, but they do not trigger a full checkpoint for every fragment. Full state/evidence checkpoints occur at semantic events and turn boundaries. Accepted event commits are serialized, late callbacks are fenced, terminal persistence is explicit, and a persistence failure cannot be reported as a durable BLOCKED state.
+
+## SDK limitation
+
+TrueForge SDK `0.1.3` does not expose a per-dynamic-subagent pre-execution tool allowlist or interceptor. EvidenceForge enforces exactly-three topology, named roles, bounded tool budgets, read-only contracts, serialized mutation, and fail-closed post-event validation, but it does not claim pre-execution prevention that the SDK cannot provide.
+
+## Start and validate
 
 ```bash
 pnpm doctor
 pnpm smoke:trueforge
-```
-
-A successful smoke must show an actual TrueForge session and turn. It should report availability of GitHub MCP, Daytona, the four skills, subagents, and approvals without performing an external write.
-
-## Live incident
-
-Start the EvidenceForge console:
-
-```bash
 pnpm dev
 ```
 
-Use the live form with `owner/repository`, GitHub Actions run ID, and exact failing commit SHA. The session state persists under `EVIDENCEFORGE_DATA_DIR` (default `.data/`) and includes TrueForge session, turn, and sequence IDs for resume.
+A successful smoke proves connectivity only. It is not a substitute for the profiled incident workflow.
 
-Before any deterministic verifier runs, EvidenceForge gives the supervisor one exact, application-owned Daytona bootstrap manifest. It checks out the requested revision into `/workspace/repository`, installs the same pinned Node.js `22.14.0` and pnpm `11.16.0` toolchain used by CI (including a fixed Node archive checksum), and runs `pnpm install --frozen-lockfile`. A non-zero bootstrap exit is infrastructure evidence only and blocks verification; it can never satisfy a success criterion.
+## Observed live result
 
-The public live incident profile is bound to `cmdr-chara/evidenceforge`, Actions run `32892119950`, and exact revision `9accc9e484e055c8b22172e389dc50f84315f4e2`: `pnpm test:unit` must reproduce the recorded `authoritative TrueForge sandbox non-zero exit is never reported as OK` failure before patching, and the same unit suite must pass after the patch. An unprofiled repository/run/revision tuple is rejected before TrueForge starts. The demo fixture has a separate deterministic contract and is never substituted for this live run.
+The strongest credentialed run reached 9/10 application gates: incident context, failure reproduction, root cause, regression, targeted tests, typecheck, lint, diff integrity, and independent review all passed. `external-pr` remained pending/blocked. No invalid PR write or merge occurred.
 
-After the serialized edit and before any post-patch verifier, the supervisor must run the exact application-owned `evidenceforge.patch` manifest (`git diff --binary` in `/workspace/repository`). After all deterministic checks pass, it creates exactly one read-only `Independent Patch Reviewer`; EvidenceForge accepts only strict JSON bound to that patch digest with no critical blockers. GitHub calls may arrive through TrueForge's `call_tool` system envelope and are credited only when the inner MCP server, tool, and input are structurally valid.
-
-If a TrueForge turn finishes after review while `external-pr` is still pending, the live Resume action starts a new continuation turn in the same session. It does not replay the provider's compacted completed-turn event listing, because that listing has no stream sequence IDs. The continuation may only prepare the exact `create_pull_request` call and pause it for human approval; it cannot rerun the diagnostic fan-out or merge.
-
-Set the Daytona provider's default command timeout to at least `300000` ms. TrueForge 0.1.4 does not expose a per-call timeout field on the model-facing `sandbox.exec` schema, so the provider default must cover the longest immutable verifier (`pnpm test`, 300 seconds). EvidenceForge still records and validates the verifier manifest's application-owned timeout.
-
-The live supervisor preloads an explicit GitHub MCP allowlist: `get_commit`, `create_pull_request`, and `pull_request_read`. TrueForge therefore does not expose tool discovery or unrelated GitHub operations to the supervisor. `create_pull_request` remains approval-paused and EvidenceForge still validates the exact repository, head, base, patch binding, and authoritative head SHA before any write.
-
-The public incident profile is narrower than the control-plane allowlist: its initial incident context uses exactly one `get_commit` call at the failing SHA. Repository diagnostics then use the bootstrapped Daytona checkout. Broad GitHub searches are deliberately omitted because a query that is not bound to the exact revision is inadmissible evidence and blocks the task.
-
-The profiled historical revision has no committed `pnpm-lock.yaml`, and its authoritative CI run installs with `pnpm install --no-frozen-lockfile`. The live bootstrap uses that same install mode after pinning Node and pnpm; requiring `--frozen-lockfile` would fail before reproduction and would not match the incident environment.
-
-TrueForge model-message deltas remain durably journaled and projected for tool-call correlation, but EvidenceForge defers the full state-and-evidence checkpoint until the next semantic event or the turn boundary. This prevents long reasoning streams from causing quadratic checkpoint rewrites while preserving fail-closed replay from the last durable cursor.
-
-## Approval behavior
-
-The inline agent spec configures GitHub tool approval for `@write` and `@destructive`. EvidenceForge also applies its own risk policy. The PR action must be prepared in exact form and approved before the TrueForge `user.tool_approval` resume event is submitted.
-
-If a completed TrueForge turn stops after review without requesting the PR action, EvidenceForge may open one bounded continuation turn in the same session. That path is enabled only when the latest durable event is a `turn.done` with no required action, every non-external criterion and the current patch-bound reviewer are PASS, `external-pr` is still PENDING, and no terminal state, prepared action, or pending approval exists. The continuation performs only the authoritative head read and one approval-paused PR request.
-
-For the public profile, publishing is bound to `head: feat/foundation-control-plane` and `base: determination`. The supervisor must read the current head with `get_commit` before requesting `create_pull_request`; a skipped head read or a substituted base such as `main` blocks the task before any external write.
+The deterministic fixture can complete the approval/reconciliation/certificate path, but must remain labeled fixture evidence.
 
 ## Troubleshooting
 
-| Symptom | Action |
+| Symptom | Required response |
 |---|---|
-| SDK package cannot load | run `pnpm install` |
-| health check fails | verify `TRUEFORGE_BASE_URL` and server process |
-| model call fails | verify provider credentials in TrueForge |
-| GitHub MCP auth pause | complete MCP authorization, then resume with empty input as documented |
-| sandbox unavailable | configure Daytona in TrueForge settings |
-| a complete verifier stops at about 60 seconds | set the TrueForge Daytona provider command timeout to at least `300000` ms; do not shorten the verifier |
-| sandbox reports `/usr/bin/bash: no such file or directory` | inspect the requested `cwd`; Daytona can return this message when `/workspace/repository` was not materialized. Start a new live task with the current EvidenceForge bootstrap manifest instead of resuming a terminal turn |
-| bootstrap cannot install the pinned runtime | verify outbound access to `github.com`, `nodejs.org`, and the package registry from Daytona; do not substitute host execution |
-| skills absent | add git-backed skills and keep sandbox enabled |
-| no Qodo review | install Qodo GitHub integration and comment `/agentic_review` |
+| repository install rejects lockfile drift | keep normal CI frozen; inspect the committed lockfile |
+| historical live bootstrap reports no lockfile | use the profile's `--no-frozen-lockfile` manifest; do not change normal CI |
+| verifier stops near 60 seconds | set Daytona provider command timeout to at least `300000` ms |
+| model proposes `base: main` | block; the exact base is `determination` |
+| model skips head `get_commit` | block before any write |
+| specialist exceeds tool budget | block; do not silently continue |
+| `list_tools` appears | verify the three-tool preloaded supervisor MCP configuration |
+| pending approval exists | obtain an explicit human decision; never approve automatically |
+| terminal task is offered for resume | reject the continuation |
+| credentialed services are unavailable | label the live gate UNVERIFIED; do not substitute fixture output |
