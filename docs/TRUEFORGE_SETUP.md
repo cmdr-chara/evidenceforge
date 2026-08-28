@@ -98,10 +98,10 @@ The live workflow is intentionally narrow:
    - Failure / Log Investigator;
    - Dependency / Configuration Investigator.
 4. Require each specialist to return one bounded JSON object containing observations, causal hypotheses, affected locations, and exact strings observed in that specialist's completed tool results.
-5. Store specialist causal claims as non-authoritative `OPEN` observations.
-6. Resolve every causal reference to an earlier successful `TOOL_RESULT` from the same specialist thread; model-authored locations and reference strings never become artifact references directly.
-7. Promote `root-cause-supported` only when the application correlates the resulting event-backed observation with admissible exact-incident and exact-reproduction evidence.
-8. Reproduce the original failure using the application-owned manifest.
+5. Resolve every causal reference to an earlier successful `TOOL_RESULT` from the same specialist thread; model-authored locations and reference strings never become artifact references directly.
+6. Store only those event-backed causal claims as non-authoritative `OPEN` observations.
+7. Reproduce the original failure using the application-owned manifest.
+8. Promote `root-cause-supported` only when the application correlates a current event-backed observation with admissible exact-incident and exact-reproduction evidence.
 9. Serialize patching.
 10. Capture `git diff --binary` before any post-patch verifier.
 11. Run every deterministic verifier from the exact manifest.

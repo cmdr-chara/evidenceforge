@@ -22,7 +22,8 @@ EvidenceForge does not label prompt instructions or post-event rejection as equi
 | Severity | Finding | Disposition | Evidence |
 |---|---|---|---|
 | High | Root cause is fabricated | RESOLVED | context + reproduction alone remains PENDING; structured causal observation + exact evidence is required for application PASS |
-| High | Unresolved references become evidence | FIXED — PENDING EXACT-SHA QODO | cited strings resolve to earlier successful same-thread tool events; missing, failed, transport-key, and cross-thread regressions |
+| High | Unresolved references become evidence | RESOLVED | Qodo's exact-SHA aggregate for `5f7fc10c2327b56dea18645f15035520e48f40ee` marks the finding resolved after same-thread successful-tool-result grounding and its missing, failed, transport-key, and cross-thread regressions |
+| Medium | Root-cause steps are reversed | FIXED — PENDING EXACT-SHA QODO | setup now reproduces the exact failure before application promotion of `root-cause-supported` |
 | Medium | Serialization bypasses prompt cap | RESOLVED | task validation measures actual JSON-serialized objective/constraints; hostile control-character regression |
 | Medium | Fixture reset command omitted | RESOLVED IN THIS COMMIT | demo preparation invokes `pnpm demo:reset` before fixture validation |
 | Medium | Unverified head marked passing | RESOLVED IN THIS COMMIT | executable candidate PASS and self-referential final-documentation-head CI are separate gates |
