@@ -65,7 +65,7 @@ pnpm install --frozen-lockfile
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test                  231/231
+pnpm test                  233/233
 pnpm eval:smoke
 pnpm demo:fixture
 pnpm build

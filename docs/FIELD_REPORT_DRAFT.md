@@ -4,7 +4,7 @@
 
 EvidenceForge is a TrueForge-based CI incident control plane designed to prevent false completion. Models diagnose and propose; application-owned evidence, deterministic verifiers, approval policy, external-state reconciliation, and CompletionGate decide.
 
-The executable candidate passes the local verification matrix with 231 tests; exact-head CI is recorded externally after publication. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached 9/10 application gates; `external-pr` remains the unverified live gate. The deterministic fixture completes the full approval/reconciliation/certificate path and is labeled accordingly.
+The executable candidate passes the local verification matrix with 233 tests; exact-head CI is recorded externally after publication. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached 9/10 application gates; `external-pr` remains the unverified live gate. The deterministic fixture completes the full approval/reconciliation/certificate path and is labeled accordingly.
 
 ## Problem
 
@@ -81,7 +81,7 @@ Responsive browser observations cover 320, 375, 768, 1024, and 1440px. The final
 ## Measured result
 
 ```text
-Executable local candidate:  complete matrix, 231/231 tests
+Executable local candidate:  complete matrix, 233/233 tests
 Deterministic fixture:       10/10 + CompletionGate certificate
 Credentialed live workflow:  9/10; external-pr not completed
 False-success evaluation:    EvidenceForge 0%; baseline 57.14%

@@ -356,26 +356,72 @@ function eventPayloadContainsReference(event: RuntimeEvent, reference: string): 
   try {
     const response = asRecord(JSON.parse(content) as unknown);
     if (!diagnosticToolResultIsUsable(response)) return false;
-    return collectToolResultStrings(response).some((text) => text.includes(reference));
+    return collectToolResultStrings(response).some((text) =>
+      containsBoundedReference(text, reference),
+    );
   } catch {
     return false;
   }
 }
 
 function diagnosticToolResultIsUsable(response: Record<string, unknown>): boolean {
-  const records = [
-    response,
-    asRecord(response.result),
-    asRecord(response.response),
-    asRecord(response.output),
+  const pending: Array<{ value: unknown; depth: number }> = [
+    { value: response, depth: 0 },
   ];
-  if (records.some((record) => record.success === false)) return false;
-  return !records.some((record) =>
+  let visited = 0;
+  while (pending.length > 0 && visited < 512) {
+    const current = pending.pop();
+    if (current === undefined) break;
+    visited += 1;
+    if (current.value === null || typeof current.value !== "object") continue;
+    if (
+      !Array.isArray(current.value) &&
+      recordReportsToolFailure(current.value as Record<string, unknown>)
+    ) {
+      return false;
+    }
+    if (current.depth >= 8) continue;
+    const children = Array.isArray(current.value)
+      ? current.value
+      : Object.values(current.value as Record<string, unknown>);
+    for (const child of children) {
+      pending.push({ value: child, depth: current.depth + 1 });
+    }
+  }
+  return pending.length === 0;
+}
+
+function recordReportsToolFailure(record: Record<string, unknown>): boolean {
+  if (record.success === false) return true;
+  return (
     typeof record.status === "string" &&
     ["ERROR", "FAILED", "FAILURE", "DENIED", "TIMEOUT"].includes(
       record.status.toUpperCase(),
     )
   );
+}
+
+function containsBoundedReference(text: string, reference: string): boolean {
+  let offset = 0;
+  while (offset <= text.length - reference.length) {
+    const index = text.indexOf(reference, offset);
+    if (index === -1) return false;
+    const before = index === 0 ? undefined : text[index - 1];
+    const afterIndex = index + reference.length;
+    const after = afterIndex === text.length ? undefined : text[afterIndex];
+    const startsOnBoundary =
+      !isReferenceWordCharacter(reference[0]) || !isReferenceWordCharacter(before);
+    const endsOnBoundary =
+      !isReferenceWordCharacter(reference[reference.length - 1]) ||
+      !isReferenceWordCharacter(after);
+    if (startsOnBoundary && endsOnBoundary) return true;
+    offset = index + 1;
+  }
+  return false;
+}
+
+function isReferenceWordCharacter(value: string | undefined): boolean {
+  return value !== undefined && /[\p{L}\p{N}_]/u.test(value);
 }
 
 function collectToolResultStrings(response: Record<string, unknown>): string[] {

@@ -13,7 +13,7 @@ The exact final SHA, exact-head CI URL, and post-commit Qodo request are maintai
 | Published history preserved | PASS | no force push, rebase, or merge performed in finalization |
 | Runtime state excluded | PASS | `.data/` and `.evidenceforge/` remain ignored and untracked |
 | Executable candidate frozen install | PASS | exact code-head CI ran `pnpm install --frozen-lockfile` |
-| Executable candidate verification matrix | PASS | local candidate passed format, lint, typecheck, 231/231 tests, eval, fixture, build, doctor, and diff check |
+| Executable candidate verification matrix | PASS | local candidate passed format, lint, typecheck, 233/233 tests, eval, fixture, build, doctor, and diff check |
 | Final documentation-head CI | MANUAL | must run after this file is committed and be recorded externally in PR #2 |
 | CompletionGate-only completion | PASS | direct/model/tool/reviewer completion paths are rejected |
 | Certificate identity and integrity | PASS | task/repository/revision/patch/state/contract/subject/payload digests validated |

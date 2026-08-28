@@ -4,7 +4,7 @@
 
 EvidenceForge is an evidence-gated CI incident control plane built on TrueForge. It binds a failed GitHub Actions incident to an exact repository revision, reproduces it in Daytona, captures and verifies a patch, obtains an independent patch review, pauses before any external write, reconciles the resulting pull request, and permits completion only through an application-issued certificate.
 
-> **Release status — 2026-08-28:** [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) is the authoritative record for the exact final SHA, exact-head GitHub Actions run, Qodo status, and remaining human actions. The executable candidate passes the frozen local matrix with **231/231 tests**; exact-head CI is recorded externally after publication. The PR remains open and unmerged, with `feat/foundation-control-plane` targeting `determination`.
+> **Release status — 2026-08-28:** [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) is the authoritative record for the exact final SHA, exact-head GitHub Actions run, Qodo status, and remaining human actions. The executable candidate passes the frozen local matrix with **233/233 tests**; exact-head CI is recorded externally after publication. The PR remains open and unmerged, with `feat/foundation-control-plane` targeting `determination`.
 
 ## Evidence boundary
 
@@ -12,7 +12,7 @@ EvidenceForge deliberately separates three kinds of evidence:
 
 | Evidence | Observed result | What it proves |
 |---|---|---|
-| Repository verification | frozen install, format, lint, typecheck, 231 tests, evaluation, fixture, build, doctor, diff check | the executable candidate is reproducible and internally consistent; exact-head CI remains an external publication gate |
+| Repository verification | frozen install, format, lint, typecheck, 233 tests, evaluation, fixture, build, doctor, diff check | the executable candidate is reproducible and internally consistent; exact-head CI remains an external publication gate |
 | Credentialed live TrueForge workflow | strongest run reached 9/10 application gates | real TrueForge, GitHub MCP, Daytona, three specialists, deterministic verification, and independent review worked together |
 | Deterministic fixture | complete approval, reconciliation, and CompletionGate certificate path | control-plane semantics, not live sponsor integration |
 

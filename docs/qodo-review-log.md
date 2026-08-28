@@ -23,7 +23,9 @@ EvidenceForge does not label prompt instructions or post-event rejection as equi
 |---|---|---|---|
 | High | Root cause is fabricated | RESOLVED | context + reproduction alone remains PENDING; structured causal observation + exact evidence is required for application PASS |
 | High | Unresolved references become evidence | RESOLVED | Qodo's exact-SHA aggregate for `5f7fc10c2327b56dea18645f15035520e48f40ee` marks the finding resolved after same-thread successful-tool-result grounding and its missing, failed, transport-key, and cross-thread regressions |
-| Medium | Root-cause steps are reversed | FIXED — PENDING EXACT-SHA QODO | setup now reproduces the exact failure before application promotion of `root-cause-supported` |
+| High | Failed nested results accepted | FIXED — PENDING EXACT-SHA QODO | bounded recursive validation now rejects nested failure states before any result string can ground diagnostic evidence |
+| High | Reference prefixes miscorrelate evidence | FIXED — PENDING EXACT-SHA QODO | reference matching now requires lexical boundaries and rejects location prefixes such as `runtime.ts:12` against `runtime.ts:123` |
+| Medium | Root-cause steps are reversed | RESOLVED | Qodo's exact-SHA aggregate for `8d8ee23b14bb91bd40fc8d369d6894be30be4757` no longer reports the finding after reproduction was ordered before root-cause promotion |
 | Medium | Serialization bypasses prompt cap | RESOLVED | task validation measures actual JSON-serialized objective/constraints; hostile control-character regression |
 | Medium | Fixture reset command omitted | RESOLVED IN THIS COMMIT | demo preparation invokes `pnpm demo:reset` before fixture validation |
 | Medium | Unverified head marked passing | RESOLVED IN THIS COMMIT | executable candidate PASS and self-referential final-documentation-head CI are separate gates |
