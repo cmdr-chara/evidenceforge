@@ -4,9 +4,19 @@
 
 EvidenceForge is an evidence-gated CI incident resolution agent built on TrueForge. It investigates failed GitHub Actions runs, reproduces failures in an isolated Daytona sandbox, generates and verifies a patch, pauses before external writes, and refuses to mark a task complete until required evidence exists.
 
-> **Verified repository baseline — 2026-08-27:** implementation SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` passed GitHub Actions runs [`33101668750`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33101668750) and [`33101672505`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33101672505), including **202/202 tests**.
+> **Verified repository baseline — 2026-08-28:** technical implementation SHA
+> `aed84feb7205d7b66a13804fc2fb8f4184f2324f` passed push and PR GitHub Actions
+> runs [`33155806482`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33155806482)
+> and [`33155815342`](https://github.com/cmdr-chara/evidenceforge/actions/runs/33155815342),
+> including **204/204 tests**. The evidence-synchronization commit `7458388…` also
+> passed both exact-head workflows.
 
-A credentialed TrueForge/model session and a real read-only GitHub MCP `get_commit` call were also observed (session `01m11zp6dfp08dq520eqsp9cdx`, turn `01m11zp6dyt1xq08qwdkzdns1h.local`) against the exact repository SHA. Daytona connectivity and command execution were observed separately. These observations do **not** prove the still-open end-to-end failing-revision reproduction, approval, PR creation, or completion flow.
+A credentialed TrueForge/model session and a real read-only GitHub MCP `get_commit`
+call were observed against the exact repository SHA. A later full task created and
+completed all three specialists and initialized Daytona/GitHub MCP, then failed
+closed when the model provider returned HTTP 402 `Insufficient Balance`. No approval
+or PR write occurred. These observations do **not** prove the still-open end-to-end
+reproduction, approval, PR creation, or completion flow.
 
 PR #2 remains open against `determination` and is intentionally unmerged.
 

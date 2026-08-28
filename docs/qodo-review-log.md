@@ -7,17 +7,20 @@ Record only genuine Qodo findings and follow-up evidence.
 - PR: https://github.com/cmdr-chara/evidenceforge/pull/2
 - Aggregate Agentic Review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 - Earlier follow-up request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5428521720
-- Latest reviewed implementation SHA: `c57c5e424054af04c999bd2c144e09b8d54d0622`
+- Latest reviewed implementation SHA observed before final synchronization: `3e3a06e8f7c98c47e2582d5cf67cbfb93100d48d`
 - Final exact-SHA request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5440874929
 - Latest Qodo aggregate: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 - Latest exact-SHA update: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5443260617
-- GitHub Actions evidence: runs `33101668750` and `33101672505`, all required steps green including 202/202 tests.
+- Final review request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5450392923 (Qodo response pending at synchronization time)
+- GitHub Actions evidence: runs `33156408778` and `33156412192`, all required steps green including 204/204 tests on `7458388…`.
 
 Qodo previously marked **Old patch evidence reused** and **Stale certificate completes state** resolved after the earlier P0.1 batch. Additional earlier findings such as specialist budgets, missing explicit specialist terminal status, blocked-stream mutation, and sequential fan-out were also resolved/outdated in Qodo's thread state before this reconstruction.
 
 ## Current High / Medium finding disposition
 
-Qodo's aggregate review was observed for exact implementation SHA `c57c5e4…`. All implementable runtime transaction findings are resolved. The read-only boundary remains explicitly SDK-blocked.
+Qodo's aggregate review was observed through implementation SHA `3e3a06e8…`. All
+implementable findings in that aggregate are resolved. The read-only boundary
+remains explicitly SDK-blocked; the final exact-head re-review is pending.
 
 | Severity | Finding | Disposition | Evidence in reconstructed batch |
 |---|---|---|---|

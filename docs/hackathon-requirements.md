@@ -91,20 +91,24 @@ Tool annotations are useful metadata, not an authorization oracle. EvidenceForge
 
 ## Verified repository evidence
 
-Latest verified implementation SHA `c57c5e424054af04c999bd2c144e09b8d54d0622` passed GitHub Actions runs `33101668750` and `33101672505` with:
+Latest technical implementation SHA
+`aed84feb7205d7b66a13804fc2fb8f4184f2324f` passed GitHub Actions runs
+`33155806482` and `33155815342` with:
 
 - `pnpm install --frozen-lockfile`;
 - format check;
 - lint;
 - TypeScript typecheck;
-- 202/202 tests;
+- 204/204 tests;
 - evaluation smoke;
 - demo fixture;
 - build;
 - doctor;
 - `git diff --check`.
 
-This proves the published implementation candidate, not a full sponsor-infrastructure vertical slice.
+The subsequent evidence-synchronization commit `7458388…` also passed both exact-head
+workflows. These results prove the published repository candidate, not a completed
+sponsor-infrastructure vertical slice.
 
 Observed live component evidence:
 
@@ -113,7 +117,11 @@ Observed live component evidence:
 - Daytona connectivity and a successful command execution were observed separately;
 - the configured skills and dynamic-subagent/approval surfaces were observed in a credentialed session.
 
-These observations do not satisfy the still-open exact failing-revision reproduction, live approval/PR write, reconciliation, or CompletionGate path.
+A later live task created and completed exactly three TrueForge specialists and
+initialized GitHub MCP and Daytona, but the model provider ended with HTTP 402
+`Insufficient Balance`. EvidenceForge remained `BLOCKED` and created no PR. The
+failing-revision reproduction, live approval/PR write, reconciliation, and
+CompletionGate path therefore remain open.
 
 ## UI evidence boundary
 
