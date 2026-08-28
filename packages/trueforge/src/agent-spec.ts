@@ -88,9 +88,9 @@ Use the attached skills for triage, reproduction, remediation, and review. Expos
     mcp_servers: [
       {
         name: config.githubMcpName,
-        enable_tools: ["@all"],
+        enable_tools: ["get_commit", "create_pull_request", "pull_request_read"],
         require_approval_for_tools: ["@write", "@destructive"],
-        preload: false,
+        preload: true,
       },
     ],
     skills: [

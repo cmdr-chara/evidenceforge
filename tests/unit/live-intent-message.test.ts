@@ -61,8 +61,8 @@ test("live task objective and constraints are bound into the TrueForge message a
   assert.match(message, /base "determination"/);
   assert.match(message, /Do not use "main" as the base/);
   assert.match(message, /Do not call search_issues, search_pull_requests/);
-  assert.match(message, /only admissible GitHub MCP operations are get_commit/);
-  assert.match(message, /Do not call any other GitHub MCP operation, including search_commits/);
+  assert.match(message, /preloaded GitHub MCP surface contains only get_commit/);
+  assert.match(message, /do not discover or call any other GitHub operation/);
   assert.match(message, /CompletionGate owns that decision/);
   const reproduction = contract.find((criterion) => criterion.id === "failure-reproduced");
   assert.equal(reproduction?.verifier.kind, "FAILURE_SIGNATURE");

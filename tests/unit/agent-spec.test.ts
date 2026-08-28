@@ -20,7 +20,13 @@ test("TrueForge agent spec enables sponsor primitives centrally", () => {
   assert.equal(spec.config.dynamic_sub_agents.enabled, true);
   assert.equal(spec.config.context_management.compaction.enabled, true);
   assert.equal(spec.mcp_servers[0]?.name, "github");
+  assert.deepEqual(spec.mcp_servers[0]?.enable_tools, [
+    "get_commit",
+    "create_pull_request",
+    "pull_request_read",
+  ]);
   assert.deepEqual(spec.mcp_servers[0]?.require_approval_for_tools, ["@write", "@destructive"]);
+  assert.equal(spec.mcp_servers[0]?.preload, true);
   assert.equal(spec.skills.length, 4);
 });
 

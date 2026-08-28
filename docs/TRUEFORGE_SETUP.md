@@ -75,7 +75,7 @@ If a TrueForge turn finishes after review while `external-pr` is still pending, 
 
 Set the Daytona provider's default command timeout to at least `300000` ms. TrueForge 0.1.4 does not expose a per-call timeout field on the model-facing `sandbox.exec` schema, so the provider default must cover the longest immutable verifier (`pnpm test`, 300 seconds). EvidenceForge still records and validates the verifier manifest's application-owned timeout.
 
-The live supervisor is restricted to EvidenceForge's GitHub operation allowlist: `get_commit`, `get_file_contents`, `issue_read`, `list_issues`, `list_pull_requests`, `search_issues`, `search_pull_requests`, and read-only `pull_request_read`; `create_pull_request` becomes admissible only after application approval. Any other operation, including `search_commits`, blocks the run.
+The live supervisor preloads an explicit GitHub MCP allowlist: `get_commit`, `create_pull_request`, and `pull_request_read`. TrueForge therefore does not expose tool discovery or unrelated GitHub operations to the supervisor. `create_pull_request` remains approval-paused and EvidenceForge still validates the exact repository, head, base, patch binding, and authoritative head SHA before any write.
 
 The public incident profile is narrower than the control-plane allowlist: its initial incident context uses exactly one `get_commit` call at the failing SHA. Repository diagnostics then use the bootstrapped Daytona checkout. Broad GitHub searches are deliberately omitted because a query that is not bound to the exact revision is inadmissible evidence and blocks the task.
 
