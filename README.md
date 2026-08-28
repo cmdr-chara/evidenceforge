@@ -4,7 +4,7 @@
 
 EvidenceForge is an evidence-gated CI incident control plane built on TrueForge. It binds a failed GitHub Actions incident to an exact repository revision, reproduces it in Daytona, captures and verifies a patch, obtains an independent patch review, pauses before any external write, reconciles the resulting pull request, and permits completion only through an application-issued certificate.
 
-> **Release status — 2026-08-28:** [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) is the authoritative record for the exact final SHA, exact-head GitHub Actions run, Qodo status, and remaining human actions. The executable candidate passes the frozen local matrix with **233/233 tests**; exact-head CI is recorded externally after publication. The PR remains open and unmerged, with `feat/foundation-control-plane` targeting `determination`.
+> **Release status — 2026-08-28:** the substantive implementation was human-reviewed and squash-merged through [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) into `determination` at [`819c281`](https://github.com/cmdr-chara/evidenceforge/commit/819c2815b5bd8cfdf35847ed76a58a457168e74c). Its [exact-head CI](https://github.com/cmdr-chara/evidenceforge/actions/runs/33194606687) passed. A narrowly scoped submission-readiness follow-up fixes Qodo's later non-zero-result finding and synchronizes the public evidence; its exact-head CI and Qodo result remain publication gates.
 
 ## Evidence boundary
 
@@ -12,7 +12,7 @@ EvidenceForge deliberately separates three kinds of evidence:
 
 | Evidence | Observed result | What it proves |
 |---|---|---|
-| Repository verification | frozen install, format, lint, typecheck, 233 tests, evaluation, fixture, build, doctor, diff check | the executable candidate is reproducible and internally consistent; exact-head CI remains an external publication gate |
+| Repository verification | frozen install, format, lint, typecheck, 235 tests, evaluation, fixture, build, doctor, diff check | the executable candidate is reproducible and internally consistent; the follow-up exact-head CI remains an external publication gate |
 | Credentialed live TrueForge workflow | strongest run reached 9/10 application gates | real TrueForge, GitHub MCP, Daytona, three specialists, deterministic verification, and independent review worked together |
 | Deterministic fixture | complete approval, reconciliation, and CompletionGate certificate path | control-plane semantics, not live sponsor integration |
 
@@ -122,7 +122,7 @@ The profiled incident is deliberately exact:
 
 The historical revision has no committed lockfile. Its live bootstrap therefore uses `pnpm install --no-frozen-lockfile` while pinning Node `22.14.0` and pnpm `11.16.0`. Normal repository CI remains frozen.
 
-The supervisor preloads only `get_commit`, `create_pull_request`, and `pull_request_read` from the GitHub MCP server. The PR write remains approval-paused and must target `head: feat/foundation-control-plane`, `base: determination`. See [docs/TRUEFORGE_SETUP.md](docs/TRUEFORGE_SETUP.md).
+The supervisor preloads only `get_commit`, `create_pull_request`, and `pull_request_read` from the GitHub MCP server. The profiled demo PR write remains approval-paused and targets the preserved reviewed demo head `feat/foundation-control-plane` against `determination`. See [docs/TRUEFORGE_SETUP.md](docs/TRUEFORGE_SETUP.md).
 
 ### SDK limitation
 
@@ -138,29 +138,23 @@ The console provides task-scoped SSE, snapshot reconstruction, semantic INFO/SUC
 
 The 320, 375, 768, 1024, and 1440px layouts were browser-observed without page-level horizontal overflow. The subsequent executable changes do not alter layout geometry; the final accessibility pass improves small muted-text contrast and locks it with a deterministic WCAG contrast test. Exact 200% browser zoom remains a manual release check and is not inferred from equivalent viewport width.
 
-## Qodo and release workflow
+## Qodo Code Review Evidence
 
-Qodo Agentic Review is active on PR #2. The canonical aggregate is [this review comment](https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502); detailed disposition is in [docs/qodo-review-log.md](docs/qodo-review-log.md).
+Qodo Agentic Review reviewed the substantive implementation on [merged PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2). The canonical aggregate is [this review comment](https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502); detailed disposition is in [docs/qodo-review-log.md](docs/qodo-review-log.md).
 
-The finalization passes resolved serialized prompt expansion, the fabricated-root-cause path, and promotion of unresolved model-authored references. Exact context plus exact reproduction alone leaves `root-cause-supported` pending. Specialist causal claims are bounded and structured; every cited reference must resolve to a successful, earlier tool result from the same specialist thread. Only those event-backed observations can enter application-owned correlation.
+Qodo findings directly drove fixes for certificate immutability, stale approvals, PR reconciliation, recovery races, fabricated root cause, unresolved or prefix-matched references, nested failed results, and non-zero command results. Exact context plus exact reproduction alone leaves `root-cause-supported` pending. Every specialist reference must resolve to a successful earlier result from the same thread, and any enclosing `success: false`, failure status, or non-zero `exitCode`/`exit_code` makes that result inadmissible.
 
-The final post-commit exact-SHA request and status are recorded in the PR body because a repository document cannot truthfully contain the SHA of the commit that contains itself.
+The remaining **Read-only boundary is unenforced** High is valid but cannot be implemented against TrueForge SDK `0.1.3`: the SDK exposes no per-dynamic-subagent pre-execution allowlist or interceptor. EvidenceForge restricts the supervisor, enforces budgets and fails closed after violations, but does not falsely claim that post-event detection prevents execution. The exact follow-up Qodo request and disposition are recorded on the submission-readiness PR because a repository document cannot contain the SHA of the commit that contains itself.
 
-The required release flow remains:
-
-```text
-issue → feat/foundation-control-plane → PR #2 → Qodo → human Squash and merge
-```
-
-Suggested squash title:
+The substantive release flow was:
 
 ```text
-feat: add EvidenceForge evidence-gated incident control plane
+issue → feat/foundation-control-plane → PR #2 → Qodo → human Squash and merge → determination
 ```
 
 ## Submission status
 
-Repository implementation and executable CI are release-ready. Remaining external/manual work is explicitly tracked in [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md): exact final-head CI after this documentation commit, exact 200% zoom, a stable credentialed live `external-pr` path, public demo video, human merge, and official hackathon submission.
+The substantive implementation is merged. Remaining gates are explicitly tracked in [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md): follow-up exact-head CI and Qodo, exact 200% zoom, a stable credentialed live `external-pr` path, public demo video, merge of the small submission-readiness PR, and official hackathon submission.
 
 ## AI-assistance disclosure
 

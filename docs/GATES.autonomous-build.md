@@ -4,17 +4,17 @@
 
 Status values: `PASS`, `PARTIAL`, `BLOCKED`, `MANUAL`.
 
-The exact final SHA, exact-head CI URL, and post-commit Qodo request are maintained in [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2). A file inside the repository cannot truthfully embed the SHA or CI result of the commit that contains itself.
+The substantive merge, CI, and Qodo history are maintained in [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2). The submission-readiness exact SHA, CI URL, and post-commit Qodo request are maintained in its follow-up PR. A file inside the repository cannot truthfully embed the SHA or CI result of the commit that contains itself.
 
 | Gate | Status | Evidence / blocker |
 |---|---|---|
-| Feature branch only | PASS | work remains on `feat/foundation-control-plane` |
-| Default branch untouched directly | PASS | PR #2 targets `determination` |
-| Published history preserved | PASS | no force push, rebase, or merge performed in finalization |
+| Reviewed integration | PASS | substantive work was squash-merged through PR #2 into `determination` |
+| Finalization branch | PASS | issue #3 work is isolated on `codex/submission-readiness` |
+| Published history preserved | PASS | no force push or rebase performed |
 | Runtime state excluded | PASS | `.data/` and `.evidenceforge/` remain ignored and untracked |
 | Executable candidate frozen install | PASS | exact code-head CI ran `pnpm install --frozen-lockfile` |
-| Executable candidate verification matrix | PASS | local candidate passed format, lint, typecheck, 233/233 tests, eval, fixture, build, doctor, and diff check |
-| Final documentation-head CI | MANUAL | must run after this file is committed and be recorded externally in PR #2 |
+| Executable candidate verification matrix | PASS | local candidate passed format, lint, typecheck, 235/235 tests, eval, fixture, build, doctor, and diff check |
+| Final documentation-head CI | MANUAL | must run after this file is committed and be recorded on the follow-up PR |
 | CompletionGate-only completion | PASS | direct/model/tool/reviewer completion paths are rejected |
 | Certificate identity and integrity | PASS | task/repository/revision/patch/state/contract/subject/payload digests validated |
 | Stale evidence/certificate rejection | PASS | exact-subject and current-state checks |
@@ -43,15 +43,15 @@ The exact final SHA, exact-head CI URL, and post-commit Qodo request are maintai
 | Exact viewport matrix | PASS | 320/375/768/1024/1440 observed; later changes do not alter geometry |
 | Small-text contrast | PASS | accessible muted color + deterministic >=4.5:1 test on both dark surfaces |
 | Exact 200% zoom | MANUAL | unavailable through current connector/browser surface; not inferred |
-| Qodo implementable High findings | PASS | fabricated root cause and unresolved-reference promotion are fixed in the candidate; exact-SHA Qodo confirmation remains external |
+| Qodo implementable High findings | PARTIAL | all known code paths including non-zero command results are fixed locally; exact-SHA Qodo confirmation remains external |
 | Qodo documentation Medium findings | PASS | fixture reset command and external final-head gate representation corrected in this commit |
 | Qodo SDK boundary | BLOCKED | retained as genuine High limitation |
-| Final post-commit Qodo exact-SHA record | MANUAL | external result linked in PR body/aggregate after this commit |
-| Human merge | BLOCKED | PR #2 intentionally remains open/unmerged |
+| Final post-commit Qodo exact-SHA record | MANUAL | external result linked in the follow-up PR after this commit |
+| Human merge | PARTIAL | PR #2 merged; the narrow submission-readiness PR remains human-gated |
 | Demo video and submission | BLOCKED | human/external account actions remain |
 
 ## Release decision
 
 The executable repository candidate is **release-ready but not application-certified as a live completed incident**.
 
-Exact final-head CI, exact final-SHA Qodo, live `external-pr`, exact 200% zoom, video, human merge, and submission remain separate observed-evidence gates. They are not converted to in-repository PASS claims before the commit containing this ledger exists.
+Follow-up exact-head CI, exact-SHA Qodo, live `external-pr`, exact 200% zoom, video, finalization merge, and submission remain separate observed-evidence gates. They are not converted to in-repository PASS claims before the commit containing this ledger exists.

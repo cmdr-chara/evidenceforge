@@ -4,9 +4,10 @@
 
 ## Repository and control plane
 
-- [x] Work remains on `feat/foundation-control-plane`.
-- [x] PR #2 targets `determination` and remains open/unmerged.
-- [x] No force push, rebase, or direct modification of `determination`.
+- [x] Substantive work was squash-merged through PR #2 into `determination`.
+- [x] PR #2 is closed as merged; its Qodo thread and review history remain public.
+- [x] Submission finalization is isolated on `codex/submission-readiness` under issue #3.
+- [x] No force push or rebase of published history.
 - [x] TrueForge remains the primary runtime; no second agent framework.
 - [x] Application-owned CompletionGate is the only completion path.
 - [x] Deeply immutable, canonically digested completion certificate.
@@ -44,20 +45,20 @@
 
 ## Verification
 
-The current executable candidate contains 233 tests and passed the complete local matrix. Because this checklist changes repository state, exact-head CI for the commit containing it is deliberately a separate external gate recorded in PR #2.
+The current executable candidate contains 235 tests. Because this checklist changes repository state, exact-head CI for the commit containing it is deliberately a separate external gate recorded on the submission-readiness PR.
 
 - [x] `pnpm install --frozen-lockfile` on the executable code head.
 - [x] `pnpm format:check` on the executable code head.
 - [x] `pnpm lint` on the executable code head.
 - [x] `pnpm typecheck` on the executable code head.
-- [x] `pnpm test` — 233/233 on the executable candidate.
+- [x] `pnpm test` — 235/235 on the executable candidate.
 - [x] `pnpm eval:smoke` on the executable code head.
 - [x] `pnpm demo:fixture` on the executable code head.
 - [x] `pnpm build` on the executable code head.
 - [x] `pnpm doctor` on the executable code head.
 - [x] `git diff --check` on the executable code head.
 - [x] Push and pull-request workflows green on the executable code head.
-- [ ] Confirm the same matrix on the commit containing this checklist and record it in PR #2.
+- [ ] Confirm the same matrix on the commit containing this checklist and record it on the submission-readiness PR.
 
 ## Live evidence
 
@@ -92,14 +93,16 @@ The current executable candidate contains 233 tests and passed the complete loca
 ## Qodo
 
 - [x] Genuine Agentic Review aggregate: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
-- [x] Every implementable Critical/High finding on the executable code head fixed or resolved.
+- [x] Qodo's later **Nonzero results accepted** High fixed with `exitCode` and `exit_code` regressions.
 - [x] JSON serialization prompt-cap finding fixed with deterministic regression.
 - [x] Fabricated root-cause finding fixed with negative and positive exact-evidence regressions.
 - [x] Unresolved diagnostic references rejected with missing, failed-result, transport-key, and cross-thread regressions.
 - [x] SDK-limited read-only boundary retained as BLOCKED, not falsely resolved.
 - [x] Demo reset command added.
 - [x] Final-documentation-head verification represented as an external gate, not a premature PASS.
-- [ ] Record the post-documentation exact-SHA `/agentic_review` request and result in PR #2.
+- [ ] Record the exact-SHA `/agentic_review` request and result on the submission-readiness PR.
+- [ ] Obtain Qodo resolution of the non-zero-result finding on that exact SHA.
+- [ ] Record an explicit justified disposition for the SDK-blocked read-only finding in the Qodo thread.
 
 ## Documentation and demo
 
@@ -112,7 +115,7 @@ The current executable candidate contains 233 tests and passed the complete loca
 - [x] Demo script runs `pnpm demo:reset` before fixture validation.
 - [x] Demo script separates credentialed 9/10 evidence from deterministic certificate footage.
 - [ ] Add public demo video URL.
-- [ ] Perform final secret/diff review before human merge.
+- [ ] Perform final secret/diff review before the finalization PR is merged.
 
 ## Human release and submission
 
@@ -120,6 +123,6 @@ The current executable candidate contains 233 tests and passed the complete loca
 - [ ] Inspect final exact-SHA Qodo aggregate.
 - [ ] Perform exact 200% zoom check.
 - [ ] Record demo video.
-- [ ] Human `Squash and merge` PR #2.
-- [ ] Use squash title `feat: add EvidenceForge evidence-gated incident control plane`.
+- [x] Human `Squash and merge` PR #2 completed.
+- [ ] Human merge of the narrow submission-readiness PR after exact-head CI and Qodo.
 - [ ] Complete official hackathon submission before the observed deadline.

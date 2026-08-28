@@ -4,7 +4,7 @@
 
 EvidenceForge is a TrueForge-based CI incident control plane designed to prevent false completion. Models diagnose and propose; application-owned evidence, deterministic verifiers, approval policy, external-state reconciliation, and CompletionGate decide.
 
-The executable candidate passes the local verification matrix with 233 tests; exact-head CI is recorded externally after publication. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached 9/10 application gates; `external-pr` remains the unverified live gate. The deterministic fixture completes the full approval/reconciliation/certificate path and is labeled accordingly.
+The executable candidate passes the local verification matrix with 235 tests; exact-head CI for the narrow follow-up is recorded externally after publication. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached 9/10 application gates; `external-pr` remains the unverified live gate. The deterministic fixture completes the full approval/reconciliation/certificate path and is labeled accordingly.
 
 ## Problem
 
@@ -61,7 +61,7 @@ EvidenceForge blocked every unsafe deviation. No invalid PR was created.
 
 Qodo Agentic Review materially improved certificate immutability, repatch invalidation, approval races, PR identity, cursor recovery, stream timeout fencing, event-journal order, terminal durability, cancellation retry, response binding, prompt bounds, and causal root-cause verification.
 
-The fabricated-root-cause and unresolved-reference High paths are fixed in the candidate: exact context plus exact reproduction alone remains pending, and structured specialist causality is accepted only after same-thread tool-result resolution and application correlation. Exact-SHA Qodo confirmation remains an external gate.
+The fabricated-root-cause, unresolved-reference, failed-result, prefix-correlation, and non-zero-result High paths are fixed in the candidate: exact context plus exact reproduction alone remains pending, and structured specialist causality is accepted only after successful same-thread tool-result resolution and application correlation. Exact-SHA Qodo confirmation for the follow-up remains an external gate.
 
 Qodo's standing SDK-boundary High is valid but blocked: TrueForge SDK `0.1.3` has no per-dynamic-subagent pre-execution tool interceptor/allowlist. EvidenceForge does not mislabel post-event rejection as prevention.
 
@@ -81,14 +81,15 @@ Responsive browser observations cover 320, 375, 768, 1024, and 1440px. The final
 ## Measured result
 
 ```text
-Executable local candidate:  complete matrix, 233/233 tests
+Executable local candidate:  complete matrix, 235/235 tests
 Deterministic fixture:       10/10 + CompletionGate certificate
 Credentialed live workflow:  9/10; external-pr not completed
 False-success evaluation:    EvidenceForge 0%; baseline 57.14%
-PR state:                     open, unmerged, base determination
+Substantive PR state:         PR #2 merged into determination
+Follow-up state:              submission-readiness PR pending review
 ```
 
-The exact final-head CI result for the commit containing this report is recorded externally in PR #2 after publication.
+The exact final-head CI result for the commit containing this report is recorded on the submission-readiness PR after publication.
 
 ## Remaining risks and actions
 
@@ -96,7 +97,7 @@ The exact final-head CI result for the commit containing this report is recorded
 - live external PR approval/write/reconciliation has not been stably reproduced;
 - exact final-head CI/Qodo must be observed after this report commit;
 - exact 200% zoom remains manual;
-- video, human merge, and submission require human/external account actions.
+- video, follow-up merge, and submission require human/external account actions.
 
 ## Submission position
 

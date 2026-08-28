@@ -36,7 +36,7 @@ This file records the requirements that materially affect EvidenceForge. Officia
 - GitHub MCP, Daytona, four skills, approvals, compaction, exactly three dynamic specialists, bounded iterations, and durable session recovery are integrated.
 - `CompletionGate` is the only application path to `COMPLETED`.
 - Exact PR identity, approval provenance, stale evidence/certificate rejection, repatch invalidation, crash recovery, terminal cutoffs, and collision-safe persistence are implemented and tested.
-- Exact code-head CI runs the frozen verification matrix with 226 passing tests.
+- The substantive merged head passed exact-head GitHub Actions; the follow-up candidate contains 235 tests.
 - The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for the unenforced baseline.
 
 ### Live sponsor evidence
@@ -68,7 +68,7 @@ Required workflow:
 
 Canonical aggregate: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 
-The candidate fixes the fabricated-root-cause and unresolved-reference paths. Context plus reproduction alone leaves the criterion pending; a specialist causal claim becomes a non-authoritative observation only after each reference resolves to an earlier successful same-thread tool result, and the application promotes it only after exact-evidence correlation. Exact-SHA Qodo confirmation remains external.
+The candidate fixes the fabricated-root-cause, unresolved-reference, nested-failure, prefix-correlation, and non-zero-result paths. Context plus reproduction alone leaves the criterion pending; a specialist causal claim becomes a non-authoritative observation only after each reference resolves to an earlier successful same-thread tool result, and the application promotes it only after exact-evidence correlation. Exact-SHA confirmation of the follow-up remains external.
 
 One High remains **BLOCKED by TrueForge SDK 0.1.3**: per-dynamic-subagent read-only pre-execution enforcement. The SDK exposes no per-dynamic-subagent interceptor/allowlist, so post-event rejection is not represented as prevention.
 
@@ -84,12 +84,12 @@ Exact 200% browser zoom remains a manual check. A width-equivalent reflow must n
 
 ## Remaining external/human actions
 
-- observe and record exact final-head CI after this documentation commit;
+- observe and record exact-head CI and Qodo for the submission-readiness PR;
 - reproduce a stable credentialed live path through `external-pr`, approval, write, reconciliation, and certificate, or present the live result as 9/10 without embellishment;
 - perform exact 200% browser zoom review;
 - record and publish the demo video;
 - inspect the final exact-SHA Qodo aggregate;
-- human `Squash and merge` PR #2 into `determination`;
+- human merge of the submission-readiness PR into `determination`;
 - complete the official submission before the observed deadline.
 
 No live completion, Qodo closure, merge, video, or submission is represented as complete without observed evidence.

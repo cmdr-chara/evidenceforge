@@ -2,7 +2,7 @@
 
 **Finalization snapshot:** 2026-08-28
 
-This journal records the production path and its evidence boundaries. Commit-level history remains available in PR #2.
+This journal records the production path and its evidence boundaries. Commit-level history remains available in merged PR #2 and the narrow submission-readiness follow-up.
 
 ## 1. Foundation and recovery
 
@@ -42,7 +42,7 @@ The historical incident bootstrap was aligned with its authoritative CI: the old
 
 Repeated Agentic Review passes found and verified fixes for stale approvals/certificates, reconciliation identity, cursor durability, timeout races, event-journal ordering, terminal persistence, cancellation retry, GitHub response binding, serialized prompt expansion, and fabricated root-cause promotion.
 
-The final causal changes reject both the unsafe equivalence between symptom reproduction and diagnosis and promotion of unresolved model-authored references. Exact context plus exact reproduction remains pending. A named specialist must supply a bounded cause and causal mechanism whose references resolve to earlier successful tool results in that specialist thread; the application then performs exact-evidence correlation before PASS.
+The final causal changes reject both the unsafe equivalence between symptom reproduction and diagnosis and promotion of unresolved model-authored references. Exact context plus exact reproduction remains pending. A named specialist must supply a bounded cause and causal mechanism whose references resolve to earlier successful tool results in that specialist thread; command results must also report a zero exit. The application then performs exact-evidence correlation before PASS.
 
 One High remains intentionally open: TrueForge SDK `0.1.3` lacks a per-dynamic-subagent pre-execution tool policy. EvidenceForge documents the boundary rather than pretending post-event rejection prevents execution.
 
@@ -65,7 +65,7 @@ pnpm install --frozen-lockfile
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test                  233/233
+pnpm test                  235/235
 pnpm eval:smoke
 pnpm demo:fixture
 pnpm build
@@ -75,7 +75,7 @@ git diff --check
 
 The deterministic evaluation remains 0% false success for EvidenceForge versus 57.14% for the unenforced baseline.
 
-The commit containing this journal must run the same matrix after publication; that self-referential exact-head result is recorded externally in PR #2 rather than predeclared here.
+The commit containing this journal must run the same matrix after publication; that self-referential exact-head result is recorded on the submission-readiness PR rather than predeclared here.
 
 ## 6. Live evidence result
 
@@ -87,11 +87,11 @@ The deterministic fixture completes 10/10 and issues a CompletionGate certificat
 
 ## 7. Final release boundary
 
-Repository code, tests, executable CI, Qodo remediation, and documentation are finalized on the feature branch. Remaining work requires external observation, credentials, or human authority:
+The substantive implementation is merged into `determination`; the small Qodo/documentation follow-up remains review-gated. Remaining work requires external observation, credentials, or human authority:
 
 - exact final-head CI and Qodo after this commit;
 - exact 200% zoom;
 - stable live approval/write/reconciliation/certificate path;
 - demo video;
-- human squash merge;
+- human merge of the submission-readiness PR;
 - official submission.

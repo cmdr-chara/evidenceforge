@@ -5,13 +5,16 @@ Record only genuine Qodo findings and observed follow-up evidence.
 ## Canonical review
 
 - PR: https://github.com/cmdr-chara/evidenceforge/pull/2
+- PR state: merged into `determination` at `819c2815b5bd8cfdf35847ed76a58a457168e74c`
 - Aggregate Agentic Review: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5417017502
 - Latest exact executable-code-head request: https://github.com/cmdr-chara/evidenceforge/pull/2#issuecomment-5455477708
-- The final post-documentation exact-SHA request and result are recorded in the PR body because this file cannot contain the SHA of its own commit.
+- The final post-documentation exact-SHA request and result are recorded on the follow-up PR because this file cannot contain the SHA of its own commit.
 
 ## Current disposition
 
-The exact code-head aggregate for `917de0ab2edab1f2b49c7a4ea8f1707737402286` marks every implementable finalization finding resolved. Exact incident context plus exact reproduction no longer produces a synthetic hypothesis or PASS, and a causal claim becomes a non-authoritative `OPEN` observation only after every cited string resolves with lexical boundaries to an earlier successful tool result from the same named specialist thread. Model-authored locations, unresolved strings, failed or nested-failed outputs, transport keys, cross-thread results, and ambiguous prefixes are not promoted to artifact references.
+The aggregate later reported **Nonzero results accepted** against the merged implementation: a nested result with a non-zero `exitCode` could still ground causal evidence. The submission-readiness follow-up rejects non-zero numeric `exitCode` and `exit_code` values at any bounded inspected level and adds deterministic regressions for both spellings. Exact-SHA Qodo confirmation remains a publication gate.
+
+Earlier exact-head reviews marked the fabricated-root-cause, unresolved-reference, nested-failure, and prefix-correlation fixes resolved. Exact incident context plus exact reproduction no longer produces a synthetic hypothesis or PASS. Model-authored locations, unresolved strings, failed outputs, transport keys, cross-thread results, ambiguous prefixes, and non-zero command outputs are not admissible artifact references.
 
 The standing SDK-boundary High is **Read-only boundary is unenforced**. It is valid but blocked by the public TrueForge SDK `0.1.3` surface. The SDK enables dynamic subagents but exposes no per-dynamic-subagent pre-execution tool allowlist, interceptor, or separate capability set.
 
@@ -25,6 +28,7 @@ EvidenceForge does not label prompt instructions or post-event rejection as equi
 | High | Unresolved references become evidence | RESOLVED | Qodo's exact-SHA aggregate for `5f7fc10c2327b56dea18645f15035520e48f40ee` marks the finding resolved after same-thread successful-tool-result grounding and its missing, failed, transport-key, and cross-thread regressions |
 | High | Failed nested results accepted | RESOLVED | Qodo's exact-SHA aggregate for `917de0ab2edab1f2b49c7a4ea8f1707737402286` marks the bounded recursive rejection and regression resolved |
 | High | Reference prefixes miscorrelate evidence | RESOLVED | Qodo's exact-SHA aggregate for `917de0ab2edab1f2b49c7a4ea8f1707737402286` marks lexical-boundary matching and its prefix regression resolved |
+| High | Nonzero results accepted | FIXED — AWAITING EXACT-SHA QODO | bounded recursive failure detection now rejects numeric non-zero `exitCode` and `exit_code`; both spellings have integration regressions |
 | Medium | Root-cause steps are reversed | RESOLVED | Qodo's exact-SHA aggregate for `8d8ee23b14bb91bd40fc8d369d6894be30be4757` no longer reports the finding after reproduction was ordered before root-cause promotion |
 | Medium | Serialization bypasses prompt cap | RESOLVED | task validation measures actual JSON-serialized objective/constraints; hostile control-character regression |
 | Medium | Fixture reset command omitted | RESOLVED IN THIS COMMIT | demo preparation invokes `pnpm demo:reset` before fixture validation |
@@ -58,9 +62,9 @@ Each implementable behavior change is covered by deterministic regression tests.
 
 ## Required release handling
 
-1. Trigger `/agentic_review` after this documentation commit and exact-head CI.
+1. Trigger `/agentic_review` on the submission-readiness PR after this documentation commit and exact-head CI.
 2. Inspect the aggregate against that exact SHA.
 3. Fix any new implementable Critical/High finding.
 4. Keep the SDK-blocked High visible.
-5. Record the exact final request/result in PR #2.
-6. Keep PR #2 unmerged until a human decides to merge.
+5. Record the exact request/result on the follow-up PR.
+6. Merge the follow-up only after a human inspects exact-head CI and Qodo.

@@ -4,8 +4,8 @@ Target: approximately three minutes. The demo must distinguish credentialed live
 
 ## Before recording
 
-1. Confirm PR #2 is open, unmerged, and targets `determination`.
-2. Confirm the exact final SHA and CI run in the PR body.
+1. Confirm merged PR #2 and the submission-readiness PR are public.
+2. Confirm the exact final SHA and CI run on the follow-up PR.
 3. Confirm TrueForge, model, GitHub MCP, Daytona, and skills are available.
 4. Run the repository checks.
 5. Reset the deterministic fixture.
@@ -80,7 +80,7 @@ Show the certificate's task, criteria, patch digest, reviewer, external identity
 
 ## 2:55–3:00 — close
 
-Show PR #2 and the deterministic evaluation:
+Show merged PR #2, its Qodo evidence, and the deterministic evaluation:
 
 ```text
 EvidenceForge false success: 0%
