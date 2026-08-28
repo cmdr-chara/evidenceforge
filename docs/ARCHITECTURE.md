@@ -82,7 +82,9 @@ sequenceDiagram
     EF->>EF: lock success contract
     TF->>TF: spawn exactly 3 read-only specialists
     TF-->>EF: structured findings and evidence refs
-    TF->>DT: checkout exact revision and reproduce
+    TF->>DT: run exact bootstrap manifest (checkout + pinned runtime + frozen install)
+    DT-->>EF: bootstrap exit code
+    TF->>DT: run exact failing test command
     DT-->>EF: exit code + matching failure signature
     TF->>DT: serialized minimal patch
     TF->>DT: regression, tests, lint, typecheck, diff check

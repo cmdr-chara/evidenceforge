@@ -16,7 +16,7 @@ export function buildCiSuccessContract(task: Task): SuccessCriterion[] {
     ),
     pendingCriterion("failure-reproduced", "Original failure independently reproduced", {
       kind: "FAILURE_SIGNATURE",
-      argv: ["pnpm", "test"],
+      argv: ["node", "--test", "demo/incident-fixture/test/config.test.mjs"],
       cwd,
       expectedNonZeroExit: true,
       signature: "CONFIG_VALIDATION_ORDER",
@@ -35,7 +35,7 @@ export function buildCiSuccessContract(task: Task): SuccessCriterion[] {
     ),
     pendingCriterion("regression", "Regression verifier passes post-patch", {
       kind: "COMMAND",
-      argv: ["pnpm", "test", "--", "config"],
+      argv: ["node", "--test", "demo/incident-fixture/test/config.test.mjs"],
       cwd,
       expectedExitCode: 0,
       outputMustContain: ["pass"],

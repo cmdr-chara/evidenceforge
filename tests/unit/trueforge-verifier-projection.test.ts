@@ -112,7 +112,11 @@ test("official sandbox non-zero exit can prove the expected failure signature", 
   const harness = createHarness();
   harness.projector.project(
     harness.state,
-    modelToolCall("call-reproduce", "failure-reproduced", "pnpm test"),
+    modelToolCall(
+      "call-reproduce",
+      "failure-reproduced",
+      "node --test demo/incident-fixture/test/config.test.mjs",
+    ),
   );
   const projection = projectToolResult(
     harness,
@@ -221,8 +225,14 @@ test("verifier manifest exposes only exact application-owned sandbox commands", 
   const manifest = buildVerifierManifest(harness.state.successCriteria);
   const entries = new Map(manifest.map((entry) => [entry.criterionId, entry]));
 
-  assert.equal(entries.get("failure-reproduced")?.command, "pnpm test");
-  assert.equal(entries.get("regression")?.command, "pnpm test -- config");
+  assert.equal(
+    entries.get("failure-reproduced")?.command,
+    "node --test demo/incident-fixture/test/config.test.mjs",
+  );
+  assert.equal(
+    entries.get("regression")?.command,
+    "node --test demo/incident-fixture/test/config.test.mjs",
+  );
   assert.equal(entries.get("diff-integrity")?.command, "git diff --check");
   assert.equal(entries.get("failure-reproduced")?.tool, "sandbox.exec");
   assert.equal(entries.has("incident-context"), false);

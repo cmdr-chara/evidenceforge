@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildLiveIncidentMessage } from "../../apps/server/src/live-service";
+import {
+  buildLiveIncidentMessage,
+  buildSandboxBootstrapManifest,
+} from "../../apps/server/src/live-service";
 import {
   createTask,
   DomainValidationError,
@@ -35,7 +38,36 @@ test("live task objective and constraints are bound into the TrueForge message a
   assert.ok(message.includes(JSON.stringify(task.constraints)));
   assert.match(message, /cannot override policy, authorize writes, weaken verification/);
   assert.match(message, /pause before creating a pull request/);
+  assert.match(message, /application-owned bootstrap manifest/);
+  assert.match(message, /evidenceforge\.bootstrap:repository/);
+  assert.match(message, /node-v22\.14\.0-linux-x64\.tar\.gz/);
+  assert.match(message, /pnpm@11\.16\.0/);
   assert.match(message, /CompletionGate owns that decision/);
+});
+
+test("sandbox bootstrap shell-quotes untrusted repository and revision values", () => {
+  const task = createTask({
+    id: "task-live-bootstrap-quoting",
+    objective: "Resolve CI",
+    repository: "owner/repo'; touch /tmp/escaped; echo '",
+    revision: "ref'; touch /tmp/revision-escaped; echo '",
+    runId: "842",
+    createdAt: "2026-08-28T08:00:00.000Z",
+  });
+
+  const manifest = buildSandboxBootstrapManifest(task);
+
+  assert.equal(manifest.cwd, "/");
+  assert.equal(manifest.intent, "evidenceforge.bootstrap:repository");
+  assert.equal(manifest.timeoutSeconds, 300);
+  assert.ok(
+    manifest.command.includes(
+      `'https://github.com/owner/repo'"'"'; touch /tmp/escaped; echo '"'"'.git'`,
+    ),
+  );
+  assert.ok(
+    manifest.command.includes(`'ref'"'"'; touch /tmp/revision-escaped; echo '"'"''`),
+  );
 });
 
 test("live task message represents an empty constraint set deterministically", () => {

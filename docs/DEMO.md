@@ -86,7 +86,7 @@ Explain that the subagents share the sandbox, so mutation is forbidden during fa
 Show the sandbox command event:
 
 ```text
-node --test demo/incident-fixture/test/*.test.mjs
+node --test demo/incident-fixture/test/config.test.mjs
 exit 1
 CONFIG_VALIDATION_ORDER matched
 ```

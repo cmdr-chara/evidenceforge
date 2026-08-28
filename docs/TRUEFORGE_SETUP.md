@@ -65,6 +65,8 @@ pnpm dev
 
 Use the live form with `owner/repository`, GitHub Actions run ID, and exact failing commit SHA. The session state persists under `EVIDENCEFORGE_DATA_DIR` (default `.data/`) and includes TrueForge session, turn, and sequence IDs for resume.
 
+Before any deterministic verifier runs, EvidenceForge gives the supervisor one exact, application-owned Daytona bootstrap manifest. It checks out the requested revision into `/workspace/repository`, installs the same pinned Node.js `22.14.0` and pnpm `11.16.0` toolchain used by CI (including a fixed Node archive checksum), and runs `pnpm install --frozen-lockfile`. A non-zero bootstrap exit is infrastructure evidence only and blocks verification; it can never satisfy a success criterion.
+
 ## Approval behavior
 
 The inline agent spec configures GitHub tool approval for `@write` and `@destructive`. EvidenceForge also applies its own risk policy. The PR action must be prepared in exact form and approved before the TrueForge `user.tool_approval` resume event is submitted.
@@ -78,5 +80,7 @@ The inline agent spec configures GitHub tool approval for `@write` and `@destruc
 | model call fails | verify provider credentials in TrueForge |
 | GitHub MCP auth pause | complete MCP authorization, then resume with empty input as documented |
 | sandbox unavailable | configure Daytona in TrueForge settings |
+| sandbox reports `/usr/bin/bash: no such file or directory` | inspect the requested `cwd`; Daytona can return this message when `/workspace/repository` was not materialized. Start a new live task with the current EvidenceForge bootstrap manifest instead of resuming a terminal turn |
+| bootstrap cannot install the pinned runtime | verify outbound access to `github.com`, `nodejs.org`, and the package registry from Daytona; do not substitute host execution |
 | skills absent | add git-backed skills and keep sandbox enabled |
 | no Qodo review | install Qodo GitHub integration and comment `/agentic_review` |
