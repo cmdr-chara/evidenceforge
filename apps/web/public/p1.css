@@ -1,3 +1,7 @@
+:root {
+  --paper-muted: #858a81;
+}
+
 html,
 body {
   max-width: 100%;
@@ -44,6 +48,16 @@ dt,
 .verifier,
 .evidence-kind {
   font-size: 0.75rem;
+}
+
+.timeline li,
+.timeline li::before,
+.live-form input::placeholder {
+  color: var(--paper-muted);
+}
+
+.live-form input::placeholder {
+  opacity: 1;
 }
 
 .certificate-grid span,
