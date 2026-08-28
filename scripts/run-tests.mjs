@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, rmSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const requested = process.argv[2];
 const root = resolve(new URL('..', import.meta.url).pathname);
+rmSync(join(root, 'dist'), { recursive: true, force: true });
 run('tsc', ['-p', 'tsconfig.json']);
 const base = join(root, 'dist', 'tests');
 const roots = requested ? [join(base, requested)] : ['unit', 'integration', 'scenarios', 'failure-injection'].map((name) => join(base, name));
