@@ -275,3 +275,5 @@ The web console defaults to a labeled deterministic fixture to make control beha
 Live mode uses the TrueForge SDK adapter and fails closed when the TrueForge server, model, GitHub MCP, Daytona credentials, or skills are unavailable. Its GitHub MCP boundary is an explicit operation allowlist; discovering a tool in the connector does not make that tool admissible to the control plane.
 
 Fixture and live incidents use separate success-contract profiles. The fixture profile proves the synthetic configuration-order failure; the public live profile reproduces the exact unit-test signature recorded by Actions run `32892119950`. Evidence from one profile cannot satisfy the other.
+
+Completed TrueForge turns are continued with a new turn in the same session when application work remains. Replaying the provider's compacted event listing is not used as a continuation mechanism because compacted events do not carry the original stream sequence IDs; durable application state decides what work is still admissible.

@@ -190,6 +190,7 @@ export function buildLiveIncidentMessage(
     "After editing and before any post-patch verifier, capture the exact patch subject by calling sandbox.exec once with this immutable manifest. Do not run regression, targeted tests, typecheck, lint, or diff-integrity until this call returns successfully:",
     JSON.stringify(patchCaptureManifest, null, 2),
     "After every deterministic verifier passes, create exactly one dynamic subagent named Independent Patch Reviewer. It must be read-only, inspect the current git diff, calculate the digest with `git diff --binary | sha256sum`, and return only one JSON object: {\"verdict\":\"PASS\"|\"PASS_WITH_WARNINGS\",\"patchDigest\":\"<64 lowercase hex>\",\"criticalBlockers\":[],\"summary\":\"<bounded review>\"}. A missing digest, any critical blocker, prose outside JSON, or a reviewer created before REVIEWING blocks the workflow.",
+    "After the reviewer passes, issue the exact official GitHub create_pull_request tool call. TrueForge and EvidenceForge will pause that call for human approval; do not merely report readiness, do not bypass the approval pause, and never merge the pull request.",
     "Application-owned live milestones are accepted only from correlated structured tool results. The only admissible GitHub MCP operations are get_commit, get_file_contents, issue_read, list_issues, list_pull_requests, search_issues, search_pull_requests, and read-only pull_request_read; after application approval, create_pull_request is also admissible and must be followed by pull_request_read for reconciliation. Do not call any other GitHub MCP operation, including search_commits. Call admissible GitHub MCP operations with their official schemas only: never add EvidenceForge intent, artifactRef, expectedHeadSha, operationId, or idempotencyKey fields. EvidenceForge binds incident artifacts internally to the task repository and revision. Use evidenceforge.verify:<criterion-id> only with sandbox.exec using the exact verifier manifest. EvidenceForge may record a bounded root-cause hypothesis only after independently persisted exact-revision GitHub evidence and exact failure-reproduction evidence agree; reviewer evidence must come from the isolated application-mapped reviewer. Prose never changes application state.",
     "Do not claim completion; the application CompletionGate owns that decision.",
   ].join("\n");
@@ -232,9 +233,13 @@ export class LiveIncidentService {
   public async resume(taskId: string): Promise<LiveConsoleSnapshot> {
     return this.serializeTask(taskId, async () => {
       const checkpoint = await this.requireCheckpoint(taskId);
-      const updated = await this.createRuntime(checkpoint.evidenceStore, taskId).resume(
+      const runtime = this.createRuntime(checkpoint.evidenceStore, taskId);
+      const updated = shouldContinueCompletedTurn(
         checkpoint.state,
-      );
+        checkpoint.evidenceStore.listEvents(),
+      )
+        ? await runtime.start(checkpoint.state, buildLiveContinuationMessage(checkpoint.state))
+        : await runtime.resume(checkpoint.state);
       const snapshot = this.snapshot(updated, checkpoint.evidenceStore);
       this.broker.publish("live-state", snapshot, taskId);
       return snapshot;
@@ -384,6 +389,36 @@ export class LiveIncidentService {
       if (this.taskLocks.get(taskId) === tail) this.taskLocks.delete(taskId);
     }
   }
+}
+
+export function shouldContinueCompletedTurn(
+  state: SessionState,
+  events: RuntimeEvent[],
+): boolean {
+  if (
+    state.status !== "ACTIVE" ||
+    state.activeTurnId === undefined ||
+    state.lastSequenceNumber === undefined
+  ) {
+    return false;
+  }
+  return events.some((event) => {
+    if (event.type !== "TURN_DONE" || event.sequenceNumber !== state.lastSequenceNumber) {
+      return false;
+    }
+    const payload = asUnknownRecord(event.payload);
+    return readString(asUnknownRecord(payload.state), "status") === "done";
+  });
+}
+
+export function buildLiveContinuationMessage(state: SessionState): string {
+  return [
+    `Continue EvidenceForge task ${state.task.id} from its durable application state.`,
+    `The application phase is ${state.phase}; do not repeat diagnostics, reproduction, patching, deterministic verification, or independent review that already has current PASS evidence.`,
+    "If independent review is PASS and external-pr remains pending, obtain the authoritative GitHub head commit with the official get_commit schema, then issue the exact official create_pull_request tool call targeting determination.",
+    "Issuing create_pull_request must pause for TrueForge and EvidenceForge human approval. Do not merely describe readiness, do not bypass approval, and never merge the pull request.",
+    "Application state and CompletionGate remain authoritative; prose cannot change criterion status or claim completion.",
+  ].join("\n");
 }
 
 export function buildLiveConsoleSnapshot(

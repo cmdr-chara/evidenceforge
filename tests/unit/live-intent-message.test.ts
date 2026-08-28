@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  buildLiveContinuationMessage,
   buildLiveIncidentMessage,
   buildSandboxPatchCaptureManifest,
   buildSandboxBootstrapManifest,
+  shouldContinueCompletedTurn,
 } from "../../apps/server/src/live-service";
 import {
+  createSessionState,
   createTask,
   DomainValidationError,
+  RuntimeEvent,
   TASK_CONSTRAINT_MAX_COUNT,
   TASK_CONSTRAINT_MAX_LENGTH,
   TASK_OBJECTIVE_MAX_LENGTH,
@@ -126,6 +130,34 @@ test("live success contract fails closed for an unprofiled incident", () => {
     () => buildEvidenceForgeLiveCiSuccessContract(task),
     /no application-owned live success-contract profile matches this incident/,
   );
+});
+
+test("completed active turn continues in a new turn instead of replaying compacted history", () => {
+  const task = createTask({
+    id: "task-live-continuation",
+    objective: "Prepare the reviewed patch for approval",
+    repository: "cmdr-chara/evidenceforge",
+    revision: "9accc9e484e055c8b22172e389dc50f84315f4e2",
+    runId: "32892119950",
+  });
+  const state = createSessionState(task, buildEvidenceForgeLiveCiSuccessContract(task));
+  state.phase = "REVIEWING";
+  state.trueForgeSessionId = "session-live";
+  state.activeTurnId = "turn-live";
+  state.lastSequenceNumber = 42;
+  const done: RuntimeEvent = {
+    id: "event-turn-done",
+    type: "TURN_DONE",
+    source: "trueforge:turn.done",
+    timestamp: "2026-08-28T13:00:00.000Z",
+    sequenceNumber: 42,
+    payload: { type: "turn.done", state: { status: "done", requiredActions: [] } },
+  };
+
+  assert.equal(shouldContinueCompletedTurn(state, [done]), true);
+  assert.equal(shouldContinueCompletedTurn(state, [{ ...done, sequenceNumber: 41 }]), false);
+  assert.match(buildLiveContinuationMessage(state), /issue the exact official create_pull_request/);
+  assert.match(buildLiveContinuationMessage(state), /never merge/);
 });
 
 test("live task accepts bounded incident text at the documented limits", () => {
