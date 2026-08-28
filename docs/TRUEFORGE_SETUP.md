@@ -79,6 +79,8 @@ The live supervisor is restricted to EvidenceForge's GitHub operation allowlist:
 
 The public incident profile is narrower than the control-plane allowlist: its initial incident context uses exactly one `get_commit` call at the failing SHA. Repository diagnostics then use the bootstrapped Daytona checkout. Broad GitHub searches are deliberately omitted because a query that is not bound to the exact revision is inadmissible evidence and blocks the task.
 
+The profiled historical revision has no committed `pnpm-lock.yaml`, and its authoritative CI run installs with `pnpm install --no-frozen-lockfile`. The live bootstrap uses that same install mode after pinning Node and pnpm; requiring `--frozen-lockfile` would fail before reproduction and would not match the incident environment.
+
 TrueForge model-message deltas remain durably journaled and projected for tool-call correlation, but EvidenceForge defers the full state-and-evidence checkpoint until the next semantic event or the turn boundary. This prevents long reasoning streams from causing quadratic checkpoint rewrites while preserving fail-closed replay from the last durable cursor.
 
 ## Approval behavior

@@ -49,6 +49,8 @@ test("live task objective and constraints are bound into the TrueForge message a
   assert.match(message, /evidenceforge\.bootstrap:repository/);
   assert.match(message, /node-v22\.14\.0-linux-x64\.tar\.gz/);
   assert.match(message, /pnpm@11\.16\.0/);
+  assert.match(message, /pnpm -C '[^']+' install --no-frozen-lockfile/);
+  assert.doesNotMatch(message, /install --frozen-lockfile/);
   assert.match(message, /evidenceforge\.patch/);
   assert.match(message, /git diff --binary/);
   assert.match(message, /Independent Patch Reviewer/);

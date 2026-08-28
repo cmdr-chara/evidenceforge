@@ -148,7 +148,7 @@ export function buildSandboxBootstrapManifest(task: Task): SandboxBootstrapManif
       `if ! node --version 2>/dev/null | grep -qx ${shellQuote(`v${SANDBOX_NODE_VERSION}`)}; then curl -fsSL ${shellQuote(`https://nodejs.org/dist/v${SANDBOX_NODE_VERSION}/${nodeArchive}`)} -o ${shellQuote(nodeArchivePath)}; printf '%s  %s\\n' ${shellQuote(SANDBOX_NODE_ARCHIVE_SHA256)} ${shellQuote(nodeArchivePath)} | sha256sum -c -; rm -rf ${shellQuote(nodeDirectory)}; tar -xzf ${shellQuote(nodeArchivePath)} -C /opt; ln -sf ${shellQuote(`${nodeDirectory}/bin/node`)} /usr/local/bin/node; ln -sf ${shellQuote(`${nodeDirectory}/bin/corepack`)} /usr/local/bin/corepack; fi`,
       "corepack enable --install-directory /usr/local/bin",
       `corepack prepare ${shellQuote(`pnpm@${SANDBOX_PNPM_VERSION}`)} --activate`,
-      `pnpm -C ${repository} install --frozen-lockfile`,
+      `pnpm -C ${repository} install --no-frozen-lockfile`,
     ].join(" && "),
   };
 }
