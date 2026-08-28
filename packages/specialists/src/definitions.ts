@@ -1,3 +1,5 @@
+import { DIAGNOSTIC_OUTPUT_PROTOCOL } from "./diagnostic-output";
+
 export interface SpecialistDefinition {
   id: "repository-investigator" | "failure-investigator" | "dependency-config-investigator";
   name: string;
@@ -19,7 +21,7 @@ export const DIAGNOSTIC_SPECIALISTS: readonly SpecialistDefinition[] = Object.fr
     allowedCapabilities: ["repository search", "file read", "git history read"],
     forbiddenCapabilities: ["file write", "patch", "commit", "external write"],
     instructions:
-      "Inspect only. Identify relevant files, symbols, control flow, and recent changes. Return structured findings, hypotheses, evidence references, and unresolved questions. Do not patch.",
+      `Inspect only. Identify relevant files, symbols, control flow, and recent changes. Do not patch. ${DIAGNOSTIC_OUTPUT_PROTOCOL}`,
   },
   {
     id: "failure-investigator",
@@ -30,7 +32,7 @@ export const DIAGNOSTIC_SPECIALISTS: readonly SpecialistDefinition[] = Object.fr
     allowedCapabilities: ["GitHub Actions read", "bounded log search", "artifact read"],
     forbiddenCapabilities: ["file write", "patch", "commit", "external write"],
     instructions:
-      "Inspect the authoritative GitHub Actions failure and bounded log excerpts. Identify the first causal error, stable signature, and likely reproduction command. Do not patch.",
+      `Inspect the authoritative failure and bounded log excerpts. Identify the first causal error and likely reproduction command. Do not patch. ${DIAGNOSTIC_OUTPUT_PROTOCOL}`,
   },
   {
     id: "dependency-config-investigator",
@@ -41,7 +43,7 @@ export const DIAGNOSTIC_SPECIALISTS: readonly SpecialistDefinition[] = Object.fr
     allowedCapabilities: ["manifest read", "lockfile read", "configuration read", "environment metadata read"],
     forbiddenCapabilities: ["file write", "dependency update", "patch", "commit", "external write"],
     instructions:
-      "Inspect dependencies, lockfiles, configuration, and environment assumptions. Distinguish CI-only symptoms from source defects. Return structured evidence. Do not patch.",
+      `Inspect dependencies, lockfiles, configuration, and environment assumptions. Distinguish CI-only symptoms from source defects. Do not patch. ${DIAGNOSTIC_OUTPUT_PROTOCOL}`,
   },
 ]);
 

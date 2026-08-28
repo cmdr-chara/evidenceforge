@@ -1,3 +1,4 @@
+import { DIAGNOSTIC_OUTPUT_PROTOCOL } from "../../specialists/src";
 import { TrueForgeRuntimeConfig } from "./config";
 
 export const TRUEFORGE_LLM_ITERATION_LIMIT = 36;
@@ -67,7 +68,9 @@ Create exactly three parallel, read-only subagents named:
 1. Repository Investigator
 2. Failure / Log Investigator
 3. Dependency / Configuration Investigator
-They share the sandbox, so they must not edit files, install dependencies, patch, commit, or perform external writes. Return structured findings and evidence references only. After aggregation, reproduction and patching are serialized in the main thread.
+They share the sandbox, so they must not edit files, install dependencies, patch, commit, or perform external writes. After aggregation, reproduction and patching are serialized in the main thread.
+${DIAGNOSTIC_OUTPUT_PROTOCOL}
+Include that exact output contract in every specialist assignment. A specialist with no evidence-backed causal claim must return an empty rootCauseHypotheses array; it must not restate the failure symptom as a cause.
 
 Budget and convergence protocol:
 - After retrieving the authoritative incident context and verifier manifest, launch the three named specialists immediately in one parallel fan-out. Do not perform a broad repository investigation in the supervisor first.
