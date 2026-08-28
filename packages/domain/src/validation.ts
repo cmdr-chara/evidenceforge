@@ -56,6 +56,11 @@ function assertMaxLength(
   }
 }
 
+function jsonSerializedLength(value: unknown): number {
+  const serialized = JSON.stringify(value);
+  return typeof serialized === "string" ? serialized.length : 0;
+}
+
 export function assertIsoTimestamp(value: string, field: string, issues: string[]): void {
   if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
     issues.push(`${field} must be an ISO timestamp`);
@@ -92,17 +97,11 @@ export function validateTask(task: Task): Task {
     }
   }
   const promptTextLength =
-    (typeof task.objective === "string" ? task.objective.length : 0) +
+    jsonSerializedLength(task.objective) +
     (typeof task.repository === "string" ? task.repository.length : 0) +
     (typeof task.revision === "string" ? task.revision.length : 0) +
     (typeof task.source.runId === "string" ? task.source.runId.length : 0) +
-    (Array.isArray(task.constraints)
-      ? task.constraints.reduce(
-          (total, constraint) =>
-            total + (typeof constraint === "string" ? constraint.length : 0),
-          0,
-        )
-      : 0);
+    jsonSerializedLength(Array.isArray(task.constraints) ? task.constraints : []);
   if (promptTextLength > TASK_PROMPT_TEXT_MAX_LENGTH) {
     issues.push(
       `task prompt text must be at most ${TASK_PROMPT_TEXT_MAX_LENGTH} characters in aggregate`,
@@ -316,7 +315,7 @@ function validateCompletionCertificate(
           type: "pull_request" as const,
           ...state.externalAction.reconciledIdentity,
           evidenceId: state.externalAction.evidenceId,
-      }
+        }
       : undefined;
   if (
     state.externalAction?.status === "RECONCILED" &&
@@ -334,7 +333,10 @@ function validateCompletionCertificate(
   ) {
     issues.push(`${prefix} cannot certify an unreconciled external action`);
   }
-  if (digestCanonical(certificate.externalAction ?? null) !== digestCanonical(expectedExternalAction ?? null)) {
+  if (
+    digestCanonical(certificate.externalAction ?? null) !==
+    digestCanonical(expectedExternalAction ?? null)
+  ) {
     issues.push(`${prefix}.externalAction does not match session`);
   }
   if (
