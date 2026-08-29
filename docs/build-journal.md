@@ -81,7 +81,7 @@ The commit containing this journal must run the same matrix after publication; t
 
 The strongest credentialed TrueForge run reached 10/10 application gates. It passed incident context, reproduction, root cause, regression, targeted tests, typecheck, lint, diff integrity, and independent review.
 
-After the exact external action was approved by a human, the workflow created PR #9, reconciled its identity through an authoritative GitHub read, passed `external-pr`, and received an application-issued CompletionGate certificate. Earlier invalid-target and budget-exhaustion attempts remained blocked. PR #9 remains open and unmerged.
+After the exact external action was approved by a human, the workflow created PR #9, reconciled its identity through an authoritative GitHub read, passed `external-pr`, and received an application-issued CompletionGate certificate. Earlier invalid-target and budget-exhaustion attempts remained blocked. PR #9 was not merged and is retained as public evidence.
 
 The deterministic fixture completes 10/10 and issues a CompletionGate certificate. It is not represented as live sponsor evidence.
 

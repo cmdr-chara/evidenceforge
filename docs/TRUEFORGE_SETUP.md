@@ -168,7 +168,7 @@ A successful smoke proves connectivity only. It is not a substitute for the prof
 
 ## Observed live result
 
-The strongest credentialed run reached 10/10 application gates: the nine internal criteria passed, a human approved the exact PR action, GitHub MCP created PR #9, EvidenceForge reconciled it through an authoritative read, and CompletionGate issued a certificate. PR #9 remains open and unmerged.
+The strongest credentialed run reached 10/10 application gates: the nine internal criteria passed, a human approved the exact PR action, GitHub MCP created PR #9, EvidenceForge reconciled it through an authoritative read, and CompletionGate issued a certificate. PR #9 was not merged and is retained as public evidence.
 
 The deterministic fixture can complete the approval/reconciliation/certificate path, but must remain labeled fixture evidence.
 

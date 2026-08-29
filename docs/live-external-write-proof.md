@@ -11,4 +11,4 @@ This record distinguishes credentialed sponsor evidence from the deterministic f
 
 The live workflow paused before the exact pull-request action. After a human approved that action, TrueForge invoked the configured GitHub MCP `create_pull_request` tool. EvidenceForge then used the authoritative `pull_request_read` result to bind the observed repository, base, head, and pull-request identity before `CompletionGate` issued its certificate.
 
-PR #9 remains open and unmerged. The 10/10 result is EvidenceForge's configured ten-criterion product contract; it is not a hackathon score and does not certify a repository merge.
+PR #9 was not merged and is retained as public evidence. The 10/10 result is EvidenceForge's configured ten-criterion product contract; it is not a hackathon score and does not certify a repository merge.

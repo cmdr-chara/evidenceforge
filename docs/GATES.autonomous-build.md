@@ -53,6 +53,6 @@ The substantive merge, CI, and Qodo history are maintained in [PR #2](https://gi
 
 ## Release decision
 
-The executable repository candidate is **release-ready and application-certified for the recorded live incident**. PR #9 remains open and unmerged; certification is not a merge claim.
+The executable repository candidate is **release-ready and application-certified for the recorded live incident**. PR #9 was not merged and is retained as public evidence; certification is not a merge claim.
 
 Follow-up exact-head CI, exact-SHA Qodo, finalization merge, and submission remain separate observed-evidence gates. They are not converted to in-repository PASS claims before the commit containing this ledger exists.

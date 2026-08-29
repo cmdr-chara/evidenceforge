@@ -54,7 +54,7 @@ The strongest credentialed run reached all ten application gates and demonstrate
 - an observed GitHub MCP PR write and authoritative PR reconciliation;
 - an application-issued CompletionGate certificate.
 
-The observed external write is [PR #9](https://github.com/cmdr-chara/evidenceforge/pull/9), which remains open and unmerged. Earlier invalid-target and specialist-budget attempts remained blocked. The reported 10/10 is the product's configured success contract, not a hackathon score.
+The observed external write is [PR #9](https://github.com/cmdr-chara/evidenceforge/pull/9), which was not merged and is retained as public evidence. Earlier invalid-target and specialist-budget attempts remained blocked. The reported 10/10 is the product's configured success contract, not a hackathon score.
 
 The deterministic fixture completes all ten criteria and issues a certificate. It is control-plane evidence, not live sponsor evidence.
 

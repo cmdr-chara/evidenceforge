@@ -24,7 +24,7 @@ EvidenceForge deliberately separates three kinds of evidence:
 | Credentialed live TrueForge workflow | 10/10 application gates and a CompletionGate certificate | real TrueForge, GitHub MCP, Daytona, three specialists, deterministic verification, independent review, human approval, PR creation, and reconciliation worked together |
 | Deterministic fixture | complete approval, reconciliation, and CompletionGate certificate path | control-plane semantics, not live sponsor integration |
 
-Earlier credentialed attempts correctly blocked an invalid PR target and a specialist budget violation. The final live run passed the nine internal criteria, paused for a human decision, created [PR #9](https://github.com/cmdr-chara/evidenceforge/pull/9), reconciled its exact external identity, passed `external-pr`, and received an application-issued certificate. PR #9 remains open and unmerged; completion certifies the configured workflow contract, not repository merge or hackathon judging.
+Earlier credentialed attempts correctly blocked an invalid PR target and a specialist budget violation. The final live run passed the nine internal criteria, paused for a human decision, created [PR #9](https://github.com/cmdr-chara/evidenceforge/pull/9), reconciled its exact external identity, passed `external-pr`, and received an application-issued certificate. PR #9 was not merged and is retained as public evidence; completion certifies the configured workflow contract, not repository merge or hackathon judging.
 
 ## Core invariant
 
