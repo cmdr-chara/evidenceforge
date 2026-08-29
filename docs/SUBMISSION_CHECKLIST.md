@@ -6,7 +6,7 @@
 
 - [x] Substantive work was squash-merged through PR #2 into `determination`.
 - [x] PR #2 is closed as merged; its Qodo thread and review history remain public.
-- [x] Submission finalization is isolated on `codex/submission-readiness` under issue #3.
+- [x] Submission finalization was isolated on `codex/submission-readiness` under issue #3.
 - [x] No force push or rebase of published history.
 - [x] TrueForge remains the primary runtime; no second agent framework.
 - [x] Application-owned CompletionGate is the only completion path.
@@ -45,20 +45,20 @@
 
 ## Verification
 
-The current executable candidate contains 258 tests. Exact-head CI remains an external publication gate because a repository document cannot contain the result of the commit that contains itself.
+Suite size is intentionally not hard-coded here. Exact-head CI remains an external publication gate because a repository document cannot contain the result of the commit that contains itself.
 
-- [x] `pnpm install --frozen-lockfile` on the executable code head.
-- [x] `pnpm format:check` on the executable code head.
-- [x] `pnpm lint` on the executable code head.
-- [x] `pnpm typecheck` on the executable code head.
-- [x] `pnpm test` — 256/256 on the executable candidate.
-- [x] `pnpm eval:smoke` on the executable code head.
-- [x] `pnpm demo:fixture` on the executable code head.
-- [x] `pnpm build` on the executable code head.
-- [x] `pnpm doctor` on the executable code head.
-- [x] `git diff --check` on the executable code head.
-- [x] Push and pull-request workflows green on the executable code head.
-- [x] Exact-head CI passed on `0d370768b4195c4ac9fd763ad140118dfad6a90d`: https://github.com/cmdr-chara/evidenceforge/actions/runs/33196634885
+- [x] `pnpm install --frozen-lockfile` on the verified executable release head.
+- [x] `pnpm format:check` on the verified executable release head.
+- [x] `pnpm lint` on the verified executable release head.
+- [x] `pnpm typecheck` on the verified executable release head.
+- [x] `pnpm test` on the verified executable release head.
+- [x] `pnpm eval:smoke` on the verified executable release head.
+- [x] `pnpm demo:fixture` on the verified executable release head.
+- [x] `pnpm build` on the verified executable release head.
+- [x] `pnpm doctor` on the verified executable release head.
+- [x] `git diff --check` on the verified executable release head.
+- [x] Push and pull-request workflows green on the verified executable release head.
+- [x] Historical exact-head CI passed on `0d370768b4195c4ac9fd763ad140118dfad6a90d`: https://github.com/cmdr-chara/evidenceforge/actions/runs/33196634885
 
 ## Live evidence
 
@@ -116,7 +116,7 @@ The current executable candidate contains 258 tests. Exact-head CI remains an ex
 - [x] Demo script separates the deterministic baseline from credentialed live evidence.
 - [x] Public demo video: https://streamable.com/5sbk1k
 - [x] GitHub Pages build preserves an explicitly static fixture boundary.
-- [ ] Observe the deployed fixture at https://cmdr-chara.github.io/evidenceforge/ after human merge.
+- [x] Hosted fixture deployed successfully and remains published at https://cmdr-chara.github.io/evidenceforge/.
 - [x] Final secret/diff review completed; high-confidence token matches were confirmed as synthetic `task-*` fixture identifiers.
 
 ## Human release and submission
@@ -127,4 +127,4 @@ The current executable candidate contains 258 tests. Exact-head CI remains an ex
 - [x] Record and publish demo video.
 - [x] Human `Squash and merge` PR #2 completed.
 - [x] Human merge of the narrow submission-readiness PR after exact-head CI and Qodo.
-- [ ] Complete official hackathon submission before the observed deadline.
+- [x] Official hackathon submission sent on 2026-08-29.

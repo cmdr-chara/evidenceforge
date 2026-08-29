@@ -143,11 +143,19 @@ export function parseCreatePullRequestArguments(
       `GitHub create_pull_request contains unsupported application fields: ${unsupported.join(", ")}`,
     );
   }
-  for (const field of ["owner", "repo", "title", "body", "head", "base"] as const) {
-    if (readString(args, field) === undefined) {
-      throw new Error(`GitHub create_pull_request is missing ${field}`);
-    }
-  }
+
+  const owner = readString(args, "owner");
+  const repo = readString(args, "repo");
+  const title = readString(args, "title");
+  const body = readString(args, "body");
+  const head = readString(args, "head");
+  const base = readString(args, "base");
+  if (owner === undefined) throw new Error("GitHub create_pull_request is missing owner");
+  if (repo === undefined) throw new Error("GitHub create_pull_request is missing repo");
+  if (title === undefined) throw new Error("GitHub create_pull_request is missing title");
+  if (body === undefined) throw new Error("GitHub create_pull_request is missing body");
+  if (head === undefined) throw new Error("GitHub create_pull_request is missing head");
+  if (base === undefined) throw new Error("GitHub create_pull_request is missing base");
 
   const draft = readOptionalBoolean(args, "draft");
   const maintainerCanModify = readOptionalBoolean(args, "maintainer_can_modify");
@@ -163,12 +171,12 @@ export function parseCreatePullRequestArguments(
   }
 
   return {
-    owner: readString(args, "owner") as string,
-    repo: readString(args, "repo") as string,
-    title: readString(args, "title") as string,
-    body: readString(args, "body") as string,
-    head: readString(args, "head") as string,
-    base: readString(args, "base") as string,
+    owner,
+    repo,
+    title,
+    body,
+    head,
+    base,
     ...(draft === undefined ? {} : { draft }),
     ...(maintainerCanModify === undefined ? {} : { maintainer_can_modify: maintainerCanModify }),
     ...(reviewers === undefined ? {} : { reviewers }),
