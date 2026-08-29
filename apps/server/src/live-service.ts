@@ -48,6 +48,17 @@ export interface StartLiveIncidentInput {
   constraints?: string[];
 }
 
+export type LiveRuntimePort = Pick<
+  DurableTrueForgeRuntime,
+  "start" | "resume" | "submitApproval"
+>;
+
+export type LiveRuntimeFactory = (
+  evidenceStore: EvidenceStore,
+  taskId: string,
+  pullRequestHead: string,
+) => LiveRuntimePort;
+
 interface SandboxBootstrapManifest {
   intent: "evidenceforge.bootstrap:repository";
   command: string;
@@ -238,6 +249,7 @@ export class LiveIncidentService {
   public constructor(
     private readonly broker: SseBroker,
     private readonly pullRequestHead = resolveLivePullRequestHead(),
+    private readonly runtimeFactory?: LiveRuntimeFactory,
   ) {}
 
   public async start(input: StartLiveIncidentInput): Promise<LiveConsoleSnapshot> {
@@ -377,7 +389,10 @@ export class LiveIncidentService {
     evidenceStore: EvidenceStore,
     taskId: string,
     pullRequestHead: string,
-  ): DurableTrueForgeRuntime {
+  ): LiveRuntimePort {
+    if (this.runtimeFactory !== undefined) {
+      return this.runtimeFactory(evidenceStore, taskId, pullRequestHead);
+    }
     const config = loadTrueForgeConfig();
     const projector = new TrueForgeEventProjector(undefined, evidenceStore);
     const workflow = new LiveWorkflowReducer(
