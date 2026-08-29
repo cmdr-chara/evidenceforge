@@ -120,6 +120,25 @@ const SANDBOX_NODE_VERSION = "22.14.0";
 const SANDBOX_NODE_ARCHIVE_SHA256 =
   "9d942932535988091034dc94cc5f42b6dc8784d6366df3a36c4c9ccb3996f0c2";
 const SANDBOX_PNPM_VERSION = "11.16.0";
+const DEFAULT_LIVE_PULL_REQUEST_HEAD = "feat/foundation-control-plane";
+const LIVE_PULL_REQUEST_BASE = "determination";
+
+export function resolveLivePullRequestHead(
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  const head = environment.EVIDENCEFORGE_PR_HEAD?.trim() || DEFAULT_LIVE_PULL_REQUEST_HEAD;
+  const invalid =
+    head.length > 200 ||
+    !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(head) ||
+    head.endsWith(".") ||
+    head.endsWith("/") ||
+    head.includes("..") ||
+    head.includes("//") ||
+    head.includes("@{") ||
+    head.split("/").some((segment) => segment.endsWith(".lock"));
+  if (invalid) throw new Error("EVIDENCEFORGE_PR_HEAD must be a safe Git branch name");
+  return head;
+}
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
@@ -171,6 +190,7 @@ export function resolveEvidenceForgeDataDirectory(
 export function buildLiveIncidentMessage(
   task: Task,
   verifierManifest: VerifierManifestEntry[],
+  pullRequestHead = resolveLivePullRequestHead(),
 ): string {
   const bootstrapManifest = buildSandboxBootstrapManifest(task);
   const patchCaptureManifest = buildSandboxPatchCaptureManifest();
@@ -190,7 +210,7 @@ export function buildLiveIncidentMessage(
     "After editing and before any post-patch verifier, capture the exact patch subject by calling sandbox.exec once with this immutable manifest. Do not run regression, targeted tests, typecheck, lint, or diff-integrity until this call returns successfully:",
     JSON.stringify(patchCaptureManifest, null, 2),
     "After every deterministic verifier passes, create exactly one dynamic subagent named Independent Patch Reviewer. It must be read-only, inspect the current git diff, calculate the digest with `git diff --binary | sha256sum`, and return only one JSON object: {\"verdict\":\"PASS\"|\"PASS_WITH_WARNINGS\",\"patchDigest\":\"<64 lowercase hex>\",\"criticalBlockers\":[],\"summary\":\"<bounded review>\"}. A missing digest, any critical blocker, prose outside JSON, or a reviewer created before REVIEWING blocks the workflow.",
-    `After the reviewer passes, first call the official GitHub get_commit schema with owner ${JSON.stringify(task.repository.split("/")[0])}, repo ${JSON.stringify(task.repository.split("/")[1])}, and sha "feat/foundation-control-plane". Then issue exactly one official GitHub create_pull_request call with owner ${JSON.stringify(task.repository.split("/")[0])}, repo ${JSON.stringify(task.repository.split("/")[1])}, head "feat/foundation-control-plane", and base "determination". Do not use "main" as the base. TrueForge and EvidenceForge will pause that call for human approval; do not merely report readiness, do not bypass the approval pause, and never merge the pull request.`,
+    `After the reviewer passes, first call the official GitHub get_commit schema with owner ${JSON.stringify(task.repository.split("/")[0])}, repo ${JSON.stringify(task.repository.split("/")[1])}, and sha ${JSON.stringify(pullRequestHead)}. Then issue exactly one official GitHub create_pull_request call with owner ${JSON.stringify(task.repository.split("/")[0])}, repo ${JSON.stringify(task.repository.split("/")[1])}, head ${JSON.stringify(pullRequestHead)}, and base ${JSON.stringify(LIVE_PULL_REQUEST_BASE)}. Do not use "main" as the base. TrueForge and EvidenceForge will pause that call for human approval; do not merely report readiness, do not bypass the approval pause, and never merge the pull request.`,
     "For this public live incident profile, retrieve incident context with exactly one GitHub get_commit call bound to the task repository and exact failing revision. Do not call search_issues, search_pull_requests, issue_read, list_issues, list_pull_requests, pull_request_read, or get_file_contents during incident-context collection; the read-only specialists must inspect repository material through the Daytona sandbox after bootstrap.",
     "Application-owned live milestones are accepted only from correlated structured tool results. The supervisor's preloaded GitHub MCP surface contains only get_commit, create_pull_request, and pull_request_read; do not discover or call any other GitHub operation. create_pull_request remains approval-paused and must be followed by pull_request_read for reconciliation. Call these operations with their official schemas only: never add EvidenceForge intent, artifactRef, expectedHeadSha, operationId, or idempotencyKey fields. EvidenceForge binds incident artifacts internally to the task repository and revision. Use evidenceforge.verify:<criterion-id> only with sandbox.exec using the exact verifier manifest. EvidenceForge may record a bounded root-cause hypothesis only after independently persisted exact-revision GitHub evidence and exact failure-reproduction evidence agree; reviewer evidence must come from the isolated application-mapped reviewer. Prose never changes application state.",
     "Do not claim completion; the application CompletionGate owns that decision.",
@@ -207,7 +227,10 @@ export class LiveIncidentService {
   private readonly activityByTask = new Map<string, LiveActivityItem[]>();
   private readonly taskLocks = new Map<string, Promise<void>>();
 
-  public constructor(private readonly broker: SseBroker) {}
+  public constructor(
+    private readonly broker: SseBroker,
+    private readonly pullRequestHead = resolveLivePullRequestHead(),
+  ) {}
 
   public async start(input: StartLiveIncidentInput): Promise<LiveConsoleSnapshot> {
     const task = createTask({
@@ -224,7 +247,7 @@ export class LiveIncidentService {
     const verifierManifest = buildVerifierManifest(state.successCriteria);
     await this.checkpoints.saveCheckpoint(state, evidenceStore);
     const runtime = this.createRuntime(evidenceStore, task.id);
-    const message = buildLiveIncidentMessage(task, verifierManifest);
+    const message = buildLiveIncidentMessage(task, verifierManifest, this.pullRequestHead);
     const updated = await runtime.start(state, message);
     const snapshot = this.snapshot(updated, evidenceStore);
     this.broker.publish("live-state", snapshot, task.id);
@@ -239,7 +262,10 @@ export class LiveIncidentService {
         checkpoint.state,
         checkpoint.evidenceStore.listEvents(),
       )
-        ? await runtime.start(checkpoint.state, buildLiveContinuationMessage(checkpoint.state))
+        ? await runtime.start(
+            checkpoint.state,
+            buildLiveContinuationMessage(checkpoint.state, this.pullRequestHead),
+          )
         : await runtime.resume(checkpoint.state);
       const snapshot = this.snapshot(updated, checkpoint.evidenceStore);
       this.broker.publish("live-state", snapshot, taskId);
@@ -432,15 +458,18 @@ export function shouldContinueCompletedTurn(
   );
 }
 
-export function buildLiveContinuationMessage(state: SessionState): string {
+export function buildLiveContinuationMessage(
+  state: SessionState,
+  pullRequestHead = resolveLivePullRequestHead(),
+): string {
   return [
     "This is an application-authorized continuation turn in the existing TrueForge session.",
     'The prior turn is terminal: turn.done, status "done", requiredActions [].',
     "The current patch has an application-bound independent-review PASS.",
     "Do not rerun diagnostics, reproduction, patching, deterministic verification, or independent review.",
     "Do not edit files, commit, push, merge, or claim completion.",
-    `First call the official GitHub get_commit schema for repository ${state.task.repository} and sha feat/foundation-control-plane.`,
-    `Then issue exactly one official GitHub create_pull_request call for repository ${state.task.repository}, head feat/foundation-control-plane, and base determination, using the application-approved title and body.`,
+    `First call the official GitHub get_commit schema for repository ${state.task.repository} and sha ${pullRequestHead}.`,
+    `Then issue exactly one official GitHub create_pull_request call for repository ${state.task.repository}, head ${pullRequestHead}, and base ${LIVE_PULL_REQUEST_BASE}, using the application-approved title and body.`,
     "Do not include EvidenceForge-specific fields in the GitHub tool arguments.",
     "Stop immediately when TrueForge emits tool.approval_required. Do not retry or issue a second pull-request call.",
     "Only the human approval path authorizes the write. Application state and CompletionGate remain authoritative.",

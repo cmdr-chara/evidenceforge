@@ -57,9 +57,12 @@ export TRUEFORGE_GITHUB_MCP_NAME=github
 export TRUEFORGE_TIMEOUT_SECONDS=1200
 export EVIDENCEFORGE_PORT=4174
 export EVIDENCEFORGE_DATA_DIR=.data
+# Optional for a controlled live-write proof; defaults to feat/foundation-control-plane.
+export EVIDENCEFORGE_PR_HEAD=codex/live-external-write-proof
 ```
 
 `.data/` and `.evidenceforge/` are runtime state and must remain ignored and untracked.
+`EVIDENCEFORGE_PR_HEAD` accepts only a validated Git branch name. The application-owned base remains fixed to `determination`; changing the head never authorizes a write or bypasses approval.
 
 ## Profiled live incident
 

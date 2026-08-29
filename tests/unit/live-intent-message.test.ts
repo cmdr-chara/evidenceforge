@@ -5,6 +5,7 @@ import {
   buildLiveIncidentMessage,
   buildSandboxPatchCaptureManifest,
   buildSandboxBootstrapManifest,
+  resolveLivePullRequestHead,
   shouldContinueCompletedTurn,
 } from "../../apps/server/src/live-service";
 import {
@@ -72,6 +73,40 @@ test("live task objective and constraints are bound into the TrueForge message a
       "authoritative TrueForge sandbox non-zero exit is never reported as OK",
     );
   }
+});
+
+test("live pull-request target accepts a safe dedicated proof branch", () => {
+  assert.equal(
+    resolveLivePullRequestHead({ EVIDENCEFORGE_PR_HEAD: "codex/live-external-write-proof" }),
+    "codex/live-external-write-proof",
+  );
+  assert.throws(
+    () => resolveLivePullRequestHead({ EVIDENCEFORGE_PR_HEAD: "proof/../determination" }),
+    /safe Git branch name/,
+  );
+});
+
+test("live messages bind a configured pull-request head without weakening the base", () => {
+  const task = createTask({
+    id: "task-live-proof-target",
+    objective: "Resolve CI",
+    repository: "cmdr-chara/evidenceforge",
+    revision: "9accc9e484e055c8b22172e389dc50f84315f4e2",
+    runId: "32892119950",
+  });
+  const head = "codex/live-external-write-proof";
+  const incident = buildLiveIncidentMessage(
+    task,
+    buildVerifierManifest(buildEvidenceForgeLiveCiSuccessContract(task)),
+    head,
+  );
+  const continuation = buildLiveContinuationMessage(createSessionState(task, []), head);
+
+  assert.match(incident, /sha "codex\/live-external-write-proof"/);
+  assert.match(incident, /head "codex\/live-external-write-proof"/);
+  assert.match(incident, /base "determination"/);
+  assert.match(continuation, /sha codex\/live-external-write-proof/);
+  assert.match(continuation, /base determination/);
 });
 
 test("patch capture manifest is exact and has no environment override", () => {
