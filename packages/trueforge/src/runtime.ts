@@ -361,7 +361,11 @@ export class DurableTrueForgeRuntime {
   }
 
   private async abortGeneration(generation: StreamGeneration): Promise<void> {
-    generation.close();
+    // Fence callbacks that arrive after the adapter failure, but let callbacks
+    // already admitted to this generation finish their bounded durability and
+    // projection work. Closing before the drain can orphan an authoritative
+    // tool result in the journal without admitting it to the checkpoint.
+    generation.stopAccepting();
     try {
       await generation.drain(this.drainTimeoutMs);
     } catch {
@@ -370,6 +374,8 @@ export class DurableTrueForgeRuntime {
       // generation, but must not prevent the caller from writing the
       // authoritative BLOCKED checkpoint. The caller retains the
       // adapter/commit error as the bounded reason.
+    } finally {
+      generation.close();
     }
   }
 

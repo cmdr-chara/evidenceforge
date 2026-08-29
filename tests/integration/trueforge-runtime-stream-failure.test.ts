@@ -842,7 +842,7 @@ test("runtime checkpoints an accepted turn before an in-flight stream can crash"
   }
 });
 
-test("late journal completion cannot admit an event after the timeout cutoff", async () => {
+test("runtime drains a callback admitted before the timeout cutoff", async () => {
   const root = await mkdtemp(join(tmpdir(), "evidenceforge-mid-pipeline-timeout-"));
   try {
     const journal = new BlockingJournal(join(root, "events.jsonl"));
@@ -863,8 +863,8 @@ test("late journal completion cannot admit an event after the timeout cutoff", a
 
     const startPromise = runtime.start(state, "investigate");
     await adapter.failureObserved;
-    // Let the rejected adapter turn reach the runtime catch, which closes the
-    // generation and waits for the blocked journal operation to drain.
+    // Let the rejected adapter turn reach the runtime catch. New callbacks
+    // are fenced, while this already-admitted callback remains drainable.
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.equal(journal.appendCalls, 1);
     assert.equal(checkpoints.checkpoints.length, 1);
@@ -874,20 +874,23 @@ test("late journal completion cannot admit an event after the timeout cutoff", a
 
     assert.equal(updated.status, "BLOCKED");
     assert.equal(updated.phase, "BLOCKED");
-    assert.equal(updated.terminalSequenceNumber, undefined);
-    assert.equal(updated.activeTurnId, undefined);
+    assert.equal(updated.terminalSequenceNumber, 1);
+    assert.equal(updated.activeTurnId, "mid-pipeline-turn");
     assert.equal(adapter.cancellations, 1);
-    assert.deepEqual(observed, []);
+    assert.deepEqual(observed.map((event) => event.id), ["mid-pipeline-event"]);
     assert.equal(journal.appendCalls, 1);
     assert.deepEqual(
       checkpoints.checkpoints.map((checkpoint) => checkpoint.status),
-      ["ACTIVE", "BLOCKED"],
+      ["ACTIVE", "ACTIVE", "BLOCKED"],
     );
     const finalCheckpoint = await checkpoints.loadCheckpoint(state.task.id);
     assert.ok(finalCheckpoint);
     assert.equal(finalCheckpoint.state.status, "BLOCKED");
-    assert.equal(finalCheckpoint.state.terminalSequenceNumber, undefined);
-    assert.deepEqual(finalCheckpoint.evidenceStore.listEvents(), []);
+    assert.equal(finalCheckpoint.state.terminalSequenceNumber, 1);
+    assert.deepEqual(
+      finalCheckpoint.evidenceStore.listEvents().map((event) => event.id),
+      ["mid-pipeline-event"],
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
