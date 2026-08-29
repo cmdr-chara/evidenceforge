@@ -137,6 +137,7 @@ test("diagnostic contract rejects mutating commands smuggled through sandbox exe
     "touch marker",
     "cat README.md > copy.md",
     "git checkout -- README.md",
+    "git diff --output=marker",
     "git grep -Orm livePullRequestHead",
     "python -c 'open(\"marker\",\"w\").close()'",
     "rg TODO . | tee findings.txt",

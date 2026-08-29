@@ -61,7 +61,7 @@ test("configured live pull-request head survives checkpoint reconstruction", asy
   }
 });
 
-test("live resume reconstructs its runtime with the checkpointed head", async () => {
+test("LiveIncidentService.resume reloads its configured head from a checkpoint", async () => {
   const directory = await mkdtemp(join(tmpdir(), "evidenceforge-live-head-resume-"));
   const previousDirectory = process.env.EVIDENCEFORGE_DATA_DIR;
   const heads: string[] = [];
@@ -77,6 +77,7 @@ test("live resume reconstructs its runtime with the checkpointed head", async ()
       new SseBroker(),
       "codex/different-process-head",
       (_store, _taskId, head) => {
+        assert.equal(head, "codex/persisted-resume-head");
         heads.push(head);
         return passthroughRuntime();
       },
@@ -92,7 +93,7 @@ test("live resume reconstructs its runtime with the checkpointed head", async ()
   }
 });
 
-test("live approval reconstructs its runtime with the checkpointed head", async () => {
+test("LiveIncidentService.decideApproval reloads its configured head from a checkpoint", async () => {
   const directory = await mkdtemp(join(tmpdir(), "evidenceforge-live-head-approval-"));
   const previousDirectory = process.env.EVIDENCEFORGE_DATA_DIR;
   const heads: string[] = [];
@@ -131,6 +132,7 @@ test("live approval reconstructs its runtime with the checkpointed head", async 
       new SseBroker(),
       "codex/different-process-head",
       (_store, _taskId, head) => {
+        assert.equal(head, "codex/persisted-approval-head");
         heads.push(head);
         return passthroughRuntime();
       },
