@@ -2,7 +2,7 @@
 
 Target: approximately three minutes. The demo must distinguish credentialed live evidence from deterministic fixture evidence at all times.
 
-Published recording: https://streamable.com/3vxfjt
+Published recording: https://streamable.com/5sbk1k
 
 ## Before recording
 
@@ -11,7 +11,7 @@ Published recording: https://streamable.com/3vxfjt
 3. Confirm TrueForge, model, GitHub MCP, Daytona, and skills are available.
 4. Run the repository checks.
 5. Reset the deterministic fixture.
-6. Decide whether the live section will stop at 9/10 or proceed to a genuine human-approved external write. Never approve automatically.
+6. Confirm the recording preserves the observed human-approved external write and never implies automatic approval.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -60,7 +60,7 @@ Show, as actually observed:
 8. deterministic regression/tests/typecheck/lint/diff checks;
 9. independent reviewer bound to the current patch.
 
-The strongest existing live evidence reaches 9/10. When `external-pr` is not genuinely completed, stop and label the result **LIVE — 9/10 — NOT CERTIFIED**.
+The recorded live evidence reaches 10/10 only after human approval, PR creation, authoritative reconciliation, and certificate issuance. Label it as the **product contract**, not a hackathon score.
 
 Show one fail-closed behavior if useful: wrong `base: main`, missing head `get_commit`, symptom-only root cause, or specialist budget violation. Make clear that no write occurred.
 
@@ -68,7 +68,7 @@ Show one fail-closed behavior if useful: wrong `base: main`, missing head `get_c
 
 Show the approval card or prepared action. It must display the exact repository, `head: feat/foundation-control-plane`, `base: determination`, expected head SHA, risk, and reversible status.
 
-Do not click Approve unless the exact external write is intended and a human has reviewed it. A pending approval is a valid demonstration of control; it is not completion.
+Do not click Approve unless the exact external write is intended and a human has reviewed it. The published recording shows the observed approved action and PR #9; approval must never be simulated or automatic in live mode.
 
 ## 2:20–2:55 — deterministic certificate path
 

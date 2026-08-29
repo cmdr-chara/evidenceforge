@@ -13,7 +13,7 @@ The substantive merge, CI, and Qodo history are maintained in [PR #2](https://gi
 | Published history preserved | PASS | no force push or rebase performed |
 | Runtime state excluded | PASS | `.data/` and `.evidenceforge/` remain ignored and untracked |
 | Executable candidate frozen install | PASS | exact code-head CI ran `pnpm install --frozen-lockfile` |
-| Executable candidate verification matrix | PASS | local candidate passed format, lint, typecheck, 236/236 tests, eval, fixture, build, doctor, and diff check |
+| Executable candidate verification matrix | PASS | local candidate passed format, lint, typecheck, 247/247 tests, eval, fixture, build, doctor, and diff check |
 | Final documentation-head CI | MANUAL | must run after this file is committed and be recorded on the follow-up PR |
 | CompletionGate-only completion | PASS | direct/model/tool/reviewer completion paths are rejected |
 | Certificate identity and integrity | PASS | task/repository/revision/patch/state/contract/subject/payload digests validated |
@@ -37,21 +37,22 @@ The substantive merge, CI, and Qodo history are maintained in [PR #2](https://gi
 | Supervisor GitHub MCP surface | PASS | only `get_commit`, `create_pull_request`, `pull_request_read`, preloaded |
 | Dynamic-subagent pre-execution read-only enforcement | BLOCKED | SDK 0.1.3 exposes no per-subagent interceptor/allowlist |
 | Deterministic fixture vertical slice | PASS | all gates, approval simulation, reconciliation, certificate |
-| Credentialed live internal gates | PARTIAL | strongest run reached 9/10; all internal gates passed |
-| Credentialed live `external-pr` | BLOCKED | no approved/reconciled live write observed |
+| Credentialed live internal gates | PASS | all nine internal criteria passed in the strongest run |
+| Credentialed live `external-pr` | PASS | human-approved PR #9 was created and authoritatively reconciled |
 | Wrong PR prevention | PASS | wrong base and missing head read blocked before write |
 | Exact viewport matrix | PASS | 320/375/768/1024/1440 observed; later changes do not alter geometry |
 | Small-text contrast | PASS | accessible muted color + deterministic >=4.5:1 test on both dark surfaces |
-| Exact 200% zoom | MANUAL | unavailable through current connector/browser surface; not inferred |
+| Exact 200% zoom | PASS | manually observed without horizontal overflow or sibling overlap |
 | Qodo implementable High findings | PARTIAL | all known code paths including non-zero command results are fixed locally; exact-SHA Qodo confirmation remains external |
 | Qodo documentation Medium findings | PASS | fixture reset command and external final-head gate representation corrected in this commit |
 | Qodo SDK boundary | BLOCKED | retained as genuine High limitation |
 | Final post-commit Qodo exact-SHA record | MANUAL | external result linked in the follow-up PR after this commit |
 | Human merge | PARTIAL | PR #2 merged; the narrow submission-readiness PR remains human-gated |
-| Demo video and submission | BLOCKED | human/external account actions remain |
+| Demo video | PASS | public 2:50 recording published at https://streamable.com/5sbk1k |
+| Official submission | BLOCKED | external account action remains |
 
 ## Release decision
 
-The executable repository candidate is **release-ready but not application-certified as a live completed incident**.
+The executable repository candidate is **release-ready and application-certified for the recorded live incident**. PR #9 remains open and unmerged; certification is not a merge claim.
 
-Follow-up exact-head CI, exact-SHA Qodo, live `external-pr`, exact 200% zoom, video, finalization merge, and submission remain separate observed-evidence gates. They are not converted to in-repository PASS claims before the commit containing this ledger exists.
+Follow-up exact-head CI, exact-SHA Qodo, finalization merge, and submission remain separate observed-evidence gates. They are not converted to in-repository PASS claims before the commit containing this ledger exists.

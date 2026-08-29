@@ -4,7 +4,7 @@
 
 EvidenceForge is a TrueForge-based CI incident control plane designed to prevent false completion. Models diagnose and propose; application-owned evidence, deterministic verifiers, approval policy, external-state reconciliation, and CompletionGate decide.
 
-The executable candidate passes the local verification matrix with 236 tests; exact-head CI for the narrow follow-up is recorded externally after publication. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached 9/10 application gates; `external-pr` remains the unverified live gate. The deterministic fixture completes the full approval/reconciliation/certificate path and is labeled accordingly.
+The executable candidate passes the local verification matrix; exact-head CI for the consolidated follow-up is recorded externally after publication. The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for an unenforced baseline. The strongest credentialed live workflow reached all ten application gates after a human-approved PR write and authoritative reconciliation. Its CompletionGate certificate is live product evidence; the deterministic baseline remains separately labeled.
 
 ## Problem
 
@@ -81,9 +81,9 @@ Responsive browser observations cover 320, 375, 768, 1024, and 1440px. The final
 ## Measured result
 
 ```text
-Executable local candidate:  complete matrix, 236/236 tests
+Executable local candidate:  complete matrix, 247/247 tests
 Deterministic fixture:       10/10 + CompletionGate certificate
-Credentialed live workflow:  9/10; external-pr not completed
+Credentialed live workflow:  10/10 after human-approved PR write and reconciliation
 False-success evaluation:    EvidenceForge 0%; baseline 57.14%
 Substantive PR state:         PR #2 merged into determination
 Follow-up state:              submission-readiness PR pending review
@@ -94,11 +94,9 @@ The exact final-head CI result for the commit containing this report is recorded
 ## Remaining risks and actions
 
 - per-dynamic-subagent pre-execution capability isolation requires a future TrueForge SDK surface or a TrueForge-compatible read-only proxy;
-- live external PR approval/write/reconciliation has not been stably reproduced;
 - exact final-head CI/Qodo must be observed after this report commit;
-- exact 200% zoom remains manual;
-- video, follow-up merge, and submission require human/external account actions.
+- follow-up merge and submission require human/external account actions.
 
 ## Submission position
 
-EvidenceForge should be presented as a production-quality, fail-closed control plane with substantial credentialed live evidence and a transparent 9/10 boundary—not as a falsely completed end-to-end live run. The fixture may demonstrate the certificate path only when visibly labeled deterministic.
+EvidenceForge should be presented as a production-quality, fail-closed control plane with an observed credentialed 10/10 product contract. That result followed human approval, PR creation, authoritative reconciliation, and application certification; it is not a hackathon score or a repository merge claim. The deterministic baseline remains visibly labeled.

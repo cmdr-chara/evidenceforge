@@ -1,6 +1,6 @@
 # EvidenceForge build journal
 
-**Finalization snapshot:** 2026-08-28
+**Finalization snapshot:** 2026-08-29
 
 This journal records the production path and its evidence boundaries. Commit-level history remains available in merged PR #2 and the narrow submission-readiness follow-up.
 
@@ -54,7 +54,7 @@ The console evolved into an evidence-control-plane dossier rather than a chat tr
 
 The finalization pass identified insufficient contrast in inactive timeline labels/numbers and input placeholders. A shared muted color now clears 4.5:1 on both dark application surfaces, with a deterministic contrast test.
 
-The 320/375/768/1024/1440 geometry had already been browser-observed. No later change alters geometry. Exact 200% browser zoom remains a manual check.
+The 320/375/768/1024/1440 geometry was browser-observed. Exact 200% browser zoom was also manually observed without horizontal overflow or sibling overlap.
 
 ## 5. Verification result
 
@@ -65,7 +65,7 @@ pnpm install --frozen-lockfile
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test                  236/236
+pnpm test                  247/247
 pnpm eval:smoke
 pnpm demo:fixture
 pnpm build
@@ -79,9 +79,9 @@ The commit containing this journal must run the same matrix after publication; t
 
 ## 6. Live evidence result
 
-The strongest credentialed TrueForge run reached 9/10 application gates. It passed incident context, reproduction, root cause, regression, targeted tests, typecheck, lint, diff integrity, and independent review.
+The strongest credentialed TrueForge run reached 10/10 application gates. It passed incident context, reproduction, root cause, regression, targeted tests, typecheck, lint, diff integrity, and independent review.
 
-`external-pr` remained pending/blocked. An invalid `base: main` request and missing head read were stopped before write; a later attempt was stopped when a specialist exceeded its budget. No wrong PR, automatic approval, or merge occurred.
+After the exact external action was approved by a human, the workflow created PR #9, reconciled its identity through an authoritative GitHub read, passed `external-pr`, and received an application-issued CompletionGate certificate. Earlier invalid-target and budget-exhaustion attempts remained blocked. PR #9 remains open and unmerged.
 
 The deterministic fixture completes 10/10 and issues a CompletionGate certificate. It is not represented as live sponsor evidence.
 
@@ -90,8 +90,5 @@ The deterministic fixture completes 10/10 and issues a CompletionGate certificat
 The substantive implementation is merged into `determination`; the small Qodo/documentation follow-up remains review-gated. Remaining work requires external observation, credentials, or human authority:
 
 - exact final-head CI and Qodo after this commit;
-- exact 200% zoom;
-- stable live approval/write/reconciliation/certificate path;
-- demo video;
 - human merge of the submission-readiness PR;
 - official submission.

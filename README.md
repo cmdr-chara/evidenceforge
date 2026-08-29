@@ -4,13 +4,13 @@
 
 EvidenceForge is an evidence-gated CI incident control plane built on TrueForge. It binds a failed GitHub Actions incident to an exact repository revision, reproduces it in Daytona, captures and verifies a patch, obtains an independent patch review, pauses before any external write, reconciles the resulting pull request, and permits completion only through an application-issued certificate.
 
-> **Release status — 2026-08-29:** the substantive implementation was human-reviewed and squash-merged through [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) into `determination` at [`819c281`](https://github.com/cmdr-chara/evidenceforge/commit/819c2815b5bd8cfdf35847ed76a58a457168e74c). The executable submission-readiness candidate at [`0d37076`](https://github.com/cmdr-chara/evidenceforge/commit/0d370768b4195c4ac9fd763ad140118dfad6a90d) passed [exact-head CI](https://github.com/cmdr-chara/evidenceforge/actions/runs/33196634885), and [Qodo reports 0 bugs and 0 rule violations](https://github.com/cmdr-chara/evidenceforge/pull/4#issuecomment-5455852549). [PR #4](https://github.com/cmdr-chara/evidenceforge/pull/4) carries the final documentation and media update; its latest publication gates are authoritative on the PR. Human merge remains a release gate.
+> **Release status — 2026-08-29:** the substantive implementation was human-reviewed and squash-merged through [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) into `determination` at [`819c281`](https://github.com/cmdr-chara/evidenceforge/commit/819c2815b5bd8cfdf35847ed76a58a457168e74c). [PR #4](https://github.com/cmdr-chara/evidenceforge/pull/4) is the single submission-readiness PR and consolidates the later diagnostic hardening, live proof, documentation, and media updates. Its exact-head CI and Qodo results are authoritative. Human merge remains a release gate.
 
 ## Demo video
 
-**[Watch the 2:50 EvidenceForge demo](https://streamable.com/3vxfjt).**
+**[Watch the 2:50 EvidenceForge demo](https://streamable.com/5sbk1k).**
 
-The video keeps the evidence boundary visible: the strongest credentialed TrueForge workflow reaches **9/10 — not certified**, while the separately labeled deterministic fixture demonstrates the complete approval, reconciliation, and CompletionGate certificate path.
+The video keeps the evidence boundary visible: the deterministic baseline is labeled separately from the credentialed TrueForge workflow, which reaches **10/10** only after human approval, an observed GitHub PR write, authoritative reconciliation, and an application-issued CompletionGate certificate. This is the product's ten-criterion contract, not a hackathon score.
 
 ![EvidenceForge deterministic fixture incident dossier](docs/assets/evidenceforge-hero.jpg)
 
@@ -20,11 +20,11 @@ EvidenceForge deliberately separates three kinds of evidence:
 
 | Evidence | Observed result | What it proves |
 |---|---|---|
-| Repository verification | frozen install, format, lint, typecheck, 236 tests, evaluation, fixture, build, doctor, diff check | the executable candidate is reproducible, internally consistent, and passed exact-head CI on the submission-readiness follow-up |
-| Credentialed live TrueForge workflow | strongest run reached 9/10 application gates | real TrueForge, GitHub MCP, Daytona, three specialists, deterministic verification, and independent review worked together |
+| Repository verification | frozen install, format, lint, typecheck, 247 tests, evaluation, fixture, build, doctor, diff check | the consolidated candidate passes locally; exact-head publication results are recorded on PR #4 |
+| Credentialed live TrueForge workflow | 10/10 application gates and a CompletionGate certificate | real TrueForge, GitHub MCP, Daytona, three specialists, deterministic verification, independent review, human approval, PR creation, and reconciliation worked together |
 | Deterministic fixture | complete approval, reconciliation, and CompletionGate certificate path | control-plane semantics, not live sponsor integration |
 
-The strongest credentialed run passed `incident-context`, `failure-reproduced`, `root-cause-supported`, `regression`, `targeted-tests`, `typecheck`, `lint`, `diff-integrity`, and `independent-review`. `external-pr` remained pending because the model proposed an invalid PR target; EvidenceForge blocked before any write. A later attempt was also blocked when one diagnostic specialist exceeded the bounded tool budget. No wrong PR was created, no external write was auto-approved, and no merge occurred.
+Earlier credentialed attempts correctly blocked an invalid PR target and a specialist budget violation. The final live run passed the nine internal criteria, paused for a human decision, created [PR #9](https://github.com/cmdr-chara/evidenceforge/pull/9), reconciled its exact external identity, passed `external-pr`, and received an application-issued certificate. PR #9 remains open and unmerged; completion certifies the configured workflow contract, not repository merge or hackathon judging.
 
 ## Core invariant
 
@@ -183,7 +183,7 @@ issue → feat/foundation-control-plane → PR #2 → Qodo → human Squash and 
 
 ## Submission status
 
-The substantive implementation is merged, and the follow-up exact-head CI, Qodo review, and public demo video are available. Remaining gates are explicitly tracked in [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md): exact 200% zoom, a stable credentialed live `external-pr` path, human merge of the small submission-readiness PR, and official hackathon submission.
+The substantive implementation is merged; the credentialed live 10/10 path, exact 200% zoom check, and public demo are recorded. Remaining gates are explicitly tracked in [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md): exact-head CI and Qodo on consolidated PR #4, human merge, and official hackathon submission.
 
 ## AI-assistance disclosure
 

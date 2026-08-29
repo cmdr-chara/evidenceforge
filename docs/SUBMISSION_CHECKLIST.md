@@ -45,13 +45,13 @@
 
 ## Verification
 
-The current executable candidate contains 236 tests. Because this checklist changes repository state, exact-head CI for the commit containing it is deliberately a separate external gate recorded on the submission-readiness PR.
+The current executable candidate contains 247 tests. Because this checklist changes repository state, exact-head CI for the commit containing it is deliberately a separate external gate recorded on the submission-readiness PR.
 
 - [x] `pnpm install --frozen-lockfile` on the executable code head.
 - [x] `pnpm format:check` on the executable code head.
 - [x] `pnpm lint` on the executable code head.
 - [x] `pnpm typecheck` on the executable code head.
-- [x] `pnpm test` — 236/236 on the executable candidate.
+- [x] `pnpm test` — 247/247 on the executable candidate.
 - [x] `pnpm eval:smoke` on the executable code head.
 - [x] `pnpm demo:fixture` on the executable code head.
 - [x] `pnpm build` on the executable code head.
@@ -67,11 +67,11 @@ The current executable candidate contains 236 tests. Because this checklist chan
 - [x] Daytona bootstrap/reproduction observed in the strongest run.
 - [x] Exactly three specialists observed.
 - [x] Regression/tests/typecheck/lint/diff and independent review observed.
-- [x] Strongest credentialed result recorded as 9/10, not completed.
+- [x] Credentialed live workflow reached 10/10 only after human-approved external write and reconciliation.
 - [x] Invalid PR target blocked before write.
 - [x] Specialist budget violation blocked.
-- [ ] Human approval → live PR write → authoritative reconciliation observed.
-- [ ] Live CompletionGate certificate observed.
+- [x] Human approval → live PR write → authoritative reconciliation observed in PR #9.
+- [x] Live CompletionGate certificate observed and recorded in `docs/live-external-write-proof.md`.
 - [x] Deterministic 10/10 fixture kept explicitly separate from live evidence.
 
 ## UI and accessibility
@@ -113,8 +113,8 @@ The current executable candidate contains 236 tests. Because this checklist chan
 - [x] Build journal and field report synchronized.
 - [x] Qodo review log synchronized.
 - [x] Demo script runs `pnpm demo:reset` before fixture validation.
-- [x] Demo script separates credentialed 9/10 evidence from deterministic certificate footage.
-- [x] Public demo video: https://streamable.com/3vxfjt
+- [x] Demo script separates the deterministic baseline from credentialed live evidence.
+- [x] Public demo video: https://streamable.com/5sbk1k
 - [x] Final secret/diff review completed; high-confidence token matches were confirmed as synthetic `task-*` fixture identifiers.
 
 ## Human release and submission
