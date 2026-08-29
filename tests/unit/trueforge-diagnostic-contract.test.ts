@@ -137,9 +137,11 @@ test("diagnostic contract rejects mutating commands smuggled through sandbox exe
     "touch marker",
     "cat README.md > copy.md",
     "git checkout -- README.md",
+    "git grep -Orm livePullRequestHead",
     "python -c 'open(\"marker\",\"w\").close()'",
     "rg TODO . | tee findings.txt",
     "rg --pre 'sh -c touch marker' TODO .",
+    "sort -omarker README.md",
   ];
   for (const [index, command] of commands.entries()) {
     const result = toolResult("thread-1", index);
@@ -159,6 +161,28 @@ test("diagnostic contract rejects mutating commands smuggled through sandbox exe
     );
     assert.equal(violation?.code, "FORBIDDEN_SPECIALIST_TOOL", command);
   }
+});
+
+test("diagnostic contract rejects a tool call substituted from another thread", () => {
+  const result = toolResult("thread-1", 0);
+  const callId = String((result.payload as { toolCallId?: string }).toolCallId);
+  const violation = evaluateDiagnosticContract(
+    [turnCreated(), ...fanOut(), result],
+    (id) => id === callId
+      ? {
+          id,
+          sourceEventId: `message-${id}`,
+          threadId: "thread-2",
+          name: "exec",
+          arguments: JSON.stringify({
+            command: "rg -n livePullRequestHead apps packages",
+            cwd: "/workspace/repository",
+          }),
+          serverName: "sandbox",
+        }
+      : undefined,
+  );
+  assert.equal(violation?.code, "FORBIDDEN_SPECIALIST_TOOL");
 });
 
 test("diagnostic contract rejects a failed specialist", () => {

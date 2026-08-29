@@ -390,6 +390,9 @@ export interface SessionState {
   completionCertificate?: CompletionCertificateData;
 }
 
+/** Pull-request target used by live sessions before the target became configurable. */
+export const DEFAULT_LIVE_PULL_REQUEST_HEAD = "feat/foundation-control-plane";
+
 export interface CompletionCertificateData {
   certificateVersion: 2;
   taskId: string;

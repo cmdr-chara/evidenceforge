@@ -17,7 +17,6 @@ const READ_ONLY_COMMANDS = new Set([
   "realpath",
   "rg",
   "sha256sum",
-  "sort",
   "stat",
   "tail",
   "tr",
@@ -26,9 +25,7 @@ const READ_ONLY_COMMANDS = new Set([
 
 const READ_ONLY_GIT_SUBCOMMANDS = new Set([
   "branch",
-  "cat-file",
   "diff",
-  "grep",
   "log",
   "ls-files",
   "name-rev",
@@ -108,9 +105,6 @@ function isReadOnlyCommand(words: string[]): boolean {
   if (executable === "rg" && words.some((word) => word === "--pre" || word.startsWith("--pre="))) {
     return false;
   }
-  if (executable === "sort" && words.some((word) => word === "-o" || word.startsWith("--output"))) {
-    return false;
-  }
   return true;
 }
 
@@ -127,8 +121,7 @@ function isReadOnlyGitCommand(words: string[]): boolean {
     (word) =>
       word === "--ext-diff" ||
       word === "--textconv" ||
-      word.startsWith("--output") ||
-      word.startsWith("--open-files-in-pager"),
+      word.startsWith("--output"),
   );
 }
 

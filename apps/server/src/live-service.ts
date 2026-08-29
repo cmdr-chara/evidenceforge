@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import {
   ApprovalRequest,
+  DEFAULT_LIVE_PULL_REQUEST_HEAD,
   createSessionState,
   createTask,
   digestCanonical,
@@ -121,7 +122,6 @@ const SANDBOX_NODE_VERSION = "22.14.0";
 const SANDBOX_NODE_ARCHIVE_SHA256 =
   "9d942932535988091034dc94cc5f42b6dc8784d6366df3a36c4c9ccb3996f0c2";
 const SANDBOX_PNPM_VERSION = "11.16.0";
-const DEFAULT_LIVE_PULL_REQUEST_HEAD = "feat/foundation-control-plane";
 const LIVE_PULL_REQUEST_BASE = "determination";
 const LIVE_EXTERNAL_WRITE_PROOF_TITLE = "docs: record EvidenceForge live external-write proof";
 const LIVE_EXTERNAL_WRITE_PROOF_BODY = [
@@ -370,13 +370,6 @@ export class LiveIncidentService {
   private async requireCheckpoint(taskId: string): Promise<RuntimeCheckpoint> {
     const checkpoint = await this.checkpoints.loadCheckpoint(taskId);
     if (checkpoint === undefined) throw new Error(`unknown live task ${taskId}`);
-    if (checkpoint.state.livePullRequestHead === undefined) {
-      recoverLegacyLivePullRequestHead(checkpoint.state, this.pullRequestHead);
-      // Persist the recovered target before resume or approval can perform any
-      // state transition. A crash therefore cannot rebind the session to a
-      // later process configuration.
-      await this.checkpoints.saveCheckpoint(checkpoint.state, checkpoint.evidenceStore);
-    }
     return checkpoint;
   }
 
@@ -508,39 +501,6 @@ function requirePersistedLivePullRequestHead(state: SessionState): string {
     throw new Error("live session is missing its persisted pull-request head");
   }
   return state.livePullRequestHead;
-}
-
-/**
- * Upgrade a checkpoint written before livePullRequestHead was introduced.
- * An already prepared/approved external action is the durable authority; the
- * current service configuration is used only for sessions that never bound an
- * external target. Conflicting durable targets fail closed.
- */
-export function recoverLegacyLivePullRequestHead(
-  state: SessionState,
-  configuredHead: string,
-): string {
-  if (state.livePullRequestHead !== undefined) return state.livePullRequestHead;
-
-  const durableHeads = new Set<string>();
-  if (state.externalAction !== undefined) {
-    durableHeads.add(state.externalAction.preparedArguments.head);
-  }
-  for (const approval of state.approvals) {
-    if (approval.action !== "github.create_pull_request") continue;
-    const head = readString(asUnknownRecord(approval.normalizedArguments), "head");
-    if (head !== undefined) durableHeads.add(head);
-  }
-  if (durableHeads.size > 1) {
-    throw new Error("legacy live session contains conflicting pull-request heads");
-  }
-
-  const head = durableHeads.values().next().value ?? configuredHead;
-  if (!isSafeGitBranchName(head)) {
-    throw new Error("legacy live session contains an invalid pull-request head");
-  }
-  state.livePullRequestHead = head;
-  return head;
 }
 
 export function buildLiveConsoleSnapshot(

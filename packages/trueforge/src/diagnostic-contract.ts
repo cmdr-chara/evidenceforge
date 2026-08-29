@@ -180,6 +180,7 @@ export class DiagnosticContractGuard {
         const call = callId === undefined ? undefined : this.resolveIndexedToolCall(callId);
         if (
           call === undefined ||
+          call.threadId !== event.threadId ||
           call.name !== "exec" ||
           call.serverName !== "sandbox" ||
           !isReadOnlyDiagnosticSandboxExec(call.arguments)
