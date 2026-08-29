@@ -45,13 +45,13 @@
 
 ## Verification
 
-The current executable candidate contains 247 tests. Because this checklist changes repository state, exact-head CI for the commit containing it is deliberately a separate external gate recorded on the submission-readiness PR.
+The current executable candidate contains 250 tests. Because this checklist changes repository state, exact-head CI for the commit containing it is deliberately a separate external gate recorded on the submission-readiness PR.
 
 - [x] `pnpm install --frozen-lockfile` on the executable code head.
 - [x] `pnpm format:check` on the executable code head.
 - [x] `pnpm lint` on the executable code head.
 - [x] `pnpm typecheck` on the executable code head.
-- [x] `pnpm test` — 247/247 on the executable candidate.
+- [x] `pnpm test` — 250/250 on the executable candidate.
 - [x] `pnpm eval:smoke` on the executable code head.
 - [x] `pnpm demo:fixture` on the executable code head.
 - [x] `pnpm build` on the executable code head.

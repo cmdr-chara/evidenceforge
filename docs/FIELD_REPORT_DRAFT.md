@@ -81,7 +81,7 @@ Responsive browser observations cover 320, 375, 768, 1024, and 1440px. The final
 ## Measured result
 
 ```text
-Executable local candidate:  complete matrix, 247/247 tests
+Executable local candidate:  complete matrix, 250/250 tests
 Deterministic fixture:       10/10 + CompletionGate certificate
 Credentialed live workflow:  10/10 after human-approved PR write and reconciliation
 False-success evaluation:    EvidenceForge 0%; baseline 57.14%

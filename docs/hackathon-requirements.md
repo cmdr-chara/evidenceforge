@@ -36,7 +36,7 @@ This file records the requirements that materially affect EvidenceForge. Officia
 - GitHub MCP, Daytona, four skills, approvals, compaction, exactly three dynamic specialists, bounded iterations, and durable session recovery are integrated.
 - `CompletionGate` is the only application path to `COMPLETED`.
 - Exact PR identity, approval provenance, stale evidence/certificate rejection, repatch invalidation, crash recovery, terminal cutoffs, and collision-safe persistence are implemented and tested.
-- The substantive merged head passed exact-head GitHub Actions; the consolidated follow-up candidate contains 247 tests.
+- The substantive merged head passed exact-head GitHub Actions; the consolidated follow-up candidate contains 250 tests.
 - The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for the unenforced baseline.
 
 ### Live sponsor evidence
