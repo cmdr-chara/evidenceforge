@@ -2,6 +2,8 @@
 
 Target: approximately three minutes. The demo must distinguish credentialed live evidence from deterministic fixture evidence at all times.
 
+Published recording: https://streamable.com/3vxfjt
+
 ## Before recording
 
 1. Confirm merged PR #2 and the submission-readiness PR are public.
@@ -99,4 +101,4 @@ Close with:
 - [ ] No automatic approval or merge.
 - [ ] Exact SHA/CI/Qodo links included in submission notes.
 - [ ] SDK read-only specialist limitation disclosed.
-- [ ] Video URL added to the submission checklist after publication.
+- [x] Video URL added to the submission checklist after publication.

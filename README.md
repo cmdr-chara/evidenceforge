@@ -4,7 +4,15 @@
 
 EvidenceForge is an evidence-gated CI incident control plane built on TrueForge. It binds a failed GitHub Actions incident to an exact repository revision, reproduces it in Daytona, captures and verifies a patch, obtains an independent patch review, pauses before any external write, reconciles the resulting pull request, and permits completion only through an application-issued certificate.
 
-> **Release status — 2026-08-28:** the substantive implementation was human-reviewed and squash-merged through [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) into `determination` at [`819c281`](https://github.com/cmdr-chara/evidenceforge/commit/819c2815b5bd8cfdf35847ed76a58a457168e74c). Its [exact-head CI](https://github.com/cmdr-chara/evidenceforge/actions/runs/33194606687) passed. A narrowly scoped submission-readiness follow-up fixes Qodo's later non-zero-result finding and synchronizes the public evidence; its exact-head CI and Qodo result remain publication gates.
+> **Release status — 2026-08-29:** the substantive implementation was human-reviewed and squash-merged through [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) into `determination` at [`819c281`](https://github.com/cmdr-chara/evidenceforge/commit/819c2815b5bd8cfdf35847ed76a58a457168e74c). The executable submission-readiness candidate at [`0d37076`](https://github.com/cmdr-chara/evidenceforge/commit/0d370768b4195c4ac9fd763ad140118dfad6a90d) passed [exact-head CI](https://github.com/cmdr-chara/evidenceforge/actions/runs/33196634885), and [Qodo reports 0 bugs and 0 rule violations](https://github.com/cmdr-chara/evidenceforge/pull/4#issuecomment-5455852549). [PR #4](https://github.com/cmdr-chara/evidenceforge/pull/4) carries the final documentation and media update; its latest publication gates are authoritative on the PR. Human merge remains a release gate.
+
+## Demo video
+
+**[Watch the 2:50 EvidenceForge demo](https://streamable.com/3vxfjt).**
+
+The video keeps the evidence boundary visible: the strongest credentialed TrueForge workflow reaches **9/10 — not certified**, while the separately labeled deterministic fixture demonstrates the complete approval, reconciliation, and CompletionGate certificate path.
+
+![EvidenceForge deterministic fixture incident dossier](docs/assets/evidenceforge-hero.jpg)
 
 ## Evidence boundary
 
@@ -12,7 +20,7 @@ EvidenceForge deliberately separates three kinds of evidence:
 
 | Evidence | Observed result | What it proves |
 |---|---|---|
-| Repository verification | frozen install, format, lint, typecheck, 236 tests, evaluation, fixture, build, doctor, diff check | the executable candidate is reproducible and internally consistent; the follow-up exact-head CI remains an external publication gate |
+| Repository verification | frozen install, format, lint, typecheck, 236 tests, evaluation, fixture, build, doctor, diff check | the executable candidate is reproducible, internally consistent, and passed exact-head CI on the submission-readiness follow-up |
 | Credentialed live TrueForge workflow | strongest run reached 9/10 application gates | real TrueForge, GitHub MCP, Daytona, three specialists, deterministic verification, and independent review worked together |
 | Deterministic fixture | complete approval, reconciliation, and CompletionGate certificate path | control-plane semantics, not live sponsor integration |
 
@@ -41,6 +49,15 @@ The console exposes application state and evidence rather than a model transcrip
 - intent → effect → settlement records for external operations;
 - exact pull-request reconciliation;
 - a deeply immutable, canonically digested completion certificate.
+
+## Sponsor integrations
+
+| Integration | EvidenceForge usage |
+|---|---|
+| TrueForge | Primary supervisor runtime, persistent sessions, streamed events, three dynamic diagnostic specialists, skills, continuation, and approval pauses |
+| Daytona | Isolated checkout, bootstrap, failure reproduction, patching, and verifier execution for credentialed live workflows |
+| GitHub MCP | Exact commit lookup, approval-gated pull-request creation, and authoritative pull-request reconciliation |
+| Qodo | Agentic review on the substantive PR and exact-head submission-readiness follow-up; the final aggregate reports 0 bugs and 0 rule violations |
 
 ## Architecture
 
@@ -110,6 +127,18 @@ pnpm dev
 
 Open `http://127.0.0.1:4173`. The default console is explicitly labeled **Deterministic fixture**. Fixture output must never be represented as credentialed TrueForge, GitHub MCP, or Daytona evidence.
 
+### Judge demo in 60 seconds
+
+After installation, reset and validate the deterministic fixture before opening the console:
+
+```bash
+pnpm demo:reset
+pnpm demo:fixture
+pnpm dev
+```
+
+Then open `http://127.0.0.1:4173` and use **Advance evidence** to inspect the application-owned gate transitions. The fixture demonstrates control-plane semantics; follow [docs/TRUEFORGE_SETUP.md](docs/TRUEFORGE_SETUP.md) for the credentialed sponsor-integrated workflow.
+
 ## Live TrueForge profile
 
 The profiled incident is deliberately exact:
@@ -154,7 +183,7 @@ issue → feat/foundation-control-plane → PR #2 → Qodo → human Squash and 
 
 ## Submission status
 
-The substantive implementation is merged. Remaining gates are explicitly tracked in [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md): follow-up exact-head CI and Qodo, exact 200% zoom, a stable credentialed live `external-pr` path, public demo video, merge of the small submission-readiness PR, and official hackathon submission.
+The substantive implementation is merged, and the follow-up exact-head CI, Qodo review, and public demo video are available. Remaining gates are explicitly tracked in [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md): exact 200% zoom, a stable credentialed live `external-pr` path, human merge of the small submission-readiness PR, and official hackathon submission.
 
 ## AI-assistance disclosure
 

@@ -1,6 +1,6 @@
 # Submission checklist
 
-**Last synchronized:** 2026-08-28
+**Last synchronized:** 2026-08-29
 
 ## Repository and control plane
 
@@ -58,7 +58,7 @@ The current executable candidate contains 236 tests. Because this checklist chan
 - [x] `pnpm doctor` on the executable code head.
 - [x] `git diff --check` on the executable code head.
 - [x] Push and pull-request workflows green on the executable code head.
-- [ ] Confirm the same matrix on the commit containing this checklist and record it on the submission-readiness PR.
+- [x] Exact-head CI passed on `0d370768b4195c4ac9fd763ad140118dfad6a90d`: https://github.com/cmdr-chara/evidenceforge/actions/runs/33196634885
 
 ## Live evidence
 
@@ -100,9 +100,9 @@ The current executable candidate contains 236 tests. Because this checklist chan
 - [x] SDK-limited read-only boundary retained as BLOCKED, not falsely resolved.
 - [x] Demo reset command added.
 - [x] Final-documentation-head verification represented as an external gate, not a premature PASS.
-- [ ] Record the exact-SHA `/agentic_review` request and result on the submission-readiness PR.
-- [ ] Obtain Qodo resolution of the non-zero-result finding on that exact SHA.
-- [ ] Record an explicit justified disposition for the SDK-blocked read-only finding in the Qodo thread.
+- [x] Exact-SHA `/agentic_review` request and result recorded on submission-readiness PR #4.
+- [x] Qodo reports 0 bugs and 0 rule violations on the follow-up aggregate: https://github.com/cmdr-chara/evidenceforge/pull/4#issuecomment-5455852549
+- [x] Explicit SDK-blocked read-only disposition recorded in the PR thread: https://github.com/cmdr-chara/evidenceforge/pull/4#issuecomment-5455815694
 
 ## Documentation and demo
 
@@ -114,15 +114,15 @@ The current executable candidate contains 236 tests. Because this checklist chan
 - [x] Qodo review log synchronized.
 - [x] Demo script runs `pnpm demo:reset` before fixture validation.
 - [x] Demo script separates credentialed 9/10 evidence from deterministic certificate footage.
-- [ ] Add public demo video URL.
-- [ ] Perform final secret/diff review before the finalization PR is merged.
+- [x] Public demo video: https://streamable.com/3vxfjt
+- [x] Final secret/diff review completed; high-confidence token matches were confirmed as synthetic `task-*` fixture identifiers.
 
 ## Human release and submission
 
-- [ ] Inspect final exact-head CI.
-- [ ] Inspect final exact-SHA Qodo aggregate.
+- [ ] Inspect CI on the final published documentation/media head in PR #4.
+- [ ] Inspect Qodo on the final published documentation/media head in PR #4.
 - [ ] Perform exact 200% zoom check.
-- [ ] Record demo video.
+- [x] Record and publish demo video.
 - [x] Human `Squash and merge` PR #2 completed.
 - [ ] Human merge of the narrow submission-readiness PR after exact-head CI and Qodo.
 - [ ] Complete official hackathon submission before the observed deadline.
