@@ -308,6 +308,41 @@ test("live workflow rejects references found only in a deeply nested failed tool
   assert.equal(harness.state.completionCertificate, undefined);
 });
 
+test("live workflow fails closed when tool-result inspection reaches its depth bound", () => {
+  const harness = createHarness();
+  const feed = createFeed(harness);
+
+  feed(turnCreated());
+  feed(threadCreated(1, "Repository Investigator"));
+  const callId = "call-depth-bounded-diagnostic-evidence";
+  feed(structuredCall(
+    callId,
+    "repository",
+    "read",
+    { path: "packages/trueforge/src/runtime.ts" },
+    "thread-1",
+    "truefoundry-system",
+  ));
+  let beyondInspectionBound: unknown = { status: "ERROR" };
+  for (let depth = 0; depth < 9; depth += 1) {
+    beyondInspectionBound = { nested: beyondInspectionBound };
+  }
+  feed(toolResponse(callId, {
+    success: true,
+    response: {
+      result:
+        "runtime.ts:projectToolResult and CONFIG_VALIDATION_ORDER appear in an incompletely inspected result",
+      beyondInspectionBound,
+    },
+  }, "thread-1"));
+  feed(diagnosticThreadDone(1, causalDiagnosticOutput()));
+
+  assert.equal(harness.state.status, "BLOCKED");
+  assert.match(harness.state.blockedReason ?? "", /not observed in its specialist thread/);
+  assert.equal(harness.state.hypotheses.length, 0);
+  assert.equal(harness.state.completionCertificate, undefined);
+});
+
 for (const [exitCodeDescription, exitCodeFields] of [
   ["exitCode", { exitCode: 1 }],
   ["exit_code", { exit_code: 1 }],

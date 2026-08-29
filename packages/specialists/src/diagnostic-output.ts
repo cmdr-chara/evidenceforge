@@ -1,6 +1,10 @@
 export const DIAGNOSTIC_OUTPUT_SCHEMA_VERSION = 1 as const;
 export const DIAGNOSTIC_OUTPUT_MAX_CHARACTERS = 8_192;
 export const DIAGNOSTIC_ROOT_CAUSE_MAX_CLAIMS = 5;
+export const DIAGNOSTIC_ID_MAX_CHARACTERS = 128;
+export const DIAGNOSTIC_CAUSE_MIN_CHARACTERS = 16;
+export const DIAGNOSTIC_CAUSE_MAX_CHARACTERS = 512;
+export const DIAGNOSTIC_MECHANISM_MIN_CHARACTERS = 16;
 export const DIAGNOSTIC_TEXT_MAX_CHARACTERS = 1_024;
 export const DIAGNOSTIC_OBSERVATION_MAX_CHARACTERS = 1_024;
 export const DIAGNOSTIC_REFERENCE_MAX_CHARACTERS = 256;
@@ -45,6 +49,7 @@ export const DIAGNOSTIC_OUTPUT_PROTOCOL = [
   'When no causal claim is supported, return exactly this shape: {"schemaVersion":1,"findings":["<bounded observation>"],"rootCauseHypotheses":[],"unresolvedQuestions":[]}. Do not move affectedLocations, evidenceReferences, or status to the top level.',
   `findings and unresolvedQuestions may each contain at most ${DIAGNOSTIC_REFERENCE_MAX_COUNT} unique strings of 1-${DIAGNOSTIC_OBSERVATION_MAX_CHARACTERS} characters.`,
   `affectedLocations and evidenceReferences may each contain at most ${DIAGNOSTIC_REFERENCE_MAX_COUNT} unique strings of at most ${DIAGNOSTIC_REFERENCE_MAX_CHARACTERS} characters; every evidence reference must contain at least 8 characters.`,
+  `Each id must contain 1-${DIAGNOSTIC_ID_MAX_CHARACTERS} characters and match letters, digits, dot, underscore, or hyphen; each cause must contain ${DIAGNOSTIC_CAUSE_MIN_CHARACTERS}-${DIAGNOSTIC_CAUSE_MAX_CHARACTERS} characters; each causalMechanism must contain ${DIAGNOSTIC_MECHANISM_MIN_CHARACTERS}-${DIAGNOSTIC_TEXT_MAX_CHARACTERS} characters.`,
   `The entire serialized JSON object must not exceed ${DIAGNOSTIC_OUTPUT_MAX_CHARACTERS} characters, including field names and JSON punctuation.`,
   "EvidenceForge preserves accepted text after trimming outer whitespace; it does not truncate, rewrite, infer, or reclassify it.",
   "Every evidenceReferences entry must be an exact bounded string observed in a completed tool result from this specialist thread; EvidenceForge rejects unresolved or cross-thread references.",
@@ -104,11 +109,15 @@ function parseRootCauseClaim(value: unknown): DiagnosticRootCauseClaim | undefin
   if (!isRecord(value) || !hasExactFields(value, DIAGNOSTIC_ROOT_CAUSE_FIELDS)) {
     return undefined;
   }
-  const id = readBoundedString(value.id, 1, 128);
-  const cause = readBoundedString(value.cause, 16, 512);
+  const id = readBoundedString(value.id, 1, DIAGNOSTIC_ID_MAX_CHARACTERS);
+  const cause = readBoundedString(
+    value.cause,
+    DIAGNOSTIC_CAUSE_MIN_CHARACTERS,
+    DIAGNOSTIC_CAUSE_MAX_CHARACTERS,
+  );
   const causalMechanism = readBoundedString(
     value.causalMechanism,
-    16,
+    DIAGNOSTIC_MECHANISM_MIN_CHARACTERS,
     DIAGNOSTIC_TEXT_MAX_CHARACTERS,
   );
   const affectedLocations = readBoundedStringArray(

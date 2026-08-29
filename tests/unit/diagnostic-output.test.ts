@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  DIAGNOSTIC_CAUSE_MAX_CHARACTERS,
+  DIAGNOSTIC_CAUSE_MIN_CHARACTERS,
+  DIAGNOSTIC_ID_MAX_CHARACTERS,
+  DIAGNOSTIC_MECHANISM_MIN_CHARACTERS,
   DIAGNOSTIC_OBSERVATION_MAX_CHARACTERS,
   DIAGNOSTIC_OUTPUT_MAX_CHARACTERS,
   DIAGNOSTIC_OUTPUT_PROTOCOL,
   DIAGNOSTIC_REFERENCE_MAX_CHARACTERS,
+  DIAGNOSTIC_TEXT_MAX_CHARACTERS,
   DIAGNOSTIC_SPECIALISTS,
   parseDiagnosticSpecialistOutput,
 } from "../../packages/specialists/src";
@@ -151,6 +156,21 @@ test("TrueForge supervisor and specialist definitions share the strict diagnosti
     ),
   );
   assert.ok(DIAGNOSTIC_OUTPUT_PROTOCOL.includes("does not truncate, rewrite, infer, or reclassify"));
+  assert.ok(
+    DIAGNOSTIC_OUTPUT_PROTOCOL.includes(
+      `id must contain 1-${DIAGNOSTIC_ID_MAX_CHARACTERS} characters`,
+    ),
+  );
+  assert.ok(
+    DIAGNOSTIC_OUTPUT_PROTOCOL.includes(
+      `cause must contain ${DIAGNOSTIC_CAUSE_MIN_CHARACTERS}-${DIAGNOSTIC_CAUSE_MAX_CHARACTERS} characters`,
+    ),
+  );
+  assert.ok(
+    DIAGNOSTIC_OUTPUT_PROTOCOL.includes(
+      `causalMechanism must contain ${DIAGNOSTIC_MECHANISM_MIN_CHARACTERS}-${DIAGNOSTIC_TEXT_MAX_CHARACTERS} characters`,
+    ),
+  );
   for (const specialist of DIAGNOSTIC_SPECIALISTS) {
     assert.ok(specialist.instructions.includes(DIAGNOSTIC_OUTPUT_PROTOCOL));
   }
