@@ -120,13 +120,45 @@ test("diagnostic contract accepts sandbox exec for a diagnostic specialist", () 
             sourceEventId: `message-${id}`,
             threadId: "thread-1",
             name: "exec",
-            arguments: "{}",
+            arguments: JSON.stringify({
+              command: "rg -n 'livePullRequestHead' apps packages | head -40",
+              cwd: "/workspace/repository",
+            }),
             serverName: "sandbox",
           }
         : undefined,
     ),
     undefined,
   );
+});
+
+test("diagnostic contract rejects mutating commands smuggled through sandbox exec", () => {
+  const commands = [
+    "touch marker",
+    "cat README.md > copy.md",
+    "git checkout -- README.md",
+    "python -c 'open(\"marker\",\"w\").close()'",
+    "rg TODO . | tee findings.txt",
+    "rg --pre 'sh -c touch marker' TODO .",
+  ];
+  for (const [index, command] of commands.entries()) {
+    const result = toolResult("thread-1", index);
+    const callId = String((result.payload as { toolCallId?: string }).toolCallId);
+    const violation = evaluateDiagnosticContract(
+      [turnCreated(), ...fanOut(), result],
+      (id) => id === callId
+        ? {
+            id,
+            sourceEventId: `message-${id}`,
+            threadId: "thread-1",
+            name: "exec",
+            arguments: JSON.stringify({ command, cwd: "/workspace/repository" }),
+            serverName: "sandbox",
+          }
+        : undefined,
+    );
+    assert.equal(violation?.code, "FORBIDDEN_SPECIALIST_TOOL", command);
+  }
 });
 
 test("diagnostic contract rejects a failed specialist", () => {

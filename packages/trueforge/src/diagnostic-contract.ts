@@ -1,5 +1,6 @@
 import { RuntimeEvent, SessionState } from "../../domain/src";
 import { TRUEFORGE_SPECIALIST_TOOL_BUDGET } from "./agent-spec";
+import { isReadOnlyDiagnosticSandboxExec } from "./diagnostic-command-policy";
 import type { IndexedToolCall } from "./event-index";
 
 export const REQUIRED_DIAGNOSTIC_SPECIALISTS = [
@@ -177,10 +178,15 @@ export class DiagnosticContractGuard {
         const payload = asRecord(event.payload);
         const callId = readString(payload, "toolCallId") ?? readString(payload, "tool_call_id");
         const call = callId === undefined ? undefined : this.resolveIndexedToolCall(callId);
-        if (call === undefined || call.name !== "exec" || call.serverName !== "sandbox") {
+        if (
+          call === undefined ||
+          call.name !== "exec" ||
+          call.serverName !== "sandbox" ||
+          !isReadOnlyDiagnosticSandboxExec(call.arguments)
+        ) {
           return this.fail(
             "FORBIDDEN_SPECIALIST_TOOL",
-            "TrueForge diagnostic specialist used a tool outside sandbox.exec",
+            "TrueForge diagnostic specialist used a tool outside the read-only sandbox.exec grammar",
           );
         }
       }

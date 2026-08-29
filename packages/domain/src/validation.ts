@@ -132,17 +132,7 @@ export function validateSessionState(state: SessionState): SessionState {
   validateTask(state.task);
   if (state.livePullRequestHead !== undefined) {
     const head = state.livePullRequestHead;
-    if (
-      head.length === 0 ||
-      head.length > 200 ||
-      !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(head) ||
-      head.endsWith(".") ||
-      head.endsWith("/") ||
-      head.includes("..") ||
-      head.includes("//") ||
-      head.includes("@{") ||
-      head.split("/").some((segment) => segment.endsWith(".lock"))
-    ) {
+    if (!isSafeGitBranchName(head)) {
       issues.push("session.livePullRequestHead must be a safe Git branch name");
     }
   }
@@ -228,6 +218,30 @@ export function validateSessionState(state: SessionState): SessionState {
   }
   if (issues.length > 0) throw new DomainValidationError(issues);
   return state;
+}
+
+/**
+ * The subset of `git check-ref-format --branch` relevant to an application
+ * supplied local branch. Keeping this predicate in the domain package avoids
+ * configuration and checkpoint validation drifting apart.
+ */
+export function isSafeGitBranchName(head: string): boolean {
+  if (
+    head.length === 0 ||
+    head.length > 200 ||
+    head === "@" ||
+    !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(head) ||
+    head.endsWith(".") ||
+    head.endsWith("/") ||
+    head.includes("..") ||
+    head.includes("//") ||
+    head.includes("@{")
+  ) {
+    return false;
+  }
+  return head
+    .split("/")
+    .every((segment) => !segment.startsWith(".") && !segment.endsWith(".lock"));
 }
 
 function validateCompletionCertificate(

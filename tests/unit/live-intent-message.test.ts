@@ -88,6 +88,10 @@ test("live pull-request target accepts a safe dedicated proof branch", () => {
     () => resolveLivePullRequestHead({ EVIDENCEFORGE_PR_HEAD: "   " }),
     /safe Git branch name/,
   );
+  assert.throws(
+    () => resolveLivePullRequestHead({ EVIDENCEFORGE_PR_HEAD: "proof/.hidden" }),
+    /safe Git branch name/,
+  );
 });
 
 test("live messages bind a configured pull-request head without weakening the base", () => {
