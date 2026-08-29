@@ -48,6 +48,16 @@ test("diagnostic output parser rejects wrappers, coercions, and unknown fields",
     undefined,
   );
   assert.equal(
+    parseDiagnosticSpecialistOutput({
+      ...valid,
+      rootCauseHypotheses: [],
+      affectedLocations: ["packages/trueforge/src/verifier-projection.ts"],
+      evidenceReferences: ["verifier-projection.ts"],
+      status: "SUPPORTED",
+    }),
+    undefined,
+  );
+  assert.equal(
     parseDiagnosticSpecialistOutput({ ...valid, findings: "one observation" }),
     undefined,
   );
@@ -125,6 +135,16 @@ test("TrueForge supervisor and specialist definitions share the strict diagnosti
   assert.ok(spec.instructions.includes("must not restate the failure symptom as a cause"));
   assert.ok(spec.instructions.includes("rejects unresolved or cross-thread references"));
   assert.ok(DIAGNOSTIC_OUTPUT_PROTOCOL.includes("exactly the displayed keys"));
+  assert.ok(
+    DIAGNOSTIC_OUTPUT_PROTOCOL.includes(
+      '"rootCauseHypotheses":[],"unresolvedQuestions":[]',
+    ),
+  );
+  assert.ok(
+    DIAGNOSTIC_OUTPUT_PROTOCOL.includes(
+      "Do not move affectedLocations, evidenceReferences, or status to the top level",
+    ),
+  );
   assert.ok(
     DIAGNOSTIC_OUTPUT_PROTOCOL.includes(
       `serialized JSON object must not exceed ${DIAGNOSTIC_OUTPUT_MAX_CHARACTERS} characters`,

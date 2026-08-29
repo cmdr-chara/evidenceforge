@@ -42,6 +42,7 @@ export const DIAGNOSTIC_OUTPUT_PROTOCOL = [
   "It must use schemaVersion 1 and exactly these fields:",
   '{"schemaVersion":1,"findings":["<bounded observation>"],"rootCauseHypotheses":[{"id":"<stable-id>","cause":"<specific defect or configuration condition>","causalMechanism":"<how that cause produces the observed failure>","affectedLocations":["<path:symbol or configuration key>"],"evidenceReferences":["<bounded file, symbol, log signature, or artifact reference>"],"status":"SUPPORTED"}],"unresolvedQuestions":[]}.',
   "The top-level object and every root-cause object must contain exactly the displayed keys; wrappers, aliases, unknown fields, scalar substitutions, prose, and code fences are invalid.",
+  'When no causal claim is supported, return exactly this shape: {"schemaVersion":1,"findings":["<bounded observation>"],"rootCauseHypotheses":[],"unresolvedQuestions":[]}. Do not move affectedLocations, evidenceReferences, or status to the top level.',
   `findings and unresolvedQuestions may each contain at most ${DIAGNOSTIC_REFERENCE_MAX_COUNT} unique strings of 1-${DIAGNOSTIC_OBSERVATION_MAX_CHARACTERS} characters.`,
   `affectedLocations and evidenceReferences may each contain at most ${DIAGNOSTIC_REFERENCE_MAX_COUNT} unique strings of at most ${DIAGNOSTIC_REFERENCE_MAX_CHARACTERS} characters; every evidence reference must contain at least 8 characters.`,
   `The entire serialized JSON object must not exceed ${DIAGNOSTIC_OUTPUT_MAX_CHARACTERS} characters, including field names and JSON punctuation.`,
