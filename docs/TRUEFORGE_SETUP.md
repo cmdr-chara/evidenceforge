@@ -63,6 +63,7 @@ export EVIDENCEFORGE_PR_HEAD=codex/live-external-write-proof
 
 `.data/` and `.evidenceforge/` are runtime state and must remain ignored and untracked.
 `EVIDENCEFORGE_PR_HEAD` accepts only a validated Git branch name. The application-owned base remains fixed to `determination`; changing the head never authorizes a write or bypasses approval.
+When a non-default head is used for the controlled proof, the generated pull-request copy explicitly discloses that the PR is documentation-only and does not publish the independently verified sandbox patch.
 
 ## Profiled live incident
 

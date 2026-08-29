@@ -107,6 +107,9 @@ test("live messages bind a configured pull-request head without weakening the ba
   assert.match(incident, /base "determination"/);
   assert.match(continuation, /sha codex\/live-external-write-proof/);
   assert.match(continuation, /base determination/);
+  assert.match(incident, /documentation-only external-write proof/);
+  assert.match(incident, /docs: record EvidenceForge live external-write proof/);
+  assert.match(continuation, /does not publish the sandbox repair/);
 });
 
 test("patch capture manifest is exact and has no environment override", () => {
