@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assertLiveApprovalReady } from "../../apps/server/src/live-service";
+import { validateCreatePullRequestCall } from "../../apps/server/src/github-mcp-adapter";
 import { ApprovalRequest, digestCanonical } from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
-import { artifactBindingFor } from "../../packages/verification/src";
+import {
+  artifactBindingFor,
+  artifactBindingMatchesState,
+} from "../../packages/verification/src";
 import { createOperationIntent } from "../../packages/workflow/src";
 import { buildState, passAll } from "../fixtures/builders";
 
@@ -11,11 +15,16 @@ function approval(
   state: ReturnType<typeof buildState>,
   overrides: Partial<ApprovalRequest> = {},
 ): ApprovalRequest {
+  const [owner, repo] = state.task.repository.split("/");
+  assert.ok(owner);
+  assert.ok(repo);
   const normalizedArguments = {
-    owner: "cmdr-chara",
-    repo: "evidenceforge",
+    owner,
+    repo,
     base: "determination",
     head: "fix/demo",
+    title: "docs: record live proof",
+    body: "Documentation-only external-write proof.",
   };
   return {
     id: "approval-live-pr",
@@ -66,6 +75,57 @@ function readyState() {
 
 test("live PR approval requires verified pre-publish state", () => {
   const { state, evidence, pending } = readyState();
+  assert.doesNotThrow(() => assertLiveApprovalReady(state, pending, evidence));
+});
+
+test("live PR approval accepts bound optional GitHub fields on a prepared action", () => {
+  const { state, evidence, pending } = readyState();
+  const normalizedArguments = {
+    ...pending.normalizedArguments as Record<string, unknown>,
+    draft: false,
+    maintainer_can_modify: true,
+  };
+  pending.normalizedArguments = normalizedArguments;
+  const provenance = pending.provenance;
+  assert.ok(provenance);
+  const binding = provenance.binding;
+  assert.ok(binding);
+  provenance.actionDigest = digestCanonical(normalizedArguments);
+  const operation = state.operations.find((candidate) => candidate.id === "operation-live-pr");
+  assert.ok(operation);
+  operation.normalizedArguments = normalizedArguments;
+  operation.argumentDigest = provenance.actionDigest;
+  state.externalAction = {
+    type: "pull_request",
+    idempotencyKey: "prepared-live-pr",
+    operationId: "operation-live-pr",
+    replayPolicy: "RECONCILE_FIRST",
+    preparedArguments: {
+      repository: state.task.repository,
+      base: "determination",
+      head: "fix/demo",
+      title: "docs: record live proof",
+      body: "Documentation-only external-write proof.",
+      expectedHeadSha: "abcdef1234567890",
+    },
+    binding,
+    status: "PREPARED",
+  };
+
+  assert.equal(provenance.actionDigest, digestCanonical(pending.normalizedArguments));
+  assert.equal(digestCanonical(state.approvals[0]?.normalizedArguments), provenance.actionDigest);
+  assert.equal(operation.actionType, pending.action);
+  assert.equal(operation.repository, provenance.repository);
+  assert.equal(operation.revision, provenance.revision);
+  assert.ok(artifactBindingMatchesState(binding, state, "EXTERNAL"));
+  assert.doesNotThrow(() =>
+    validateCreatePullRequestCall(pending.normalizedArguments, {
+      ...state.externalAction!.preparedArguments,
+      operationId: state.externalAction!.operationId,
+      idempotencyKey: state.externalAction!.idempotencyKey,
+    })
+  );
+
   assert.doesNotThrow(() => assertLiveApprovalReady(state, pending, evidence));
 });
 

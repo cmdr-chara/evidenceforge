@@ -36,7 +36,7 @@ import {
 } from "../../../packages/workflow/src";
 import { SseBroker } from "./sse-broker";
 import { LiveWorkflowReducer, markLiveExternalApproval } from "./live-workflow";
-import { officialArgumentsForPreparedPullRequest } from "./github-mcp-adapter";
+import { validateCreatePullRequestCall } from "./github-mcp-adapter";
 
 export interface StartLiveIncidentInput {
   objective?: string;
@@ -751,18 +751,27 @@ export function assertLiveApprovalReady(
   // for older callers that validate a fully formed approval directly; when an
   // action exists, the exact prepared arguments and expected head are part of
   // the live provenance contract.
-  if (
-    externalAction !== undefined &&
-    (externalAction.status !== "PREPARED" ||
-      externalAction.operationId !== provenance.originatingOperationId ||
-      digestCanonical(officialArgumentsForPreparedPullRequest({
+  if (externalAction !== undefined) {
+    let argumentsMatch = false;
+    try {
+      validateCreatePullRequestCall(approval.normalizedArguments, {
         ...externalAction.preparedArguments,
         operationId: externalAction.operationId,
         idempotencyKey: externalAction.idempotencyKey,
-      })) !==
-        digestCanonical(approval.normalizedArguments))
-  ) {
-    throw new Error("external approval provenance is stale, substituted, expired, or consumed");
+      });
+      argumentsMatch = true;
+    } catch {
+      // The durable operation digest above still binds the complete official
+      // argument object, including optional GitHub fields. The prepared action
+      // separately binds the required PR identity and expected head SHA.
+    }
+    if (
+      externalAction.status !== "PREPARED" ||
+      externalAction.operationId !== provenance.originatingOperationId ||
+      !argumentsMatch
+    ) {
+      throw new Error("external approval provenance is stale, substituted, expired, or consumed");
+    }
   }
   const authorization = policy.authorize({ ...approval, status: "APPROVED" });
   if (!authorization.allowed) throw new Error(authorization.reason);
