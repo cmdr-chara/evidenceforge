@@ -81,12 +81,12 @@ Responsive browser observations cover 320, 375, 768, 1024, and 1440px. The final
 ## Measured result
 
 ```text
-Executable local candidate:  complete matrix, 256/256 tests
+Executable local candidate:  complete matrix, 258/258 tests
 Deterministic fixture:       10/10 + CompletionGate certificate
 Credentialed live workflow:  10/10 after human-approved PR write and reconciliation
 False-success evaluation:    EvidenceForge 0%; baseline 57.14%
 Substantive PR state:         PR #2 merged into determination
-Follow-up state:              submission-readiness PR pending review
+Follow-up state:              PR #4 merged; hosted fixture PR pending review
 ```
 
 The exact final-head CI result for the commit containing this report is recorded on the submission-readiness PR after publication.
@@ -94,8 +94,8 @@ The exact final-head CI result for the commit containing this report is recorded
 ## Remaining risks and actions
 
 - per-dynamic-subagent pre-execution capability isolation requires a future TrueForge SDK surface or a TrueForge-compatible read-only proxy;
-- exact final-head CI/Qodo must be observed after this report commit;
-- follow-up merge and submission require human/external account actions.
+- hosted fixture deployment must be observed after its human-reviewed PR merges;
+- official submission requires an external account action.
 
 ## Submission position
 

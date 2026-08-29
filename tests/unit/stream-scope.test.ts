@@ -169,6 +169,52 @@ test("scoped stream does not expose or depend on lexical app state globals", () 
   assert.match(source, /appendRuntimeActivity/);
 });
 
+test("static Pages showcase never opens an API event stream", () => {
+  FakeEventSource.instances.length = 0;
+  const callbacks = new Map<string, () => void>();
+  const rendered: unknown[] = [];
+  const app: AppBridge = {
+    render(input) {
+      rendered.push(input);
+    },
+    getStreamSnapshot() {
+      return { mode: "DETERMINISTIC_FIXTURE", taskId: null, activity: [] };
+    },
+    appendRuntimeActivity() {
+      return false;
+    },
+    showConnection() {},
+  };
+  const windowObject = {
+    EventSource: FakeEventSource,
+    evidenceForge: app,
+    location: { href: "https://cmdr-chara.github.io/evidenceforge/" },
+    addEventListener(name: string, callback: () => void) {
+      callbacks.set(name, callback);
+    },
+  };
+  const documentObject = {
+    getElementById() {
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+  };
+  const source = readFileSync(resolve(process.cwd(), "apps/web/public/stream-scope.js"), "utf8");
+
+  runInNewContext(source, {
+    URL,
+    document: documentObject,
+    window: windowObject,
+  });
+
+  callbacks.get("DOMContentLoaded")?.();
+  app.render({ mode: "DETERMINISTIC_FIXTURE", task: { id: "fixture" } });
+  assert.equal(FakeEventSource.instances.length, 0);
+  assert.equal(rendered.length, 1);
+});
+
 test("bootstrap stream is scoped and rejects cross-task snapshots before DOMContentLoaded", () => {
   FakeEventSource.instances.length = 0;
   const callbacks = new Map<string, () => void>();

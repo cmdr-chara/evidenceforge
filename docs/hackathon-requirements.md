@@ -36,7 +36,7 @@ This file records the requirements that materially affect EvidenceForge. Officia
 - GitHub MCP, Daytona, four skills, approvals, compaction, exactly three dynamic specialists, bounded iterations, and durable session recovery are integrated.
 - `CompletionGate` is the only application path to `COMPLETED`.
 - Exact PR identity, approval provenance, stale evidence/certificate rejection, repatch invalidation, crash recovery, terminal cutoffs, and collision-safe persistence are implemented and tested.
-- The substantive merged head passed exact-head GitHub Actions; the consolidated follow-up candidate contains 256 tests.
+- The published `determination` head passed exact-head GitHub Actions; the hosted-showcase candidate contains 258 tests.
 - The deterministic evaluation measured 0% false success for EvidenceForge versus 57.14% for the unenforced baseline.
 
 ### Live sponsor evidence
@@ -87,12 +87,10 @@ Exact 200% browser zoom was manually observed without horizontal overflow or sib
 
 ## Remaining external/human actions
 
-- observe and record exact-head CI and Qodo for the submission-readiness PR;
 - preserve the recorded credentialed live approval/write/reconciliation/certificate evidence;
 - preserve the exact 200% browser zoom review evidence;
 - keep the public demo video available;
-- inspect the final exact-SHA Qodo aggregate;
-- human merge of the submission-readiness PR into `determination`;
+- observe the GitHub Pages deployment after its human-reviewed PR is merged;
 - complete the official submission before the observed deadline.
 
 No Qodo closure, merge, video, or submission is represented as complete without observed evidence.

@@ -62,9 +62,4 @@ Each implementable behavior change is covered by deterministic regression tests.
 
 ## Required release handling
 
-1. Trigger `/agentic_review` on the submission-readiness PR after this documentation commit and exact-head CI.
-2. Inspect the aggregate against that exact SHA.
-3. Fix any new implementable Critical/High finding.
-4. Keep the SDK-blocked High visible.
-5. Record the exact request/result on the follow-up PR.
-6. Merge the follow-up only after a human inspects exact-head CI and Qodo.
+The submission-readiness PR followed the required sequence: exact-head CI, `/agentic_review`, aggregate inspection, disposition of findings and human squash merge. Future substantive changes must repeat the same process. The SDK-blocked High remains visible until TrueForge exposes a pre-execution per-subagent enforcement surface.

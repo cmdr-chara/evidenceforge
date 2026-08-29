@@ -45,7 +45,7 @@
 
 ## Verification
 
-The current executable candidate contains 256 tests. Because this checklist changes repository state, exact-head CI for the commit containing it is deliberately a separate external gate recorded on the submission-readiness PR.
+The current executable candidate contains 258 tests. Exact-head CI remains an external publication gate because a repository document cannot contain the result of the commit that contains itself.
 
 - [x] `pnpm install --frozen-lockfile` on the executable code head.
 - [x] `pnpm format:check` on the executable code head.
@@ -115,14 +115,16 @@ The current executable candidate contains 256 tests. Because this checklist chan
 - [x] Demo script runs `pnpm demo:reset` before fixture validation.
 - [x] Demo script separates the deterministic baseline from credentialed live evidence.
 - [x] Public demo video: https://streamable.com/5sbk1k
+- [x] GitHub Pages build preserves an explicitly static fixture boundary.
+- [ ] Observe the deployed fixture at https://cmdr-chara.github.io/evidenceforge/ after human merge.
 - [x] Final secret/diff review completed; high-confidence token matches were confirmed as synthetic `task-*` fixture identifiers.
 
 ## Human release and submission
 
-- [ ] Inspect CI on the final published documentation/media head in PR #4.
-- [ ] Inspect Qodo on the final published documentation/media head in PR #4.
+- [x] Inspect CI on the final published documentation/media head in PR #4.
+- [x] Inspect Qodo on the final published documentation/media head in PR #4.
 - [x] Perform exact 200% zoom check.
 - [x] Record and publish demo video.
 - [x] Human `Squash and merge` PR #2 completed.
-- [ ] Human merge of the narrow submission-readiness PR after exact-head CI and Qodo.
+- [x] Human merge of the narrow submission-readiness PR after exact-head CI and Qodo.
 - [ ] Complete official hackathon submission before the observed deadline.

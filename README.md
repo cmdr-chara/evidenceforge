@@ -4,11 +4,13 @@
 
 EvidenceForge is an evidence-gated CI incident control plane built on TrueForge. It binds a failed GitHub Actions incident to an exact repository revision, reproduces it in Daytona, captures and verifies a patch, obtains an independent patch review, pauses before any external write, reconciles the resulting pull request, and permits completion only through an application-issued certificate.
 
-> **Release status — 2026-08-29:** the substantive implementation was human-reviewed and squash-merged through [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) into `determination` at [`819c281`](https://github.com/cmdr-chara/evidenceforge/commit/819c2815b5bd8cfdf35847ed76a58a457168e74c). [PR #4](https://github.com/cmdr-chara/evidenceforge/pull/4) is the single submission-readiness PR and consolidates the later diagnostic hardening, live proof, documentation, and media updates. Its exact-head CI and Qodo results are authoritative. Human merge remains a release gate.
+> **Release status — 2026-08-29:** the substantive implementation and final hardening were human-reviewed and squash-merged through [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) and [PR #4](https://github.com/cmdr-chara/evidenceforge/pull/4). [PR #11](https://github.com/cmdr-chara/evidenceforge/pull/11) moved the CI actions to the Node 24 runtime. The published `determination` head [`347e20d`](https://github.com/cmdr-chara/evidenceforge/commit/347e20d70c68cb253195ffcaacb64cf57de1b294) passed its [exact-head CI matrix](https://github.com/cmdr-chara/evidenceforge/actions/runs/33262266277) without deprecation annotations.
 
 ## Demo video
 
 **[Watch the 2:50 EvidenceForge demo](https://streamable.com/5sbk1k).**
+
+**[Explore the hosted deterministic fixture](https://cmdr-chara.github.io/evidenceforge/).** The GitHub Pages build is an interactive static showcase: it can advance through the fixture, pause for approval, reconcile the simulated fixture PR and display the application-issued certificate. Credentialed TrueForge, GitHub MCP and Daytona execution remain available only through the local server and are never implied by the hosted fixture.
 
 The video keeps the evidence boundary visible: the deterministic baseline is labeled separately from the credentialed TrueForge workflow, which reaches **10/10** only after human approval, an observed GitHub PR write, authoritative reconciliation, and an application-issued CompletionGate certificate. This is the product's ten-criterion contract, not a hackathon score.
 
@@ -20,7 +22,7 @@ EvidenceForge deliberately separates three kinds of evidence:
 
 | Evidence | Observed result | What it proves |
 |---|---|---|
-| Repository verification | frozen install, format, lint, typecheck, 256 tests, evaluation, fixture, build, doctor, diff check | the consolidated candidate passes locally; exact-head publication results are recorded on PR #4 |
+| Repository verification | frozen install, format, lint, typecheck, 258 tests, evaluation, fixture, build, doctor, diff check | the consolidated release passes locally and on exact-head CI |
 | Credentialed live TrueForge workflow | 10/10 application gates and a CompletionGate certificate | real TrueForge, GitHub MCP, Daytona, three specialists, deterministic verification, independent review, human approval, PR creation, and reconciliation worked together |
 | Deterministic fixture | complete approval, reconciliation, and CompletionGate certificate path | control-plane semantics, not live sponsor integration |
 
@@ -183,7 +185,7 @@ issue → feat/foundation-control-plane → PR #2 → Qodo → human Squash and 
 
 ## Submission status
 
-The substantive implementation is merged; the credentialed live 10/10 path, exact 200% zoom check, and public demo are recorded. Remaining gates are explicitly tracked in [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md): exact-head CI and Qodo on consolidated PR #4, human merge, and official hackathon submission.
+The implementation and submission hardening are merged; the credentialed live 10/10 path, exact 200% zoom check, public video and hosted static fixture are recorded. The only remaining external release action is the official hackathon submission, tracked in [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md).
 
 ## AI-assistance disclosure
 
