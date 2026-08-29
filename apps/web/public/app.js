@@ -1,4 +1,6 @@
-const state = { snapshot: null, busy: false };
+const staticDemo = new URL(window.location.href).hostname.endsWith('.github.io')
+  || new URL(window.location.href).searchParams.has('static-demo');
+const state = { snapshot: null, busy: false, staticSnapshots: [], staticDenied: null, staticIndex: 0 };
 
 window.evidenceForge = {
   render,
@@ -47,17 +49,28 @@ const elements = {
   activitySummary: byId('activity-summary'),
 };
 
-elements.advance.addEventListener('click', () => mutate('/api/demo/advance'));
-elements.reset.addEventListener('click', () => mutate('/api/demo/reset'));
+elements.advance.addEventListener('click', () => staticDemo ? advanceStatic() : mutate('/api/demo/advance'));
+elements.reset.addEventListener('click', () => staticDemo ? resetStatic() : mutate('/api/demo/reset'));
 elements.approve.addEventListener('click', () => decideApproval('APPROVED'));
 elements.reject.addEventListener('click', () => decideApproval('DENIED'));
 elements.liveForm.addEventListener('submit', startLive);
 
 load();
-connectEvents();
+if (!staticDemo) connectEvents();
 
 async function load() {
   try {
+    if (staticDemo) {
+      const fixture = await request(new URL('./static-demo.json', window.location.href).href);
+      state.staticSnapshots = fixture.approved;
+      state.staticDenied = fixture.denied;
+      state.staticIndex = 0;
+      renderSnapshot(state.staticSnapshots[0]);
+      showConnection('Static fixture', 'complete');
+      elements.liveStatus.textContent = 'Static GitHub Pages showcase · credentialed TrueForge requires the local server.';
+      for (const control of elements.liveForm.elements) control.disabled = true;
+      return;
+    }
     const taskId = new URL(window.location.href).searchParams.get('task');
     renderSnapshot(await request(taskId === null
       ? '/api/demo/session'
@@ -66,6 +79,19 @@ async function load() {
     showConnection('Disconnected', 'danger');
     elements.notice.textContent = error.message;
   }
+}
+
+function advanceStatic() {
+  if (state.staticIndex >= state.staticSnapshots.length - 1) return;
+  state.staticIndex += 1;
+  renderSnapshot(state.staticSnapshots[state.staticIndex]);
+  showConnection('Static fixture', 'complete');
+}
+
+function resetStatic() {
+  state.staticIndex = 0;
+  renderSnapshot(state.staticSnapshots[0]);
+  showConnection('Static fixture', 'complete');
 }
 
 async function mutate(path) {
@@ -83,6 +109,12 @@ async function decideApproval(decision) {
   const snapshot = state.snapshot;
   const approval = snapshot?.approvals.find((item) => item.status === 'PENDING');
   if (!approval || !snapshot) return;
+  if (staticDemo) {
+    if (decision === 'DENIED') renderSnapshot(state.staticDenied);
+    else advanceStatic();
+    showConnection('Static fixture', 'complete');
+    return;
+  }
   const path = snapshot.mode === 'LIVE_TRUEFORGE'
     ? `/api/live/session/${encodeURIComponent(snapshot.task.id)}/approvals/${encodeURIComponent(approval.id)}`
     : `/api/demo/approvals/${encodeURIComponent(approval.id)}`;
@@ -103,6 +135,10 @@ async function decideApproval(decision) {
 
 async function startLive(event) {
   event.preventDefault();
+  if (staticDemo) {
+    elements.liveStatus.textContent = 'Live mode is unavailable on static hosting. Run EvidenceForge locally with credentials.';
+    return;
+  }
   const data = Object.fromEntries(new FormData(elements.liveForm));
   elements.liveStatus.textContent = 'Starting durable TrueForge session…';
   elements.liveForm.querySelector('button').disabled = true;

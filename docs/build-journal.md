@@ -87,8 +87,7 @@ The deterministic fixture completes 10/10 and issues a CompletionGate certificat
 
 ## 7. Final release boundary
 
-The substantive implementation is merged into `determination`; the small Qodo/documentation follow-up remains review-gated. Remaining work requires external observation, credentials, or human authority:
+The substantive implementation, Qodo follow-up and CI runtime update are merged into `determination`. The hosted deterministic fixture remains review-gated and explicitly separate from credentialed sponsor evidence. Remaining work requires external observation or human authority:
 
-- exact final-head CI and Qodo after this commit;
-- human merge of the submission-readiness PR;
-- official submission.
+- observe the GitHub Pages deployment after merge;
+- complete the official submission.

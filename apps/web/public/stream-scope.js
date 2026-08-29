@@ -1,5 +1,7 @@
 (() => {
   const NativeEventSource = window.EventSource;
+  const staticDemo = new URL(window.location.href).hostname.endsWith('.github.io')
+    || new URL(window.location.href).searchParams.has('static-demo');
   const bootstrapSources = [];
   const initialTaskId = normalizeTaskId(
     new URL(window.location.href).searchParams.get('task'),
@@ -86,11 +88,11 @@
       }
 
       baseRender(input);
-      ensureStream(app.getStreamSnapshot?.()?.taskId ?? null);
+      if (!staticDemo) ensureStream(app.getStreamSnapshot?.()?.taskId ?? null);
       decorateLongValues(input);
     };
 
-    ensureStream(new URL(window.location.href).searchParams.get('task'));
+    if (!staticDemo) ensureStream(new URL(window.location.href).searchParams.get('task'));
 
     function ensureStream(taskId) {
       const normalized = typeof taskId === 'string' && taskId.length > 0 ? taskId : null;

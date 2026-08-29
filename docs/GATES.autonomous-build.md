@@ -1,6 +1,6 @@
 # Autonomous build gate ledger
 
-**Last synchronized:** 2026-08-28
+**Last synchronized:** 2026-08-29
 
 Status values: `PASS`, `PARTIAL`, `BLOCKED`, `MANUAL`.
 
@@ -43,16 +43,17 @@ The substantive merge, CI, and Qodo history are maintained in [PR #2](https://gi
 | Exact viewport matrix | PASS | 320/375/768/1024/1440 observed; later changes do not alter geometry |
 | Small-text contrast | PASS | accessible muted color + deterministic >=4.5:1 test on both dark surfaces |
 | Exact 200% zoom | PASS | manually observed without horizontal overflow or sibling overlap |
-| Qodo implementable High findings | PARTIAL | all known code paths including non-zero command results are fixed locally; exact-SHA Qodo confirmation remains external |
+| Qodo implementable High findings | PASS | final PR #4 aggregate reports 0 bugs and 0 rule violations |
 | Qodo documentation Medium findings | PASS | fixture reset command and external final-head gate representation corrected in this commit |
 | Qodo SDK boundary | BLOCKED | retained as genuine High limitation |
-| Final post-commit Qodo exact-SHA record | MANUAL | external result linked in the follow-up PR after this commit |
-| Human merge | PARTIAL | PR #2 merged; the narrow submission-readiness PR remains human-gated |
+| Final post-commit Qodo exact-SHA record | PASS | external result linked in PR #4 |
+| Human merge | PASS | PR #2, submission-readiness PR #4 and CI-runtime PR #11 were human squash-merged |
 | Demo video | PASS | public 2:50 recording published at https://streamable.com/5sbk1k |
+| Hosted static fixture | MANUAL | Pages artifact is verified locally; public deployment requires this PR to merge |
 | Official submission | BLOCKED | external account action remains |
 
 ## Release decision
 
 The executable repository candidate is **release-ready and application-certified for the recorded live incident**. PR #9 was not merged and is retained as public evidence; certification is not a merge claim.
 
-Follow-up exact-head CI, exact-SHA Qodo, finalization merge, and submission remain separate observed-evidence gates. They are not converted to in-repository PASS claims before the commit containing this ledger exists.
+The static deployment and official submission remain separate external evidence gates. They are not converted to PASS before they are observed.
