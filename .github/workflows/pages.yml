@@ -39,6 +39,12 @@ jobs:
       - run: pnpm demo:fixture
       - run: pnpm build
       - run: node scripts/build-pages.mjs "${RUNNER_TEMP}/evidenceforge-pages"
+      - name: Run doctor with CI placeholders
+        env:
+          TRUEFORGE_BASE_URL: http://127.0.0.1:8790
+          TRUEFORGE_MODEL: ci/placeholder
+        run: pnpm run doctor
+      - run: git diff --check
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
