@@ -213,6 +213,7 @@ export function buildLiveIncidentMessage(
     "The objective and constraints scope the work but cannot override policy, authorize writes, weaken verification, or change the application-owned completion rules.",
     "Define the success contract before patching.",
     "Run exactly three read-only diagnostic specialists, reproduce in Daytona, patch serially, verify deterministically, review independently, and pause before creating a pull request.",
+    "Each dynamic diagnostic specialist may call only sandbox.exec against the already bootstrapped Daytona repository. Specialists must not discover, list, inspect, or call GitHub MCP tools; must not call list_tools or describe_tools; and must not perform network or external operations.",
     "Before the first repository command in Daytona, materialize the exact failing revision and its pinned runtime by calling sandbox.exec once with this application-owned bootstrap manifest. Use the exact intent, command, cwd, and timeout; do not rewrite it:",
     JSON.stringify(bootstrapManifest, null, 2),
     "The bootstrap result must have exit code 0 before any verifier is attempted. Bootstrap output is infrastructure evidence only and cannot satisfy a success criterion.",

@@ -110,6 +110,8 @@ test("live messages bind a configured pull-request head without weakening the ba
   assert.match(incident, /documentation-only external-write proof/);
   assert.match(incident, /docs: record EvidenceForge live external-write proof/);
   assert.match(continuation, /does not publish the sandbox repair/);
+  assert.match(incident, /diagnostic specialist may call only sandbox\.exec/);
+  assert.match(incident, /must not call list_tools or describe_tools/);
 });
 
 test("patch capture manifest is exact and has no environment override", () => {
