@@ -7,7 +7,11 @@ import {
   SessionState,
 } from "../../packages/domain/src";
 import { EvidenceStore } from "../../packages/evidence/src";
-import { parseDiagnosticSpecialistOutput } from "../../packages/specialists/src";
+import {
+  DIAGNOSTIC_OBSERVATION_MAX_CHARACTERS,
+  DIAGNOSTIC_OUTPUT_MAX_CHARACTERS,
+  parseDiagnosticSpecialistOutput,
+} from "../../packages/specialists/src";
 import { buildCiSuccessContract } from "../../packages/workflow/src";
 import {
   DiagnosticOutputError,
@@ -118,6 +122,46 @@ test("real Luna retry ignores a cited string that appears only in a failed tool 
     done,
     "Repository Investigator",
   );
+});
+
+test("field-valid diagnostic output still fails closed above the aggregate limit", () => {
+  const events = loadLiveDiagnosticRunFixture("sol-schema");
+  const done = requiredRuntimeEvent(events, LIVE_DIAGNOSTIC_EVENT_IDS.solSchemaDone);
+  const rawOutput = diagnosticOutputFrom(done);
+  rawOutput.findings = Array.from({ length: 10 }, (_, index) =>
+    `${index}`.padEnd(DIAGNOSTIC_OBSERVATION_MAX_CHARACTERS, "x")
+  );
+  assert.ok(parseDiagnosticSpecialistOutput(rawOutput));
+
+  const content = JSON.stringify(rawOutput);
+  assert.ok(content.length > DIAGNOSTIC_OUTPUT_MAX_CHARACTERS);
+  const oversizedDone = structuredClone(done);
+  oversizedDone.id = "event-aggregate-diagnostic-limit";
+  const payload = asRecord(oversizedDone.payload);
+  const state = asRecord(payload.state);
+  const output = asRecord(state.output);
+  oversizedDone.payload = {
+    ...payload,
+    state: {
+      ...state,
+      output: { ...output, content },
+    },
+  };
+  const session = createDiagnosticState();
+  const before = structuredClone(session);
+
+  assert.throws(
+    () => projectDiagnosticRootCauseClaims(
+      session,
+      oversizedDone,
+      "Dependency / Configuration Investigator",
+      recordEvents(events),
+    ),
+    (error: unknown) =>
+      error instanceof DiagnosticOutputError &&
+      error.message === "diagnostic output exceeded the application character limit",
+  );
+  assert.deepEqual(session, before);
 });
 
 function assertUnobservedReferenceRejection(

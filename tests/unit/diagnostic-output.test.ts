@@ -94,9 +94,6 @@ test("diagnostic output parser rejects duplicate or unbounded references", () =>
     unresolvedQuestions: [],
   };
   assert.equal(parseDiagnosticSpecialistOutput(duplicate), undefined);
-
-  const oversized = JSON.stringify({ finding: "x".repeat(DIAGNOSTIC_OUTPUT_MAX_CHARACTERS) });
-  assert.ok(oversized.length > DIAGNOSTIC_OUTPUT_MAX_CHARACTERS);
 });
 
 test("diagnostic output parser rejects trivially short evidence references", () => {
@@ -128,6 +125,11 @@ test("TrueForge supervisor and specialist definitions share the strict diagnosti
   assert.ok(spec.instructions.includes("must not restate the failure symptom as a cause"));
   assert.ok(spec.instructions.includes("rejects unresolved or cross-thread references"));
   assert.ok(DIAGNOSTIC_OUTPUT_PROTOCOL.includes("exactly the displayed keys"));
+  assert.ok(
+    DIAGNOSTIC_OUTPUT_PROTOCOL.includes(
+      `serialized JSON object must not exceed ${DIAGNOSTIC_OUTPUT_MAX_CHARACTERS} characters`,
+    ),
+  );
   assert.ok(DIAGNOSTIC_OUTPUT_PROTOCOL.includes("does not truncate, rewrite, infer, or reclassify"));
   for (const specialist of DIAGNOSTIC_SPECIALISTS) {
     assert.ok(specialist.instructions.includes(DIAGNOSTIC_OUTPUT_PROTOCOL));

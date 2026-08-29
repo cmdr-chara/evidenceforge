@@ -44,6 +44,7 @@ export const DIAGNOSTIC_OUTPUT_PROTOCOL = [
   "The top-level object and every root-cause object must contain exactly the displayed keys; wrappers, aliases, unknown fields, scalar substitutions, prose, and code fences are invalid.",
   `findings and unresolvedQuestions may each contain at most ${DIAGNOSTIC_REFERENCE_MAX_COUNT} unique strings of 1-${DIAGNOSTIC_OBSERVATION_MAX_CHARACTERS} characters.`,
   `affectedLocations and evidenceReferences may each contain at most ${DIAGNOSTIC_REFERENCE_MAX_COUNT} unique strings of at most ${DIAGNOSTIC_REFERENCE_MAX_CHARACTERS} characters; every evidence reference must contain at least 8 characters.`,
+  `The entire serialized JSON object must not exceed ${DIAGNOSTIC_OUTPUT_MAX_CHARACTERS} characters, including field names and JSON punctuation.`,
   "EvidenceForge preserves accepted text after trimming outer whitespace; it does not truncate, rewrite, infer, or reclassify it.",
   "Every evidenceReferences entry must be an exact bounded string observed in a completed tool result from this specialist thread; EvidenceForge rejects unresolved or cross-thread references.",
   "Use SUPPORTED or CONFIRMED only for a causal claim backed by those recorded tool results; otherwise return an empty rootCauseHypotheses array rather than guessing.",
