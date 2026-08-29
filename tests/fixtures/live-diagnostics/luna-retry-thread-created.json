@@ -1,0 +1,24 @@
+{
+  "id": "01m16gzr6kzyaxh0mtxhvw3z36",
+  "type": "THREAD_CREATED",
+  "source": "trueforge:thread.created",
+  "threadId": "6131c6b3-f60d-48d0-8cae-62a7b9a5e513",
+  "timestamp": "2026-08-29T10:28:01.363Z",
+  "payload": {
+    "type": "thread.created",
+    "id": "01m16gzr6kzyaxh0mtxhvw3z36",
+    "agentInfo": {
+      "type": "dynamic",
+      "name": "Repository Investigator",
+      "input": "You are the Repository Investigator for EvidenceForge incident triage. Incident repository is already bootstrapped at /workspace/repository at exact revision 9accc9e484e055c8b22172e389dc50f84315f4e2. Objective: investigate the profiled configuration-order repair needed for the failing unit suite. You may call only sandbox.exec, and only against /workspace/repository. Do not discover, list, inspect, or call GitHub MCP tools; do not call list_tools or describe_tools; do not perform network or external operations. Be read-only: do not edit files, install dependencies, patch, commit, or write outside transient command output. Inspect relevant source, tests, package scripts, and git metadata with bounded commands. At most 12 tool calls, at most 800 words, at most 10 evidence references; stop after one unsuccessful attempt that yields no new evidence; no nested subagents. Return only one JSON object, with no prose or code fence, exactly: {\"schemaVersion\":1,\"findings\":[\"<bounded observation>\"],\"rootCauseHypotheses\":[{\"id\":\"<stable-id>\",\"cause\":\"<specific defect or configuration condition>\",\"causalMechanism\":\"<how that cause produces the observed failure>\",\"affectedLocations\":[\"<path:symbol or configuration key>\"],\"evidenceReferences\":[\"<bounded file, symbol, log signature, or artifact reference>\"],\"status\":\"SUPPORTED\"}],\"unresolvedQuestions\":[]}. Every evidenceReferences entry must be an exact bounded string observed in a completed tool result from this specialist thread. Use SUPPORTED or CONFIRMED only for a causal claim backed by your recorded tool results; otherwise return an empty rootCauseHypotheses array rather than guessing. Keep findings bounded."
+    },
+    "createdAt": "2026-08-29T10:28:01.363Z",
+    "parent": {
+      "toolCallId": "call_j6pOj7Jm0cyw3mOKscZGsqfD",
+      "threadId": "main"
+    },
+    "title": "Repository Investigator",
+    "threadId": "6131c6b3-f60d-48d0-8cae-62a7b9a5e513"
+  },
+  "sequenceNumber": 358
+}

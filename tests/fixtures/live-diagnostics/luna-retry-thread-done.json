@@ -1,0 +1,42 @@
+{
+  "id": "01m16h2atdbb0s2fqzdb6zgbp5",
+  "type": "THREAD_DONE",
+  "source": "trueforge:thread.done",
+  "threadId": "6131c6b3-f60d-48d0-8cae-62a7b9a5e513",
+  "timestamp": "2026-08-29T10:29:25.965Z",
+  "payload": {
+    "type": "thread.done",
+    "id": "01m16h2atdbb0s2fqzdb6zgbp5",
+    "createdAt": "2026-08-29T10:29:25.965Z",
+    "state": {
+      "status": "done",
+      "output": {
+        "content": "{\"schemaVersion\":1,\"findings\":[\"pnpm test:unit exits 1 with 68 passing tests and one failure: 'OK' !== 'ERROR' in the authoritative TrueForge sandbox non-zero-exit test.\",\"The sandbox payload contains success:true with exitCode:1 and CONFIG_VALIDATION_ORDER; the current normalizer unconditionally returns status OK for every success:true payload.\",\"The profiled configuration-order fixture validates before applying the test fallback in demo/incident-fixture/fixtures/buggy-config.mjs, producing CONFIG_VALIDATION_ORDER; the active demo source applies the fallback before validation.\"],\"rootCauseHypotheses\":[{\"id\":\"sandbox-success-ignores-exit-code\",\"cause\":\"normalizeSandboxExecPayload hardcodes status OK for success:true without converting a non-zero nested response exitCode into an error.\",\"causalMechanism\":\"A command envelope with success:true and response.exitCode:1 is normalized as OK, causing the unit assertion expecting ERROR and COMMAND_EXIT_NON_ZERO to fail and potentially allowing CONFIG_VALIDATION_ORDER failures to be treated as successful verification.\",\"affectedLocations\":[\"packages/trueforge/src/event-index.ts:normalizeSandboxExecPayload\",\"tests/unit/trueforge-event-index.test.ts:authoritative TrueForge sandbox non-zero exit is never reported as OK\"],\"evidenceReferences\":[\"if (success === true)\",\"status: \\\"OK\\\"\",\"response: { exitCode: 1, result: \\\"CONFIG_VALIDATION_ORDER\\\" }\",\"'OK' !== 'ERROR'\",\"assert.equal(result.errorCode, \\\"COMMAND_EXIT_NON_ZERO\\\")\"],\"status\":\"SUPPORTED\"}],\"unresolvedQuestions\":[]}",
+        "type": "model.message",
+        "id": "01m16h1hkczvfdqmjyh373ptja",
+        "createdAt": "2026-08-29T10:29:25.956Z",
+        "threadId": "6131c6b3-f60d-48d0-8cae-62a7b9a5e513",
+        "finishReason": "stop",
+        "usage": {
+          "inputTokens": 17992,
+          "outputTokens": 1365,
+          "cacheReadTokens": 15872,
+          "inputTokensBreakdown": {
+            "harness": 2372,
+            "skills": 330,
+            "instructions": 0,
+            "toolDefinitions": 1126,
+            "messages": 14164
+          }
+        }
+      }
+    },
+    "parent": {
+      "toolCallId": "call_j6pOj7Jm0cyw3mOKscZGsqfD",
+      "threadId": "main"
+    },
+    "threadId": "6131c6b3-f60d-48d0-8cae-62a7b9a5e513",
+    "title": "Repository Investigator"
+  },
+  "sequenceNumber": 4216
+}
