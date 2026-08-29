@@ -140,7 +140,10 @@ export class DurableTrueForgeRuntime {
     options?: TrueForgeRuntimeOptions,
   ) {
     this.projector = projector ?? new TrueForgeEventProjector(undefined, evidenceStore);
-    this.diagnosticGuard = new DiagnosticContractGuard(evidenceStore.listEvents());
+    this.diagnosticGuard = new DiagnosticContractGuard(
+      evidenceStore.listEvents(),
+      (callId) => this.projector.getToolCall(callId),
+    );
     this.applicationReducer = applicationReducer;
     this.drainTimeoutMs = normalizeDrainTimeout(options?.drainTimeoutMs);
   }

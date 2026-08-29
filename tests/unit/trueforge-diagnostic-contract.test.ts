@@ -4,6 +4,7 @@ import { RuntimeEvent } from "../../packages/domain/src";
 import {
   DiagnosticContractGuard,
   evaluateDiagnosticContract,
+  IndexedToolCall,
   INDEPENDENT_REVIEWER_NAME,
   REQUIRED_DIAGNOSTIC_SPECIALISTS,
   TRUEFORGE_SPECIALIST_TOOL_BUDGET,
@@ -79,6 +80,53 @@ test("diagnostic contract accepts the observed protocol-inclusive live specialis
     events.push(toolResult("thread-1", index));
   }
   assert.equal(evaluateDiagnosticContract(events), undefined);
+});
+
+test("diagnostic contract rejects forbidden specialist tool identities", () => {
+  const forbidden: Array<Pick<IndexedToolCall, "name" | "serverName">> = [
+    { name: "get_commit", serverName: "github" },
+    { name: "list_tools", serverName: undefined },
+    { name: "fetch", serverName: "network" },
+  ];
+  for (const [index, identity] of forbidden.entries()) {
+    const result = toolResult("thread-1", index);
+    const callId = String((result.payload as { toolCallId?: string }).toolCallId);
+    const violation = evaluateDiagnosticContract(
+      [turnCreated(), ...fanOut(), result],
+      (id) => id === callId
+        ? {
+            id,
+            sourceEventId: `message-${id}`,
+            threadId: "thread-1",
+            name: identity.name,
+            arguments: "{}",
+            serverName: identity.serverName,
+          }
+        : undefined,
+    );
+    assert.equal(violation?.code, "FORBIDDEN_SPECIALIST_TOOL");
+  }
+});
+
+test("diagnostic contract accepts sandbox exec for a diagnostic specialist", () => {
+  const result = toolResult("thread-1", 0);
+  const callId = String((result.payload as { toolCallId?: string }).toolCallId);
+  assert.equal(
+    evaluateDiagnosticContract(
+      [turnCreated(), ...fanOut(), result],
+      (id) => id === callId
+        ? {
+            id,
+            sourceEventId: `message-${id}`,
+            threadId: "thread-1",
+            name: "exec",
+            arguments: "{}",
+            serverName: "sandbox",
+          }
+        : undefined,
+    ),
+    undefined,
+  );
 });
 
 test("diagnostic contract rejects a failed specialist", () => {
@@ -242,7 +290,11 @@ function threadDone(threadId: string): RuntimeEvent {
 
 function toolResult(threadId: string, index: number): RuntimeEvent {
   return {
-    ...event(`tool-${threadId}-${index}`, "TOOL_RESULT", { type: "tool.response", threadId }),
+    ...event(`tool-${threadId}-${index}`, "TOOL_RESULT", {
+      type: "tool.response",
+      threadId,
+      toolCallId: `call-tool-${threadId}-${index}`,
+    }),
     threadId,
   };
 }

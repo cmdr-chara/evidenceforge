@@ -384,6 +384,7 @@ export interface SessionState {
   activeTurnId?: string;
   lastSequenceNumber?: number;
   terminalSequenceNumber?: number;
+  livePullRequestHead?: string;
   externalAction?: ExternalActionState;
   blockedReason?: string;
   completionCertificate?: CompletionCertificateData;

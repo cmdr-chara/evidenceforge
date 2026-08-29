@@ -134,7 +134,8 @@ const LIVE_EXTERNAL_WRITE_PROOF_BODY = [
 export function resolveLivePullRequestHead(
   environment: NodeJS.ProcessEnv = process.env,
 ): string {
-  const head = environment.EVIDENCEFORGE_PR_HEAD?.trim() || DEFAULT_LIVE_PULL_REQUEST_HEAD;
+  const configured = environment.EVIDENCEFORGE_PR_HEAD;
+  const head = configured === undefined ? DEFAULT_LIVE_PULL_REQUEST_HEAD : configured.trim();
   const invalid =
     head.length > 200 ||
     !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(head) ||
@@ -256,10 +257,11 @@ export class LiveIncidentService {
       constraints: input.constraints,
     });
     const state = createSessionState(task, buildEvidenceForgeLiveCiSuccessContract(task));
+    state.livePullRequestHead = this.pullRequestHead;
     const evidenceStore = new EvidenceStore();
     const verifierManifest = buildVerifierManifest(state.successCriteria);
     await this.checkpoints.saveCheckpoint(state, evidenceStore);
-    const runtime = this.createRuntime(evidenceStore, task.id);
+    const runtime = this.createRuntime(evidenceStore, task.id, state.livePullRequestHead);
     const message = buildLiveIncidentMessage(task, verifierManifest, this.pullRequestHead);
     const updated = await runtime.start(state, message);
     const snapshot = this.snapshot(updated, evidenceStore);
@@ -270,14 +272,15 @@ export class LiveIncidentService {
   public async resume(taskId: string): Promise<LiveConsoleSnapshot> {
     return this.serializeTask(taskId, async () => {
       const checkpoint = await this.requireCheckpoint(taskId);
-      const runtime = this.createRuntime(checkpoint.evidenceStore, taskId);
+      const pullRequestHead = requirePersistedLivePullRequestHead(checkpoint.state);
+      const runtime = this.createRuntime(checkpoint.evidenceStore, taskId, pullRequestHead);
       const updated = shouldContinueCompletedTurn(
         checkpoint.state,
         checkpoint.evidenceStore.listEvents(),
       )
         ? await runtime.start(
             checkpoint.state,
-            buildLiveContinuationMessage(checkpoint.state, this.pullRequestHead),
+            buildLiveContinuationMessage(checkpoint.state, pullRequestHead),
           )
         : await runtime.resume(checkpoint.state);
       const snapshot = this.snapshot(updated, checkpoint.evidenceStore);
@@ -325,7 +328,11 @@ export class LiveIncidentService {
 
       const decided = updated.approvals.find((approval) => approval.id === approvalId);
       if (decided === undefined) throw new Error(`approval ${approvalId} disappeared after persistence`);
-      updated = await this.createRuntime(evidenceStore, taskId).submitApproval(
+      updated = await this.createRuntime(
+        evidenceStore,
+        taskId,
+        requirePersistedLivePullRequestHead(updated),
+      ).submitApproval(
         updated,
         decided,
         decision,
@@ -375,12 +382,14 @@ export class LiveIncidentService {
   private createRuntime(
     evidenceStore: EvidenceStore,
     taskId: string,
+    pullRequestHead: string,
   ): DurableTrueForgeRuntime {
     const config = loadTrueForgeConfig();
     const projector = new TrueForgeEventProjector(undefined, evidenceStore);
     const workflow = new LiveWorkflowReducer(
       evidenceStore,
       (callId) => projector.getToolCall(callId),
+      pullRequestHead,
     );
     return new DurableTrueForgeRuntime(
       new TrueForgeSdkAdapter(config),
@@ -491,6 +500,13 @@ export function buildLiveContinuationMessage(
     "Stop immediately when TrueForge emits tool.approval_required. Do not retry or issue a second pull-request call.",
     "Only the human approval path authorizes the write. Application state and CompletionGate remain authoritative.",
   ].join("\n");
+}
+
+function requirePersistedLivePullRequestHead(state: SessionState): string {
+  if (state.livePullRequestHead === undefined) {
+    throw new Error("live session is missing its persisted pull-request head");
+  }
+  return state.livePullRequestHead;
 }
 
 export function buildLiveConsoleSnapshot(
