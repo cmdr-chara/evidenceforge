@@ -88,7 +88,7 @@ The current executable candidate contains 236 tests. Because this checklist chan
 - [x] 1024px browser observation.
 - [x] 1440px browser observation.
 - [x] Small muted-text contrast regression fixed and tested.
-- [ ] Exact 200% browser zoom observation.
+- [x] Exact 200% browser zoom observed at a 908×706 CSS viewport: no horizontal overflow or sibling overlap; long revision and trace values now reflow without clipping.
 
 ## Qodo
 
@@ -121,7 +121,7 @@ The current executable candidate contains 236 tests. Because this checklist chan
 
 - [ ] Inspect CI on the final published documentation/media head in PR #4.
 - [ ] Inspect Qodo on the final published documentation/media head in PR #4.
-- [ ] Perform exact 200% zoom check.
+- [x] Perform exact 200% zoom check.
 - [x] Record and publish demo video.
 - [x] Human `Squash and merge` PR #2 completed.
 - [ ] Human merge of the narrow submission-readiness PR after exact-head CI and Qodo.
