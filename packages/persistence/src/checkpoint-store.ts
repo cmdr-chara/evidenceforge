@@ -1,7 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { Evidence, RuntimeEvent, SessionState, SuccessCriterion } from "../../domain/src/types";
+import {
+  DEFAULT_LIVE_PULL_REQUEST_HEAD,
+  Evidence,
+  RuntimeEvent,
+  SessionState,
+  SuccessCriterion,
+} from "../../domain/src/types";
 import { validateSessionState } from "../../domain/src/validation";
 import { EvidenceStore } from "../../evidence/src";
 import { SessionStore } from "./session-store";
@@ -157,6 +163,7 @@ function parseCheckpoint(value: unknown): PersistedRuntimeCheckpoint {
   value.state.operations ??= [];
   value.state.roundEvaluations ??= [];
   value.state.toolAttempts ??= [];
+  value.state.livePullRequestHead ??= DEFAULT_LIVE_PULL_REQUEST_HEAD;
   if (Array.isArray(value.state.successCriteria)) {
     for (const candidate of value.state.successCriteria) {
       if (!isRecord(candidate) || !isRecord(candidate.verifier)) continue;

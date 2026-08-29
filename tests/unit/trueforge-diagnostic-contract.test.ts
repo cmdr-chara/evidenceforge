@@ -4,6 +4,7 @@ import { RuntimeEvent } from "../../packages/domain/src";
 import {
   DiagnosticContractGuard,
   evaluateDiagnosticContract,
+  IndexedToolCall,
   INDEPENDENT_REVIEWER_NAME,
   REQUIRED_DIAGNOSTIC_SPECIALISTS,
   TRUEFORGE_SPECIALIST_TOOL_BUDGET,
@@ -79,6 +80,110 @@ test("diagnostic contract accepts the observed protocol-inclusive live specialis
     events.push(toolResult("thread-1", index));
   }
   assert.equal(evaluateDiagnosticContract(events), undefined);
+});
+
+test("diagnostic contract rejects forbidden specialist tool identities", () => {
+  const forbidden: Array<Pick<IndexedToolCall, "name" | "serverName">> = [
+    { name: "get_commit", serverName: "github" },
+    { name: "list_tools", serverName: undefined },
+    { name: "fetch", serverName: "network" },
+  ];
+  for (const [index, identity] of forbidden.entries()) {
+    const result = toolResult("thread-1", index);
+    const callId = String((result.payload as { toolCallId?: string }).toolCallId);
+    const violation = evaluateDiagnosticContract(
+      [turnCreated(), ...fanOut(), result],
+      (id) => id === callId
+        ? {
+            id,
+            sourceEventId: `message-${id}`,
+            threadId: "thread-1",
+            name: identity.name,
+            arguments: "{}",
+            serverName: identity.serverName,
+          }
+        : undefined,
+    );
+    assert.equal(violation?.code, "FORBIDDEN_SPECIALIST_TOOL");
+  }
+});
+
+test("diagnostic contract accepts sandbox exec for a diagnostic specialist", () => {
+  const result = toolResult("thread-1", 0);
+  const callId = String((result.payload as { toolCallId?: string }).toolCallId);
+  assert.equal(
+    evaluateDiagnosticContract(
+      [turnCreated(), ...fanOut(), result],
+      (id) => id === callId
+        ? {
+            id,
+            sourceEventId: `message-${id}`,
+            threadId: "thread-1",
+            name: "exec",
+            arguments: JSON.stringify({
+              command: "rg -n 'livePullRequestHead' apps packages | head -40",
+              cwd: "/workspace/repository",
+            }),
+            serverName: "sandbox",
+          }
+        : undefined,
+    ),
+    undefined,
+  );
+});
+
+test("diagnostic contract rejects mutating commands smuggled through sandbox exec", () => {
+  const commands = [
+    "touch marker",
+    "cat README.md > copy.md",
+    "git checkout -- README.md",
+    "git diff --output=marker",
+    "git grep -Orm livePullRequestHead",
+    "python -c 'open(\"marker\",\"w\").close()'",
+    "rg TODO . | tee findings.txt",
+    "rg --pre 'sh -c touch marker' TODO .",
+    "sort -omarker README.md",
+  ];
+  for (const [index, command] of commands.entries()) {
+    const result = toolResult("thread-1", index);
+    const callId = String((result.payload as { toolCallId?: string }).toolCallId);
+    const violation = evaluateDiagnosticContract(
+      [turnCreated(), ...fanOut(), result],
+      (id) => id === callId
+        ? {
+            id,
+            sourceEventId: `message-${id}`,
+            threadId: "thread-1",
+            name: "exec",
+            arguments: JSON.stringify({ command, cwd: "/workspace/repository" }),
+            serverName: "sandbox",
+          }
+        : undefined,
+    );
+    assert.equal(violation?.code, "FORBIDDEN_SPECIALIST_TOOL", command);
+  }
+});
+
+test("diagnostic contract rejects a tool call substituted from another thread", () => {
+  const result = toolResult("thread-1", 0);
+  const callId = String((result.payload as { toolCallId?: string }).toolCallId);
+  const violation = evaluateDiagnosticContract(
+    [turnCreated(), ...fanOut(), result],
+    (id) => id === callId
+      ? {
+          id,
+          sourceEventId: `message-${id}`,
+          threadId: "thread-2",
+          name: "exec",
+          arguments: JSON.stringify({
+            command: "rg -n livePullRequestHead apps packages",
+            cwd: "/workspace/repository",
+          }),
+          serverName: "sandbox",
+        }
+      : undefined,
+  );
+  assert.equal(violation?.code, "FORBIDDEN_SPECIALIST_TOOL");
 });
 
 test("diagnostic contract rejects a failed specialist", () => {
@@ -242,7 +347,11 @@ function threadDone(threadId: string): RuntimeEvent {
 
 function toolResult(threadId: string, index: number): RuntimeEvent {
   return {
-    ...event(`tool-${threadId}-${index}`, "TOOL_RESULT", { type: "tool.response", threadId }),
+    ...event(`tool-${threadId}-${index}`, "TOOL_RESULT", {
+      type: "tool.response",
+      threadId,
+      toolCallId: `call-tool-${threadId}-${index}`,
+    }),
     threadId,
   };
 }

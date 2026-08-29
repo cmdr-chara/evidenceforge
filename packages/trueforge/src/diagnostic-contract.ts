@@ -1,5 +1,7 @@
 import { RuntimeEvent, SessionState } from "../../domain/src";
 import { TRUEFORGE_SPECIALIST_TOOL_BUDGET } from "./agent-spec";
+import { isReadOnlyDiagnosticSandboxExec } from "./diagnostic-command-policy";
+import type { IndexedToolCall } from "./event-index";
 
 export const REQUIRED_DIAGNOSTIC_SPECIALISTS = [
   "Repository Investigator",
@@ -16,6 +18,7 @@ export interface DiagnosticContractViolation {
     | "INVALID_PARENT"
     | "UNKNOWN_SPECIALIST_THREAD"
     | "FAILED_SPECIALIST"
+    | "FORBIDDEN_SPECIALIST_TOOL"
     | "TOOL_BUDGET_EXCEEDED"
     | "INCOMPLETE_FAN_OUT"
     | "INVALID_TURN_ORDER"
@@ -35,7 +38,12 @@ export class DiagnosticContractGuard {
   private reviewThreadId: string | undefined;
   private violation: DiagnosticContractViolation | undefined;
 
-  public constructor(events: RuntimeEvent[] = []) {
+  public constructor(
+    events: RuntimeEvent[] = [],
+    private readonly resolveIndexedToolCall?: (
+      id: string,
+    ) => IndexedToolCall | undefined,
+  ) {
     for (const event of events) this.observe(event);
   }
 
@@ -166,6 +174,23 @@ export class DiagnosticContractGuard {
           "TrueForge began specialist work before the three-way fan-out was created",
         );
       }
+      if (this.resolveIndexedToolCall !== undefined) {
+        const payload = asRecord(event.payload);
+        const callId = readString(payload, "toolCallId") ?? readString(payload, "tool_call_id");
+        const call = callId === undefined ? undefined : this.resolveIndexedToolCall(callId);
+        if (
+          call === undefined ||
+          call.threadId !== event.threadId ||
+          call.name !== "exec" ||
+          call.serverName !== "sandbox" ||
+          !isReadOnlyDiagnosticSandboxExec(call.arguments)
+        ) {
+          return this.fail(
+            "FORBIDDEN_SPECIALIST_TOOL",
+            "TrueForge diagnostic specialist used a tool outside the read-only sandbox.exec grammar",
+          );
+        }
+      }
       const count = (this.toolResults.get(event.threadId) ?? 0) + 1;
       this.toolResults.set(event.threadId, count);
       if (count > TRUEFORGE_SPECIALIST_TOOL_BUDGET) {
@@ -256,8 +281,9 @@ export class DiagnosticContractGuard {
 
 export function evaluateDiagnosticContract(
   events: RuntimeEvent[],
+  resolveIndexedToolCall?: (id: string) => IndexedToolCall | undefined,
 ): DiagnosticContractViolation | undefined {
-  const guard = new DiagnosticContractGuard();
+  const guard = new DiagnosticContractGuard([], resolveIndexedToolCall);
   let violation: DiagnosticContractViolation | undefined;
   for (const event of events) violation = guard.observe(event) ?? violation;
   return violation;

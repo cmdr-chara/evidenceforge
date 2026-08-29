@@ -380,10 +380,13 @@ function diagnosticToolResultIsUsable(response: Record<string, unknown>): boolea
     ) {
       return false;
     }
-    if (current.depth >= 8) continue;
     const children = Array.isArray(current.value)
       ? current.value
       : Object.values(current.value as Record<string, unknown>);
+    if (children.length === 0) continue;
+    // Evidence is admissible only when the complete result envelope was inspected.
+    // Hitting the traversal bound with unseen descendants must fail closed.
+    if (current.depth >= 8) return false;
     for (const child of children) {
       pending.push({ value: child, depth: current.depth + 1 });
     }
@@ -393,6 +396,8 @@ function diagnosticToolResultIsUsable(response: Record<string, unknown>): boolea
 
 function recordReportsToolFailure(record: Record<string, unknown>): boolean {
   if (record.success === false) return true;
+  if (typeof record.exitCode === "number" && record.exitCode !== 0) return true;
+  if (typeof record.exit_code === "number" && record.exit_code !== 0) return true;
   return (
     typeof record.status === "string" &&
     ["ERROR", "FAILED", "FAILURE", "DENIED", "TIMEOUT"].includes(

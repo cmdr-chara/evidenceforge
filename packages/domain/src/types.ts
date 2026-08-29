@@ -384,10 +384,14 @@ export interface SessionState {
   activeTurnId?: string;
   lastSequenceNumber?: number;
   terminalSequenceNumber?: number;
+  livePullRequestHead?: string;
   externalAction?: ExternalActionState;
   blockedReason?: string;
   completionCertificate?: CompletionCertificateData;
 }
+
+/** Pull-request target used by live sessions before the target became configurable. */
+export const DEFAULT_LIVE_PULL_REQUEST_HEAD = "feat/foundation-control-plane";
 
 export interface CompletionCertificateData {
   certificateVersion: 2;

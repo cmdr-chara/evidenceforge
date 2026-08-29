@@ -137,6 +137,7 @@ export class LiveWorkflowReducer {
   public constructor(
     private readonly evidenceStore: EvidenceStore,
     private readonly resolveIndexedToolCall?: (id: string) => IndexedToolCall | undefined,
+    private readonly expectedPullRequestHead = "feat/foundation-control-plane",
   ) {
     for (const event of evidenceStore.listEvents()) this.indexDiagnosticThread(event);
   }
@@ -607,6 +608,9 @@ export class LiveWorkflowReducer {
       // absent from that schema and must come from an earlier application-
       // correlated get_commit read for the exact proposed head branch.
       const official = parseCreatePullRequestArguments(args);
+      if (official.head !== this.expectedPullRequestHead) {
+        throw new Error("external pull-request head does not match the persisted live target");
+      }
       const expectedHeadSha = this.findAuthoritativeHeadSha(state, official.head);
       if (expectedHeadSha === undefined) {
         throw new Error(

@@ -57,9 +57,13 @@ export TRUEFORGE_GITHUB_MCP_NAME=github
 export TRUEFORGE_TIMEOUT_SECONDS=1200
 export EVIDENCEFORGE_PORT=4174
 export EVIDENCEFORGE_DATA_DIR=.data
+# Optional for a controlled live-write proof; defaults to feat/foundation-control-plane.
+export EVIDENCEFORGE_PR_HEAD=codex/live-external-write-proof
 ```
 
 `.data/` and `.evidenceforge/` are runtime state and must remain ignored and untracked.
+`EVIDENCEFORGE_PR_HEAD` accepts only a validated Git branch name. The application-owned base remains fixed to `determination`; changing the head never authorizes a write or bypasses approval.
+When a non-default head is used for the controlled proof, the generated pull-request copy explicitly discloses that the PR is documentation-only and does not publish the independently verified sandbox patch.
 
 ## Profiled live incident
 
@@ -164,7 +168,7 @@ A successful smoke proves connectivity only. It is not a substitute for the prof
 
 ## Observed live result
 
-The strongest credentialed run reached 9/10 application gates: incident context, failure reproduction, root cause, regression, targeted tests, typecheck, lint, diff integrity, and independent review all passed. `external-pr` remained pending/blocked. No invalid PR write or merge occurred.
+The strongest credentialed run reached 10/10 application gates: the nine internal criteria passed, a human approved the exact PR action, GitHub MCP created PR #9, EvidenceForge reconciled it through an authoritative read, and CompletionGate issued a certificate. PR #9 was not merged and is retained as public evidence.
 
 The deterministic fixture can complete the approval/reconciliation/certificate path, but must remain labeled fixture evidence.
 

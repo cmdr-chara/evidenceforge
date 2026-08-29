@@ -1,18 +1,34 @@
 import { spawnSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync, statSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const requested = process.argv[2];
 const root = resolve(new URL('..', import.meta.url).pathname);
-run('tsc', ['-p', 'tsconfig.json']);
-const base = join(root, 'dist', 'tests');
-const roots = requested ? [join(base, requested)] : ['unit', 'integration', 'scenarios', 'failure-injection'].map((name) => join(base, name));
-const files = roots.flatMap(findTests).sort();
-if (files.length === 0) {
-  console.error('No compiled tests found.');
-  process.exit(1);
+const output = mkdtempSync(join(tmpdir(), 'evidenceforge-tests-'));
+let status = 1;
+try {
+  symlinkSync(
+    join(root, 'node_modules'),
+    join(output, 'node_modules'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
+  status = run('tsc', ['-p', 'tsconfig.json', '--outDir', output]);
+  if (status === 0) {
+    const base = join(output, 'tests');
+    const roots = requested ? [join(base, requested)] : ['unit', 'integration', 'scenarios', 'failure-injection'].map((name) => join(base, name));
+    const files = roots.flatMap(findTests).sort();
+    if (files.length === 0) {
+      console.error('No compiled tests found.');
+      status = 1;
+    } else {
+      status = run(process.execPath, ['--test', ...files]);
+    }
+  }
+} finally {
+  rmSync(output, { recursive: true, force: true });
 }
-run(process.execPath, ['--test', ...files]);
+process.exit(status);
 
 function findTests(directory) {
   try {
@@ -29,5 +45,5 @@ function findTests(directory) {
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', env: process.env });
   if (result.error) throw result.error;
-  if (result.status !== 0) process.exit(result.status ?? 1);
+  return result.status ?? 1;
 }

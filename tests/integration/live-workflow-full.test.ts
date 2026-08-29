@@ -20,7 +20,10 @@ import {
   TrueForgeEventProjector,
   TrueForgeRuntimeAdapter,
 } from "../../packages/trueforge/src";
-import { buildCiSuccessContract } from "../../packages/workflow/src";
+import {
+  buildCiSuccessContract,
+  createOperationIntent,
+} from "../../packages/workflow/src";
 import { LiveWorkflowReducer } from "../../apps/server/src/live-workflow";
 
 interface Harness {
@@ -308,6 +311,80 @@ test("live workflow rejects references found only in a deeply nested failed tool
   assert.equal(harness.state.completionCertificate, undefined);
 });
 
+test("live workflow fails closed when tool-result inspection reaches its depth bound", () => {
+  const harness = createHarness();
+  const feed = createFeed(harness);
+
+  feed(turnCreated());
+  feed(threadCreated(1, "Repository Investigator"));
+  const callId = "call-depth-bounded-diagnostic-evidence";
+  feed(structuredCall(
+    callId,
+    "repository",
+    "read",
+    { path: "packages/trueforge/src/runtime.ts" },
+    "thread-1",
+    "truefoundry-system",
+  ));
+  let beyondInspectionBound: unknown = { status: "ERROR" };
+  for (let depth = 0; depth < 9; depth += 1) {
+    beyondInspectionBound = { nested: beyondInspectionBound };
+  }
+  feed(toolResponse(callId, {
+    success: true,
+    response: {
+      result:
+        "runtime.ts:projectToolResult and CONFIG_VALIDATION_ORDER appear in an incompletely inspected result",
+      beyondInspectionBound,
+    },
+  }, "thread-1"));
+  feed(diagnosticThreadDone(1, causalDiagnosticOutput()));
+
+  assert.equal(harness.state.status, "BLOCKED");
+  assert.match(harness.state.blockedReason ?? "", /not observed in its specialist thread/);
+  assert.equal(harness.state.hypotheses.length, 0);
+  assert.equal(harness.state.completionCertificate, undefined);
+});
+
+for (const [exitCodeDescription, exitCodeFields] of [
+  ["exitCode", { exitCode: 1 }],
+  ["exit_code", { exit_code: 1 }],
+  ["conflicting exit-code fields", { exitCode: 0, exit_code: 1 }],
+] as const) {
+  test(`live workflow rejects references from nonzero ${exitCodeDescription} tool results`, () => {
+    const harness = createHarness();
+    const feed = createFeed(harness);
+
+    feed(turnCreated());
+    feed(threadCreated(1, "Repository Investigator"));
+    const callId = `call-${exitCodeDescription.replaceAll(" ", "-")}-diagnostic-evidence`;
+    feed(structuredCall(
+      callId,
+      "repository",
+      "read",
+      { path: "packages/trueforge/src/runtime.ts" },
+      "thread-1",
+      "truefoundry-system",
+    ));
+    feed(toolResponse(callId, {
+      success: true,
+      response: {
+        result: {
+          ...exitCodeFields,
+          result:
+            "runtime.ts:projectToolResult and CONFIG_VALIDATION_ORDER came from a failed command",
+        },
+      },
+    }, "thread-1"));
+    feed(diagnosticThreadDone(1, causalDiagnosticOutput()));
+
+    assert.equal(harness.state.status, "BLOCKED");
+    assert.match(harness.state.blockedReason ?? "", /not observed in its specialist thread/);
+    assert.equal(harness.state.hypotheses.length, 0);
+    assert.equal(harness.state.completionCertificate, undefined);
+  });
+}
+
 test("live workflow rejects diagnostic reference prefixes", () => {
   const harness = createHarness();
   const feed = createFeed(harness);
@@ -529,6 +606,69 @@ test("live external publishing stores only an official PR receipt and requires a
   }));
   assert.equal(harness.state.status, "BLOCKED");
   assert.equal(harness.state.completionCertificate, undefined);
+});
+
+test("live workflow rejects a PR head that differs from the persisted target", () => {
+  const harness = createHarness();
+  harness.reducer = new LiveWorkflowReducer(
+    harness.store,
+    (callId) => harness.projector.getToolCall(callId),
+    "codex/live-external-write-proof",
+  );
+  const args = {
+    owner: "cmdr-chara",
+    repo: "evidenceforge",
+    title: "docs: alternative proof",
+    body: "Observed proof.",
+    head: "coordinated/alternative-head",
+    base: "determination",
+  };
+  const operationId = "operation-wrong-configured-head";
+  harness.state.phase = "REVIEWING";
+  harness.state.patchDigest = "a".repeat(64);
+  harness.state.reviewerVerdict = "PASS";
+  harness.state.reviewBinding = artifactBindingFor(harness.state, "PATCH");
+  harness.state.operations.push(createOperationIntent({
+    id: operationId,
+    actionType: "github.create_pull_request",
+    tool: "github.create_pull_request",
+    normalizedArguments: args,
+    repository: harness.state.task.repository,
+    revision: harness.state.task.revision,
+    risk: "EXTERNAL_REVERSIBLE",
+    replayPolicy: "RECONCILE_FIRST",
+    expectedEvidence: ["runtime-event:call-wrong-configured-head"],
+  }, "2026-08-26T14:00:00.000Z"));
+  harness.state.approvals.push({
+    id: "approval-wrong-configured-head",
+    action: "github.create_pull_request",
+    normalizedArguments: args,
+    risk: "EXTERNAL_REVERSIBLE",
+    reason: "test",
+    reversible: true,
+    status: "PENDING",
+    toolCallId: "call-wrong-configured-head",
+    threadId: "main",
+    provenance: {
+      actionDigest: "application-test-digest",
+      repository: harness.state.task.repository,
+      revision: harness.state.task.revision,
+      risk: "EXTERNAL_REVERSIBLE",
+      originatingOperationId: operationId,
+      binding: artifactBindingFor(harness.state, "EXTERNAL"),
+      issuedAt: "2026-08-26T14:00:00.000Z",
+      expiresAt: "2026-08-26T14:15:00.000Z",
+    },
+  });
+
+  harness.reducer.apply(
+    harness.state,
+    event("APPROVAL", "approval-wrong-head-event", { type: "tool.approval_required" }),
+  );
+
+  assert.equal(harness.state.status, "BLOCKED");
+  assert.match(harness.state.blockedReason ?? "", /persisted live target/);
+  assert.equal(harness.state.externalAction, undefined);
 });
 
 test("live workflow blocks stale reconciliation and never promotes model prose", () => {

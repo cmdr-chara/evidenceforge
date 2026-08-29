@@ -92,13 +92,29 @@ dt,
   background: rgb(255 110 95 / 0.09);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 1120px) {
+  .case-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .case-strip div {
+    min-height: 88px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .case-strip div:nth-child(even) {
+    border-right: 0;
+  }
+
   .case-strip dd {
     overflow: visible;
+    overflow-wrap: anywhere;
     text-overflow: clip;
     white-space: normal;
   }
+}
 
+@media (max-width: 760px) {
   .digest {
     max-width: 62%;
     white-space: normal;
