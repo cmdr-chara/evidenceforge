@@ -8,7 +8,7 @@
 
 EvidenceForge is an evidence-gated CI incident control plane built on TrueForge. It binds a failed GitHub Actions incident to an exact repository revision, reproduces it in Daytona, captures and verifies a patch, obtains an independent patch review, pauses before any external write, reconciles the resulting pull request, and permits completion only through an application-issued certificate.
 
-> **Release status — 2026-08-29:** the substantive implementation and final hardening were human-reviewed and squash-merged through [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) and [PR #4](https://github.com/cmdr-chara/evidenceforge/pull/4). [PR #11](https://github.com/cmdr-chara/evidenceforge/pull/11) moved the CI actions to the Node 24 runtime, and [PR #13](https://github.com/cmdr-chara/evidenceforge/pull/13) published the honest deterministic GitHub Pages fixture. The current `determination` head [`228711a`](https://github.com/cmdr-chara/evidenceforge/commit/228711a51f9a9a485d891780517beb349efa0a5b) passed its [exact-head CI matrix](https://github.com/cmdr-chara/evidenceforge/actions/runs/33263677552), and the corresponding [Pages deployment](https://github.com/cmdr-chara/evidenceforge/actions/runs/33263737679) completed successfully.
+> **Release status — 2026-08-29:** the substantive implementation and submission hardening were human-reviewed and squash-merged through [PR #2](https://github.com/cmdr-chara/evidenceforge/pull/2) and [PR #4](https://github.com/cmdr-chara/evidenceforge/pull/4). [PR #11](https://github.com/cmdr-chara/evidenceforge/pull/11) moved the CI actions to the Node 24 runtime, [PR #13](https://github.com/cmdr-chara/evidenceforge/pull/13) published the honest deterministic GitHub Pages fixture, and [PR #15](https://github.com/cmdr-chara/evidenceforge/pull/15) consolidated the post-submission clean-code hardening. The current `determination` head [`39d7ef4`](https://github.com/cmdr-chara/evidenceforge/commit/39d7ef47ddb3d01f462ae37f733f2dc72f419579) passed its [exact-head CI matrix](https://github.com/cmdr-chara/evidenceforge/actions/runs/33270149665), and the corresponding [Pages deployment](https://github.com/cmdr-chara/evidenceforge/actions/runs/33270149674) completed successfully.
 
 ## Judge quick path
 
@@ -17,7 +17,7 @@ EvidenceForge is an evidence-gated CI incident control plane built on TrueForge.
 | 3 min | [Watch the 2:50 demo](https://streamable.com/5sbk1k) | product, architecture, live evidence boundary, and completion invariant |
 | 1 min | [Explore the hosted fixture](https://cmdr-chara.github.io/evidenceforge/) | interactive application-owned gates without implying live sponsor execution |
 | 2 min | [Read the credentialed 10/10 proof](docs/live-external-write-proof.md) | TrueForge + Daytona + GitHub MCP + human approval + authoritative PR reconciliation |
-| 2 min | [Inspect exact-head CI](https://github.com/cmdr-chara/evidenceforge/actions/runs/33263677552) and [Qodo evidence](docs/qodo-review-log.md) | executable quality gates and independent review disposition |
+| 2 min | [Inspect exact-head CI](https://github.com/cmdr-chara/evidenceforge/actions/runs/33270149665) and [Qodo evidence](docs/qodo-review-log.md) | executable quality gates and independent review disposition |
 
 The central claim is intentionally narrow: **models propose progress; EvidenceForge certifies completion from current, correctly bound evidence.** The hosted experience is labeled as a deterministic fixture, while credentialed sponsor evidence is reported separately with its provenance.
 
@@ -200,7 +200,7 @@ issue → feat/foundation-control-plane → PR #2 → Qodo → human Squash and 
 
 ## Submission status
 
-The implementation and submission hardening are merged; the credentialed live 10/10 path, exact 200% zoom check, public video and hosted static fixture are recorded. The official hackathon submission was sent on 2026-08-29. Subsequent repository changes are post-submission maintenance and must preserve the evidence boundary and historical runtime, CI, Qodo and sponsor claims.
+The implementation, submission hardening, and bounded post-submission clean-code pass are merged; the credentialed live 10/10 path, exact 200% zoom check, public video and hosted static fixture are recorded. The official hackathon submission was sent on 2026-08-29. Subsequent repository changes are post-submission maintenance and must preserve the evidence boundary and historical runtime, CI, Qodo and sponsor claims.
 
 ## AI-assistance disclosure
 
