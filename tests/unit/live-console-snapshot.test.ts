@@ -108,6 +108,119 @@ test("non-zero tool exit is rendered as ERROR", () => {
   assert.doesNotMatch(JSON.stringify(activity), /private/);
 });
 
+test("nested failed tool response is never presented as successful", () => {
+  const activity = toLiveActivity({
+    id: "event-tool-nested-failure",
+    type: "TOOL_RESULT",
+    source: "trueforge:tool.response",
+    timestamp: "2026-08-26T12:31:30.000Z",
+    payload: {
+      content: JSON.stringify({
+        success: true,
+        response: { success: false, result: "secret-private-output" },
+      }),
+    },
+  });
+
+  assert.ok(activity);
+  assert.equal(activity.tone, "ERROR");
+  assert.equal(activity.label, "Tool execution failed");
+  assert.doesNotMatch(JSON.stringify(activity), /secret-private-output/);
+});
+
+test("deeply nested failed tool response is never presented as successful", () => {
+  const activity = toLiveActivity({
+    id: "event-tool-deeply-nested-failure",
+    type: "TOOL_RESULT",
+    source: "trueforge:tool.response",
+    timestamp: "2026-08-26T12:31:35.000Z",
+    payload: {
+      content: JSON.stringify({
+        success: true,
+        response: { result: { status: "ERROR", result: "secret-private-output" } },
+      }),
+    },
+  });
+
+  assert.ok(activity);
+  assert.equal(activity.tone, "ERROR");
+  assert.equal(activity.label, "Tool execution failed");
+  assert.doesNotMatch(JSON.stringify(activity), /secret-private-output/);
+});
+
+test("conflicting tool exit-code fields fail closed", () => {
+  const activity = toLiveActivity({
+    id: "event-tool-conflicting-exit-codes",
+    type: "TOOL_RESULT",
+    source: "trueforge:tool.response",
+    timestamp: "2026-08-26T12:31:40.000Z",
+    payload: {
+      content: JSON.stringify({
+        success: true,
+        response: { exitCode: 0, exit_code: 1, result: "secret-private-output" },
+      }),
+    },
+  });
+
+  assert.ok(activity);
+  assert.equal(activity.tone, "ERROR");
+  assert.equal(activity.label, "Tool execution failed");
+  assert.doesNotMatch(JSON.stringify(activity), /secret-private-output/);
+});
+
+test("root failure status overrides nested success", () => {
+  const activity = toLiveActivity({
+    id: "event-tool-root-failure",
+    type: "TOOL_RESULT",
+    source: "trueforge:tool.response",
+    timestamp: "2026-08-26T12:31:42.000Z",
+    payload: {
+      content: JSON.stringify({
+        status: "ERROR",
+        response: { success: true, result: "secret-private-output" },
+      }),
+    },
+  });
+
+  assert.ok(activity);
+  assert.equal(activity.tone, "ERROR");
+  assert.equal(activity.label, "Tool execution failed");
+  assert.doesNotMatch(JSON.stringify(activity), /secret-private-output/);
+});
+
+test("tool response traversal bound fails closed", () => {
+  let nested: Record<string, unknown> = { success: true };
+  for (let depth = 0; depth < 9; depth += 1) nested = { response: nested };
+  const activity = toLiveActivity({
+    id: "event-tool-depth-bound",
+    type: "TOOL_RESULT",
+    source: "trueforge:tool.response",
+    timestamp: "2026-08-26T12:31:43.000Z",
+    payload: { content: JSON.stringify({ success: true, response: nested }) },
+  });
+
+  assert.ok(activity);
+  assert.equal(activity.tone, "ERROR");
+  assert.equal(activity.label, "Tool response indeterminate");
+});
+
+test("tool response without affirmative success evidence is never presented as successful", () => {
+  const activity = toLiveActivity({
+    id: "event-tool-indeterminate",
+    type: "TOOL_RESULT",
+    source: "trueforge:tool.response",
+    timestamp: "2026-08-26T12:31:45.000Z",
+    payload: {
+      content: JSON.stringify({ response: { result: "secret-private-output" } }),
+    },
+  });
+
+  assert.ok(activity);
+  assert.equal(activity.tone, "ERROR");
+  assert.equal(activity.label, "Tool response indeterminate");
+  assert.doesNotMatch(JSON.stringify(activity), /secret-private-output/);
+});
+
 test("cancelled turn activity reports a timeout without forwarding turn metrics", () => {
   const activity = toLiveActivity(
     {

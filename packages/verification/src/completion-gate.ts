@@ -174,10 +174,11 @@ export class CompletionGate {
     );
     if (externalCriteria.length > 0) {
       const externalAction = state.externalAction;
+      const externalEvidenceId = externalAction?.evidenceId;
       const evidenceIsLinked =
-        externalAction?.evidenceId !== undefined &&
+        externalEvidenceId !== undefined &&
         externalCriteria.some((criterion) =>
-          acceptedEvidenceIds.get(criterion.id)?.includes(externalAction.evidenceId as string),
+          acceptedEvidenceIds.get(criterion.id)?.includes(externalEvidenceId),
         );
       if (
         externalAction?.status !== "RECONCILED" ||

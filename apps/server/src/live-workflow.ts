@@ -996,10 +996,7 @@ function setPlan(state: SessionState, status: "RUNNING"): void {
 
 function block(state: SessionState, reason: string): void {
   if (state.status !== "ACTIVE") return;
-  state.phase = "BLOCKED";
-  state.status = "BLOCKED";
-  state.blockedReason = reason;
-  state.version += 1;
+  transitionInPlace(state, "BLOCKED", reason);
 }
 
 function diagnosticsDone(state: SessionState, threads: Map<string, string>): boolean {

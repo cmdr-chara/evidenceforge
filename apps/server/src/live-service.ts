@@ -634,35 +634,79 @@ function toolResponseActivity(
     return { ...base, tone: "ERROR", label: "Tool response malformed" };
   }
   const record = asUnknownRecord(parsed);
-  const candidate = pickToolResultRecord(record);
-  const explicitStatus = readString(candidate, "status")?.toUpperCase();
-  const success = readBoolean(record, "success") ?? readBoolean(candidate, "success");
-  const exitCode = readNumber(candidate, "exitCode") ?? readNumber(candidate, "exit_code");
-  if (
-    success === false ||
-    explicitStatus === "ERROR" ||
-    explicitStatus === "FAILED" ||
-    explicitStatus === "FAILURE" ||
-    explicitStatus === "TIMEOUT" ||
-    (exitCode !== undefined && exitCode !== 0) ||
-    candidate.error !== undefined
-  ) {
+  const classification = classifyToolResponse(record);
+  if (classification === "FAILED") {
     return { ...base, tone: "ERROR", label: "Tool execution failed" };
   }
-  if (explicitStatus === "DENIED") {
+  if (classification === "DENIED") {
     return { ...base, tone: "WARNING", label: "Tool execution denied" };
+  }
+  if (classification === "INDETERMINATE") {
+    return { ...base, tone: "ERROR", label: "Tool response indeterminate" };
   }
   return { ...base, tone: "SUCCESS", label: "Tool execution completed" };
 }
 
-function pickToolResultRecord(record: Record<string, unknown>): Record<string, unknown> {
-  const response = asUnknownRecord(record.response);
-  if (Object.keys(response).length > 0) return response;
-  const output = asUnknownRecord(record.output);
-  const nestedOutput = asUnknownRecord(output.result);
-  if (Object.keys(nestedOutput).length > 0) return nestedOutput;
-  const result = asUnknownRecord(record.result);
-  return Object.keys(result).length > 0 ? result : record;
+type ToolResponseClassification = "SUCCESS" | "DENIED" | "FAILED" | "INDETERMINATE";
+
+function classifyToolResponse(record: Record<string, unknown>): ToolResponseClassification {
+  const traversal = collectToolResponseRecords(record);
+  let explicitSuccess = false;
+  let denied = false;
+  for (const candidate of traversal.records) {
+    const status = readString(candidate, "status")?.toUpperCase();
+    const exitCodes = [
+      readNumber(candidate, "exitCode"),
+      readNumber(candidate, "exit_code"),
+    ].filter((value): value is number => value !== undefined);
+    if (
+      readBoolean(candidate, "success") === false ||
+      status === "ERROR" ||
+      status === "FAILED" ||
+      status === "FAILURE" ||
+      status === "TIMEOUT" ||
+      exitCodes.some((exitCode) => exitCode !== 0) ||
+      candidate.error !== undefined
+    ) {
+      return "FAILED";
+    }
+    if (status === "DENIED") denied = true;
+    if (
+      readBoolean(candidate, "success") === true ||
+      status === "SUCCESS" ||
+      status === "SUCCEEDED" ||
+      status === "COMPLETED" ||
+      status === "OK" ||
+      exitCodes.some((exitCode) => exitCode === 0)
+    ) {
+      explicitSuccess = true;
+    }
+  }
+  if (!traversal.complete) return "INDETERMINATE";
+  if (denied) return "DENIED";
+  return explicitSuccess ? "SUCCESS" : "INDETERMINATE";
+}
+
+function collectToolResponseRecords(
+  record: Record<string, unknown>,
+): { records: Record<string, unknown>[]; complete: boolean } {
+  const records: Record<string, unknown>[] = [];
+  const pending: Array<{ record: Record<string, unknown>; depth: number }> = [
+    { record, depth: 0 },
+  ];
+  while (pending.length > 0 && records.length < 512) {
+    const current = pending.shift();
+    if (current === undefined) break;
+    records.push(current.record);
+    for (const key of ["response", "result", "output"] as const) {
+      const nested = asUnknownRecord(current.record[key]);
+      if (Object.keys(nested).length > 0) {
+        if (current.depth >= 8) return { records, complete: false };
+        pending.push({ record: nested, depth: current.depth + 1 });
+      }
+    }
+  }
+  return { records, complete: pending.length === 0 };
 }
 
 function turnEndedActivity(
